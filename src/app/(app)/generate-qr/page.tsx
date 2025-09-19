@@ -29,7 +29,13 @@ function TransactionForm({
   const [referenceNumber, setReferenceNumber] = useState("");
 
   useEffect(() => {
-    setReferenceNumber(`INV-${new Date().getFullYear()}${Math.floor(Math.random() * 10000)}`);
+    // Generates a reference number in YYYYMMDDXXXXXX format
+    const date = new Date();
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    const randomPart = Math.floor(100000 + Math.random() * 900000);
+    setReferenceNumber(`${yyyy}${mm}${dd}${randomPart}`);
   }, []);
 
   return (
@@ -42,27 +48,21 @@ function TransactionForm({
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            onSubmit(new FormData(e.currentTarget));
+            const formData = new FormData(e.currentTarget);
+            // Add fixed values for fields that were removed from the UI
+            formData.set('currency', 'LKR');
+            formData.set('customer_email', 'customer@example.com');
+            onSubmit(formData);
           }}
           className="space-y-6"
         >
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="amount">Amount</Label>
-              <Input id="amount" name="amount" defaultValue="150.50" required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="currency">Currency</Label>
-              <Input id="currency" name="currency" defaultValue="LKR" required />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="amount">Amount</Label>
+            <Input id="amount" name="amount" placeholder="Enter amount" required />
           </div>
           <div className="space-y-2">
             <Label htmlFor="reference_number">Reference Number</Label>
-            <Input id="reference_number" name="reference_number" value={referenceNumber} onChange={(e) => setReferenceNumber(e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="customer_email">Customer Email</Label>
-            <Input id="customer_email" name="customer_email" type="email" defaultValue="customer@example.com" />
+            <Input id="reference_number" name="reference_number" value={referenceNumber} readOnly />
           </div>
           <Button type="submit" className="w-full" disabled={isSubmitting}>
             {isSubmitting ? (
