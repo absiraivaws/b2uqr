@@ -6,7 +6,6 @@ import {
   createTransaction,
   getTransactionStatus,
   simulateWebhook,
-  runReconciliation,
 } from "@/lib/actions";
 import type { Transaction } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
@@ -201,7 +200,6 @@ export default function GenerateQRPage() {
   const [currentTransaction, setCurrentTransaction] = useState<Transaction | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
-  const [isReconciling, setIsReconciling] = useState(false);
 
   const { toast } = useToast();
 
@@ -269,69 +267,11 @@ export default function GenerateQRPage() {
     }
   };
 
-  const handleReconciliation = async () => {
-    setIsReconciling(true);
-    try {
-        const result = await runReconciliation();
-        toast({
-            title: "Reconciliation Finished",
-            description: result.message,
-        });
-        if (result.alert?.alertSent) {
-            toast({
-                variant: 'destructive',
-                title: "AI Alert Triggered!",
-                description: result.alert.message,
-            });
-        }
-        // If the current transaction was reconciled, update its state
-        if (currentTransaction) {
-            const updatedTx = await getTransactionStatus(currentTransaction.transaction_uuid);
-            if (updatedTx) {
-                setCurrentTransaction(updatedTx);
-            }
-        }
-    } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
-        toast({
-            variant: "destructive",
-            title: "Reconciliation Failed",
-            description: errorMessage,
-        });
-    } finally {
-        setIsReconciling(false);
-    }
-  };
-
   return (
     <main className="p-4 sm:p-6 lg:p-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
             <div className="lg:col-span-1 space-y-8">
-            <TransactionForm onSubmit={handleCreateTransaction} isSubmitting={isSubmitting} />
-            <Card>
-                <CardHeader>
-                    <CardTitle>Developer Tools</CardTitle>
-                    <CardDescription>Actions for testing and operations.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <Button
-                        onClick={() => setCurrentTransaction(null)}
-                        variant="outline"
-                        className="w-full"
-                    >
-                        Create New Transaction
-                    </Button>
-                    <Button
-                        onClick={handleReconciliation}
-                        variant="secondary"
-                        className="w-full"
-                        disabled={isReconciling}
-                    >
-                        {isReconciling ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                        Run Reconciliation Job
-                    </Button>
-                </CardContent>
-            </Card>
+              <TransactionForm onSubmit={handleCreateTransaction} isSubmitting={isSubmitting} />
             </div>
             <div className="lg:col-span-2">
             {currentTransaction ? (
@@ -344,6 +284,13 @@ export default function GenerateQRPage() {
                         <p className="mt-1 text-sm text-muted-foreground">
                         Use the form to generate a new QR code payment.
                         </p>
+                        <Button
+                            onClick={() => setCurrentTransaction(null)}
+                            variant="outline"
+                            className="mt-6"
+                        >
+                            Create New Transaction
+                        </Button>
                     </CardContent>
                 </Card>
             )}
