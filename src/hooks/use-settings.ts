@@ -4,36 +4,88 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
-export const allApiFields = [
+export interface ApiField {
+    id: string;
+    label: string;
+    defaultValue?: string;
+    readOnly?: boolean;
+}
+
+export const allApiFields: ApiField[] = [
   { id: 'merchant_id', label: 'Merchant ID', defaultValue: 'm_12345', readOnly: true },
   { id: 'currency', label: 'Currency', defaultValue: 'LKR', readOnly: true },
   { id: 'reference_number', label: 'Reference Number', readOnly: true },
-  { id: 'customer_email', label: 'Customer Email', defaultValue: 'customer@example.com' },
-  { id: 'customer_name', label: 'Customer Name', defaultValue: 'John Doe' },
+  { id: 'customer_email', label: 'Customer Email' },
+  { id: 'customer_name', label: 'Customer Name' },
 ];
 
+export interface ApiFieldSetting {
+    id: string;
+    value: string;
+    enabled: boolean;
+}
+
 type SettingsState = {
-  supportedFields: string[];
-  toggleField: (id: string) => void;
-  setSupportedFields: (fields: string[]) => void;
+  supportedFields: ApiFieldSetting[];
+  secretKey: string;
+  setFieldValue: (id: string, value: string) => void;
+  toggleFieldEnabled: (id: string) => void;
+  setSecretKey: (key: string) => void;
 };
+
+const getDefaultSettings = (): ApiFieldSetting[] => {
+    return allApiFields.map(field => ({
+        id: field.id,
+        value: field.defaultValue ?? '',
+        enabled: !!field.readOnly, // Read-only fields are always "enabled"
+    }));
+}
 
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
-      supportedFields: ['merchant_id', 'currency', 'reference_number'],
-      toggleField: (id) =>
-        set((state) => {
-          const supportedFields = state.supportedFields.includes(id)
-            ? state.supportedFields.filter((fieldId) => fieldId !== id)
-            : [...state.supportedFields, id];
-          return { supportedFields };
-        }),
-      setSupportedFields: (fields) => set({ supportedFields: fields }),
+      supportedFields: getDefaultSettings(),
+      secretKey: '',
+      setFieldValue: (id, value) => set(state => ({
+        supportedFields: state.supportedFields.map(sf => 
+            sf.id === id ? { ...sf, value } : sf
+        )
+      })),
+      toggleFieldEnabled: (id) =>
+        set((state) => ({
+          supportedFields: state.supportedFields.map(sf =>
+            sf.id === id ? { ...sf, enabled: !sf.enabled } : sf
+          )
+        })),
+      setSecretKey: (key) => set({ secretKey: key }),
     }),
     {
-      name: 'qr-bridge-settings', // name of the item in the storage (must be unique)
-      storage: createJSONStorage(() => localStorage), // (optional) by default, 'localStorage' is used
+      name: 'qr-bridge-settings', 
+      storage: createJSONStorage(() => localStorage),
+      // This merge function ensures that new fields in `allApiFields` are added to the persisted state
+      merge: (persistedState, currentState) => {
+        const persisted = persistedState as Partial<SettingsState>;
+        const currentFields = currentState.supportedFields.map(f => f.id);
+        const newFields = allApiFields
+            .filter(f => !currentFields.includes(f.id))
+            .map(f => ({ id: f.id, value: f.defaultValue ?? '', enabled: !!f.readOnly }));
+        
+        const mergedFields = [...(persisted.supportedFields ?? []), ...newFields];
+        
+        // Ensure all fields from allApiFields are present
+        const finalFields = allApiFields.map(field => {
+            const existing = mergedFields.find(f => f.id === field.id);
+            return existing || { id: field.id, value: field.defaultValue ?? '', enabled: !!field.readOnly };
+        });
+
+        return {
+            ...currentState,
+            ...persisted,
+            supportedFields: finalFields
+        };
+      }
     }
   )
 );
+
+    

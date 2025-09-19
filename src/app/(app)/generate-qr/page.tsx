@@ -10,7 +10,7 @@ import {
 } from "@/lib/actions";
 import type { Transaction } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
-import { useSettingsStore, allApiFields } from "@/hooks/use-settings";
+import { useSettingsStore, allApiFields, type ApiField } from "@/hooks/use-settings";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,9 +39,9 @@ function TransactionForm({
     const randomPart = Math.floor(100000 + Math.random() * 900000);
     setReferenceNumber(`${yyyy}${mm}${dd}${randomPart}`);
   }, []);
-
+  
   const visibleFields = allApiFields.filter(field => 
-    supportedFields.includes(field.id) && !field.readOnly
+    !field.readOnly && supportedFields.some(sf => sf.id === field.id && sf.enabled)
   );
 
   return (
@@ -55,29 +55,44 @@ function TransactionForm({
           onSubmit={(e) => {
             e.preventDefault();
             const formData = new FormData(e.currentTarget);
+            
+            // Set default values for fields that are part of the API but not shown on the form
             allApiFields.forEach(field => {
-              if (!supportedFields.includes(field.id) && field.defaultValue) {
-                 formData.set(field.id, field.defaultValue);
+              const supportedField = supportedFields.find(sf => sf.id === field.id);
+              if (field.readOnly || !supportedField?.enabled) {
+                 formData.set(field.id, supportedField?.value ?? field.defaultValue ?? '');
               }
             });
             
-            // Set hardcoded values for readonly fields
+            // Ensure readonly fields have correct values
             const readOnlyFields = allApiFields.filter(f => f.readOnly);
-            readOnlyFields.forEach(field => {
-                if(field.id === 'reference_number') {
-                    formData.set(field.id, referenceNumber);
-                } else if (field.defaultValue) {
-                    formData.set(field.id, field.defaultValue);
-                }
-            });
-            
+             readOnlyFields.forEach(field => {
+                 if(field.id === 'reference_number') {
+                     formData.set(field.id, referenceNumber);
+                 } else {
+                     const supportedField = supportedFields.find(sf => sf.id === field.id);
+                     formData.set(field.id, supportedField?.value ?? field.defaultValue ?? '');
+                 }
+             });
+
             onSubmit(formData);
           }}
           className="space-y-6"
         >
-          <div className="space-y-2">
-            <Label htmlFor="amount">Amount</Label>
-            <Input id="amount" name="amount" placeholder="Enter amount" required />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="amount">Amount</Label>
+              <Input id="amount" name="amount" placeholder="Enter amount" required />
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor="reference_number">Reference Number</Label>
+                <Input 
+                  id="reference_number" 
+                  name="reference_number" 
+                  value={referenceNumber}
+                  readOnly
+                  />
+             </div>
           </div>
           {visibleFields.map(field => (
              <div className="space-y-2" key={field.id}>
@@ -85,8 +100,7 @@ function TransactionForm({
                 <Input 
                   id={field.id} 
                   name={field.id} 
-                  defaultValue={field.id === 'reference_number' ? referenceNumber : field.defaultValue}
-                  readOnly={field.readOnly || field.id === 'reference_number'} 
+                  defaultValue={supportedFields.find(sf => sf.id === field.id)?.value}
                   placeholder={`Enter ${field.label.toLowerCase()}`}
                   />
              </div>
@@ -332,3 +346,5 @@ export default function GenerateQRPage() {
     </main>
   );
 }
+
+    
