@@ -26,6 +26,12 @@ function TransactionForm({
   onSubmit: (formData: FormData) => void;
   isSubmitting: boolean;
 }) {
+  const [referenceNumber, setReferenceNumber] = useState("");
+
+  useEffect(() => {
+    setReferenceNumber(`INV-${new Date().getFullYear()}${Math.floor(Math.random() * 10000)}`);
+  }, []);
+
   return (
     <Card>
       <CardHeader>
@@ -52,7 +58,7 @@ function TransactionForm({
           </div>
           <div className="space-y-2">
             <Label htmlFor="reference_number">Reference Number</Label>
-            <Input id="reference_number" name="reference_number" defaultValue={`INV-${new Date().getFullYear()}${Math.floor(Math.random() * 10000)}`} />
+            <Input id="reference_number" name="reference_number" value={referenceNumber} onChange={(e) => setReferenceNumber(e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="customer_email">Customer Email</Label>
