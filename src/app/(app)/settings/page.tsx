@@ -4,15 +4,20 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { useSettingsStore, allApiFields } from "@/hooks/use-settings";
+import { useToast } from "@/hooks/use-toast";
 
 export default function SettingsPage() {
-    const apiFields = [
-        { id: 'merchant_id', label: 'Merchant ID' },
-        { id: 'currency', label: 'Currency' },
-        { id: 'reference_number', label: 'Reference Number' },
-        { id: 'customer_email', label: 'Customer Email' },
-        { id: 'customer_name', label: 'Customer Name' },
-    ];
+    const { supportedFields, toggleField } = useSettingsStore();
+    const { toast } = useToast();
+
+    const handleSave = () => {
+        toast({
+            title: "Settings Saved",
+            description: "Your changes to the supported API fields have been saved.",
+        });
+    }
+
   return (
     <main className="p-4 sm:p-6 lg:p-8">
       <Card>
@@ -25,14 +30,21 @@ export default function SettingsPage() {
         <CardContent className="space-y-6">
             <div className="space-y-4 rounded-md border p-4">
                 <h4 className="font-medium">Supported API Fields</h4>
-                {apiFields.map((field) => (
+                {allApiFields.map((field) => (
                     <div key={field.id} className="flex items-center space-x-2">
-                        <Checkbox id={field.id} defaultChecked />
-                        <Label htmlFor={field.id} className="font-normal">{field.label}</Label>
+                        <Checkbox 
+                            id={field.id} 
+                            checked={supportedFields.includes(field.id)}
+                            onCheckedChange={() => toggleField(field.id)}
+                            disabled={field.readOnly}
+                        />
+                        <Label htmlFor={field.id} className={`font-normal ${field.readOnly ? 'text-muted-foreground' : ''}`}>
+                            {field.label}
+                        </Label>
                     </div>
                 ))}
             </div>
-            <Button>Save Settings</Button>
+            <Button onClick={handleSave}>Save Settings</Button>
         </CardContent>
       </Card>
     </main>

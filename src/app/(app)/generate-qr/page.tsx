@@ -9,6 +9,7 @@ import {
 } from "@/lib/actions";
 import type { Transaction } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
+import { useSettingsStore, allApiFields } from "@/hooks/use-settings";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ function TransactionForm({
   onSubmit: (formData: FormData) => void;
   isSubmitting: boolean;
 }) {
+  const { supportedFields } = useSettingsStore();
   const [referenceNumber, setReferenceNumber] = useState("");
 
   useEffect(() => {
@@ -37,6 +39,8 @@ function TransactionForm({
     setReferenceNumber(`${yyyy}${mm}${dd}${randomPart}`);
   }, []);
 
+  const visibleFields = allApiFields.filter(field => supportedFields.includes(field.id));
+
   return (
     <Card>
       <CardHeader>
@@ -48,9 +52,14 @@ function TransactionForm({
           onSubmit={(e) => {
             e.preventDefault();
             const formData = new FormData(e.currentTarget);
-            // Add fixed values for fields that were removed from the UI
-            formData.set('currency', 'LKR');
-            formData.set('customer_email', 'customer@example.com');
+            allApiFields.forEach(field => {
+              if (!supportedFields.includes(field.id) && field.defaultValue) {
+                 formData.set(field.id, field.defaultValue);
+              }
+            });
+            if (supportedFields.includes('reference_number')) {
+              formData.set('reference_number', referenceNumber);
+            }
             onSubmit(formData);
           }}
           className="space-y-6"
@@ -59,10 +68,19 @@ function TransactionForm({
             <Label htmlFor="amount">Amount</Label>
             <Input id="amount" name="amount" placeholder="Enter amount" required />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="reference_number">Reference Number</Label>
-            <Input id="reference_number" name="reference_number" value={referenceNumber} readOnly />
-          </div>
+          {visibleFields.map(field => (
+             <div className="space-y-2" key={field.id}>
+                <Label htmlFor={field.id}>{field.label}</Label>
+                <Input 
+                  id={field.id} 
+                  name={field.id} 
+                  defaultValue={field.id === 'reference_number' ? referenceNumber : field.defaultValue}
+                  readOnly={field.readOnly || field.id === 'reference_number'} 
+                  placeholder={`Enter ${field.label.toLowerCase()}`}
+                  />
+             </div>
+          ))}
+
           <Button type="submit" className="w-full" disabled={isSubmitting}>
             {isSubmitting ? (
               <>
@@ -227,6 +245,7 @@ export default function GenerateQRPage() {
 
   const handleCreateTransaction = async (formData: FormData) => {
     setIsSubmitting(true);
+    setCurrentTransaction(null);
     try {
       const newTransaction = await createTransaction(formData);
       setCurrentTransaction(newTransaction);
@@ -274,7 +293,17 @@ export default function GenerateQRPage() {
               <TransactionForm onSubmit={handleCreateTransaction} isSubmitting={isSubmitting} />
             </div>
             <div className="lg:col-span-2">
-            {currentTransaction ? (
+            {isSubmitting ? (
+                 <Card className="flex flex-col items-center justify-center h-full min-h-[500px] border-dashed">
+                    <CardContent className="text-center">
+                        <Loader2 className="mx-auto h-12 w-12 text-muted-foreground animate-spin" />
+                        <h3 className="mt-4 text-lg font-medium">Generating Transaction...</h3>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            Please wait while we create the transaction and QR code.
+                        </p>
+                    </CardContent>
+                </Card>
+            ) : currentTransaction ? (
                 <TransactionStatus transaction={currentTransaction} onSimulateWebhook={handleSimulateWebhook} isSimulating={isSimulating} />
             ) : (
                 <Card className="flex flex-col items-center justify-center h-full min-h-[500px] border-dashed">
