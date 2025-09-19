@@ -94,17 +94,22 @@ function TransactionForm({
                   />
              </div>
           </div>
-          {visibleFields.map(field => (
-             <div className="space-y-2" key={field.id}>
-                <Label htmlFor={field.id}>{field.label}</Label>
-                <Input 
-                  id={field.id} 
-                  name={field.id} 
-                  defaultValue={supportedFields.find(sf => sf.id === field.id)?.value}
-                  placeholder={`Enter ${field.label.toLowerCase()}`}
-                  />
-             </div>
-          ))}
+          {visibleFields.map(field => {
+            if (field.id === 'customer_email' || field.id === 'customer_name') {
+              return null;
+            }
+            return (
+              <div className="space-y-2" key={field.id}>
+                  <Label htmlFor={field.id}>{field.label}</Label>
+                  <Input 
+                    id={field.id} 
+                    name={field.id} 
+                    defaultValue={supportedFields.find(sf => sf.id === field.id)?.value}
+                    placeholder={`Enter ${field.label.toLowerCase()}`}
+                    />
+              </div>
+            );
+          })}
 
           <Button type="submit" className="w-full" disabled={isSubmitting}>
             {isSubmitting ? (
