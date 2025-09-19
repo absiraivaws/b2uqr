@@ -284,13 +284,6 @@ export default function GenerateQRPage() {
                         <p className="mt-1 text-sm text-muted-foreground">
                         Use the form to generate a new QR code payment.
                         </p>
-                        <Button
-                            onClick={() => setCurrentTransaction(null)}
-                            variant="outline"
-                            className="mt-6"
-                        >
-                            Create New Transaction
-                        </Button>
                     </CardContent>
                 </Card>
             )}
