@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -39,7 +40,9 @@ function TransactionForm({
     setReferenceNumber(`${yyyy}${mm}${dd}${randomPart}`);
   }, []);
 
-  const visibleFields = allApiFields.filter(field => supportedFields.includes(field.id));
+  const visibleFields = allApiFields.filter(field => 
+    supportedFields.includes(field.id) && !field.readOnly
+  );
 
   return (
     <Card>
@@ -57,9 +60,17 @@ function TransactionForm({
                  formData.set(field.id, field.defaultValue);
               }
             });
-            if (supportedFields.includes('reference_number')) {
-              formData.set('reference_number', referenceNumber);
-            }
+            
+            // Set hardcoded values for readonly fields
+            const readOnlyFields = allApiFields.filter(f => f.readOnly);
+            readOnlyFields.forEach(field => {
+                if(field.id === 'reference_number') {
+                    formData.set(field.id, referenceNumber);
+                } else if (field.defaultValue) {
+                    formData.set(field.id, field.defaultValue);
+                }
+            });
+            
             onSubmit(formData);
           }}
           className="space-y-6"

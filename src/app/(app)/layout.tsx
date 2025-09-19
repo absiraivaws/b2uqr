@@ -64,7 +64,7 @@ export default function AppLayout({
                     </SidebarMenuItem>
                 ))}
             </SidebarMenu>
-            <SidebarGroup className="mt-auto">
+            <SidebarGroup>
                 <SidebarGroupLabel>Account</SidebarGroupLabel>
                 <SidebarMenu>
                     {accountItems.map((item) => (
@@ -89,4 +89,3 @@ export default function AppLayout({
     </SidebarProvider>
   )
 }
-
