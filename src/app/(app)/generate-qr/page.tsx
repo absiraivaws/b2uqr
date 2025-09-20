@@ -31,7 +31,7 @@ function TransactionForm({
   const [referenceNumber, setReferenceNumber] = useState("");
 
   useEffect(() => {
-    // Generates a reference number in YYYYMMDDXXXXXX format
+    // Generates a reference number in YYYYMMDDXXXXXX format, only on the client
     const date = new Date();
     const yyyy = date.getFullYear();
     const mm = String(date.getMonth() + 1).padStart(2, '0');
