@@ -1,4 +1,4 @@
-"use server";
+'use server';
 
 import { z } from "zod";
 import { format } from "date-fns";
@@ -160,7 +160,7 @@ export async function runReconciliation(): Promise<{ message: string; alert?: Al
     console.log("Running reconciliation job...");
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
 
-    const pendingTxs = await findPendingTransactions(before);
+    const pendingTxs = await findPendingTransactions(tenMinutesAgo);
 
     if (pendingTxs.length === 0) {
         console.log("No stale pending transactions found.");
