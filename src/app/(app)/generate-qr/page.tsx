@@ -176,7 +176,7 @@ function TransactionStatus({
         <div className="flex flex-col items-center justify-center p-6 bg-muted/50 rounded-lg">
           {transaction.status === "PENDING" ? (
              <Image
-                src="https://picsum.photos/seed/qr-bridge/300/300"
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(transaction.qr_payload)}`}
                 alt="QR Code"
                 width={250}
                 height={250}
