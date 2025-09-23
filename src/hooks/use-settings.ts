@@ -11,9 +11,14 @@ export interface ApiField {
     readOnly?: boolean;
 }
 
+// Updated to include all fields for LankaQR
 export const allApiFields: ApiField[] = [
-  { id: 'merchant_id', label: 'Merchant ID', defaultValue: 'm_12345', readOnly: true },
+  { id: 'merchant_id', label: 'Merchant ID', defaultValue: 'm_12345' },
+  { id: 'merchant_name', label: 'Merchant Name', defaultValue: 'My Awesome Store'},
+  { id: 'merchant_city', label: 'Merchant City', defaultValue: 'Colombo'},
+  { id: 'mcc', label: 'Merchant Category Code', defaultValue: '5999'},
   { id: 'currency', label: 'Currency', defaultValue: 'LKR', readOnly: true },
+  { id: 'currency_code', label: 'Currency Code (ISO 4217)', defaultValue: '144', readOnly: true},
   { id: 'reference_number', label: 'Reference Number', readOnly: true },
   { id: 'customer_email', label: 'Customer Email' },
   { id: 'customer_name', label: 'Customer Name' },
@@ -37,7 +42,7 @@ const getDefaultSettings = (): ApiFieldSetting[] => {
     return allApiFields.map(field => ({
         id: field.id,
         value: field.defaultValue ?? '',
-        enabled: !!field.readOnly, // Read-only fields are always "enabled"
+        enabled: !field.readOnly, // Enable all non-readonly fields by default
     }));
 }
 
@@ -68,14 +73,22 @@ export const useSettingsStore = create<SettingsState>()(
         const currentFields = currentState.supportedFields.map(f => f.id);
         const newFields = allApiFields
             .filter(f => !currentFields.includes(f.id))
-            .map(f => ({ id: f.id, value: f.defaultValue ?? '', enabled: !!f.readOnly }));
+            .map(f => ({ id: f.id, value: f.defaultValue ?? '', enabled: !f.readOnly }));
         
         const mergedFields = [...(persisted.supportedFields ?? []), ...newFields];
         
         // Ensure all fields from allApiFields are present
         const finalFields = allApiFields.map(field => {
             const existing = mergedFields.find(f => f.id === field.id);
-            return existing || { id: field.id, value: field.defaultValue ?? '', enabled: !!field.readOnly };
+            return existing || { id: field.id, value: f.defaultValue ?? '', enabled: !f.readOnly };
+        });
+
+        // Also, make sure readonly fields are not user-disabled
+        finalFields.forEach(field => {
+          const fieldDef = allApiFields.find(f => f.id === field.id);
+          if (fieldDef?.readOnly) {
+            field.enabled = false;
+          }
         });
 
         return {
@@ -87,5 +100,3 @@ export const useSettingsStore = create<SettingsState>()(
     }
   )
 );
-
-    

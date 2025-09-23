@@ -1,3 +1,4 @@
+
 'use server';
 
 import { z } from "zod";
@@ -16,12 +17,17 @@ import crypto from "crypto";
 
 
 const TransactionSchema = z.object({
-  merchant_id: z.string().default("m_12345"),
+  merchant_id: z.string(),
   amount: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid amount format"),
   currency: z.string().length(3),
   reference_number: z.string(),
   customer_email: z.string().email().optional(),
   customer_name: z.string().optional(),
+  // For LankaQR
+  merchant_name: z.string().optional(),
+  merchant_city: z.string().optional(),
+  mcc: z.string().optional(),
+  currency_code: z.string().optional(),
 });
 
 export async function createTransaction(formData: FormData): Promise<Transaction> {
@@ -52,6 +58,12 @@ export async function createTransaction(formData: FormData): Promise<Transaction
   const bankResponse = await callBankCreateQR({
     transaction_uuid,
     amount: data.amount,
+    reference_number: data.reference_number,
+    merchant_id: data.merchant_id,
+    merchant_name: data.merchant_name || 'My Store', // Fallback
+    merchant_city: data.merchant_city || 'Colombo', // Fallback
+    mcc: data.mcc || '5999', // Fallback
+    currency_code: data.currency_code || '144' // LKR
   });
 
   // 4. Update transaction with QR data from bank
@@ -137,7 +149,8 @@ export async function handleWebhook(request: Request) {
         return { status: 404, body: { error: 'Transaction not found' } };
     }
     
-    if (tx.amount !== payload.amount) {
+    // In LankaQR amount comparison needs to be precise
+    if (parseFloat(tx.amount).toFixed(2) !== parseFloat(payload.amount).toFixed(2)) {
         await alertFailures({
             failureType: "unmatched transaction",
             details: `Amount mismatch for UUID ${payload.transaction_uuid}. Expected ${tx.amount}, got ${payload.amount}.`,
