@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import {
   createTransaction,
@@ -10,7 +10,8 @@ import {
 } from "@/lib/actions";
 import type { Transaction } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
-import { useSettingsStore, allApiFields, type ApiField } from "@/hooks/use-settings";
+import { useSettingsStore, allApiFields } from "@/hooks/use-settings";
+import { debounce } from 'lodash';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,25 +22,16 @@ import { Separator } from "@/components/ui/separator";
 import { Loader2, QrCode, AlertTriangle, CheckCircle, Clock } from "lucide-react";
 
 function TransactionForm({
-  onSubmit,
+  onAmountChange,
   isSubmitting,
+  referenceNumber,
 }: {
-  onSubmit: (formData: FormData) => void;
+  onAmountChange: (amount: string) => void;
   isSubmitting: boolean;
+  referenceNumber: string;
 }) {
   const { supportedFields } = useSettingsStore();
-  const [referenceNumber, setReferenceNumber] = useState("");
 
-  useEffect(() => {
-    // Generates a reference number in YYYYMMDDXXXXXX format, only on the client
-    const date = new Date();
-    const yyyy = date.getFullYear();
-    const mm = String(date.getMonth() + 1).padStart(2, '0');
-    const dd = String(date.getDate()).padStart(2, '0');
-    const randomPart = Math.floor(100000 + Math.random() * 900000);
-    setReferenceNumber(`${yyyy}${mm}${dd}${randomPart}`);
-  }, []);
-  
   const visibleFields = allApiFields.filter(field => 
     !field.readOnly && supportedFields.some(sf => sf.id === field.id && sf.enabled)
   );
@@ -48,41 +40,25 @@ function TransactionForm({
     <Card>
       <CardHeader>
         <CardTitle>Create a New Transaction</CardTitle>
-        <CardDescription>Enter payment details to generate a QR code.</CardDescription>
+        <CardDescription>Enter a payment amount to generate a QR code.</CardDescription>
       </CardHeader>
       <CardContent>
         <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            const formData = new FormData(e.currentTarget);
-            
-            // Set default values for fields that are part of the API but not shown on the form
-            allApiFields.forEach(field => {
-              const supportedField = supportedFields.find(sf => sf.id === field.id);
-              if (field.readOnly || !supportedField?.enabled) {
-                 formData.set(field.id, supportedField?.value ?? field.defaultValue ?? '');
-              }
-            });
-            
-            // Ensure readonly fields have correct values
-            const readOnlyFields = allApiFields.filter(f => f.readOnly);
-             readOnlyFields.forEach(field => {
-                 if(field.id === 'reference_number') {
-                     formData.set(field.id, referenceNumber);
-                 } else {
-                     const supportedField = supportedFields.find(sf => sf.id === field.id);
-                     formData.set(field.id, supportedField?.value ?? field.defaultValue ?? '');
-                 }
-             });
-
-            onSubmit(formData);
-          }}
+          onSubmit={(e) => e.preventDefault()}
           className="space-y-6"
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="amount">Amount</Label>
-              <Input id="amount" name="amount" placeholder="Enter amount" required />
+              <Input 
+                id="amount" 
+                name="amount" 
+                placeholder="Enter amount" 
+                onChange={(e) => onAmountChange(e.target.value)}
+                required 
+                type="number"
+                step="0.01"
+              />
             </div>
             <div className="space-y-2">
                 <Label htmlFor="reference_number">Reference Number</Label>
@@ -106,21 +82,11 @@ function TransactionForm({
                     name={field.id} 
                     defaultValue={supportedFields.find(sf => sf.id === field.id)?.value}
                     placeholder={`Enter ${field.label.toLowerCase()}`}
+                    readOnly
                     />
               </div>
             );
           })}
-
-          <Button type="submit" className="w-full" disabled={isSubmitting}>
-            {isSubmitting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              "Generate QR Code"
-            )}
-          </Button>
         </form>
       </CardContent>
     </Card>
@@ -130,11 +96,15 @@ function TransactionForm({
 function TransactionStatus({
   transaction,
   onSimulateWebhook,
+  onVerifyTransaction,
   isSimulating,
+  isVerifying,
 }: {
   transaction: Transaction;
   onSimulateWebhook: (status: "SUCCESS" | "FAILED") => void;
+  onVerifyTransaction: () => void;
   isSimulating: boolean;
+  isVerifying: boolean;
 }) {
   
   const getStatusVariant = (status: Transaction["status"]) => {
@@ -176,7 +146,7 @@ function TransactionStatus({
         <div className="flex flex-col items-center justify-center p-6 bg-muted/50 rounded-lg">
           {transaction.status === "PENDING" ? (
              <Image
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(transaction.qr_payload)}`}
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(transaction.qr_payload)}&logo=https://storage.googleapis.com/proudcity/mebanenc/uploads/2021/03/Peoples-Pay-Logo.png`}
                 alt="QR Code"
                 width={250}
                 height={250}
@@ -195,6 +165,10 @@ function TransactionStatus({
           <p className="font-code text-xs text-muted-foreground mt-4 break-all">
             {transaction.qr_payload}
           </p>
+          <Button onClick={onVerifyTransaction} className="mt-4" variant="outline" disabled={isVerifying || transaction.status !== 'PENDING'}>
+             {isVerifying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+             Verify Transaction
+          </Button>
         </div>
         <div className="space-y-4">
           <div>
@@ -248,8 +222,48 @@ export default function GenerateQRPage() {
   const [currentTransaction, setCurrentTransaction] = useState<Transaction | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [referenceNumber, setReferenceNumber] = useState("");
+  const [lastTxNumber, setLastTxNumber] = useState(0);
 
   const { toast } = useToast();
+  const { supportedFields } = useSettingsStore();
+
+  const generateReferenceNumber = useCallback(() => {
+    const date = new Date();
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    const nextTxNumber = lastTxNumber + 1;
+    const randomPart = String(nextTxNumber).padStart(6, '0');
+    setReferenceNumber(`${yyyy}${mm}${dd}${randomPart}`);
+    setLastTxNumber(nextTxNumber);
+  }, [lastTxNumber]);
+
+  useEffect(() => {
+    // Generate initial reference number on mount
+    generateReferenceNumber();
+  }, []); // Eslint-disable-line react-hooks/exhaustive-deps, this should only run once
+
+  const handleVerifyTransaction = async () => {
+      if (!currentTransaction) return;
+      setIsVerifying(true);
+      try {
+          const updatedTx = await getTransactionStatus(currentTransaction.transaction_uuid);
+          if (updatedTx) {
+              setCurrentTransaction(updatedTx);
+              toast({
+                  title: "Transaction Status Updated",
+                  description: `Status is now: ${updatedTx.status}`,
+              });
+          }
+      } catch (error) {
+          toast({ variant: "destructive", title: "Error", description: "Could not verify transaction status." });
+      } finally {
+          setIsVerifying(false);
+      }
+  };
+
 
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
@@ -259,7 +273,15 @@ export default function GenerateQRPage() {
         try {
           const updatedTx = await getTransactionStatus(currentTransaction.transaction_uuid);
           if (updatedTx) {
-            setCurrentTransaction(updatedTx);
+            setCurrentTransaction(prevTx => {
+              // If status changes, update and stop polling
+              if (prevTx?.status !== updatedTx.status) {
+                if (interval) clearInterval(interval);
+                generateReferenceNumber(); // Generate new ref for next transaction
+                return updatedTx;
+              }
+              return prevTx; // Keep the old state to avoid re-renders
+            });
           }
         } catch (error) {
           console.error("Failed to fetch transaction status:", error);
@@ -270,19 +292,32 @@ export default function GenerateQRPage() {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [currentTransaction]);
+  }, [currentTransaction, generateReferenceNumber]);
 
 
-  const handleCreateTransaction = async (formData: FormData) => {
+  const handleCreateTransaction = async (amount: string) => {
+    if (!amount || parseFloat(amount) <= 0) {
+      setCurrentTransaction(null);
+      return;
+    }
+    
     setIsSubmitting(true);
     setCurrentTransaction(null);
+    
+    const formData = new FormData();
+    formData.set('amount', amount);
+    formData.set('reference_number', referenceNumber);
+
+    allApiFields.forEach(field => {
+      const supportedField = supportedFields.find(sf => sf.id === field.id);
+      if (supportedField) {
+         formData.set(field.id, supportedField.value);
+      }
+    });
+
     try {
       const newTransaction = await createTransaction(formData);
       setCurrentTransaction(newTransaction);
-      toast({
-        title: "Transaction Created",
-        description: `QR Code generated for UUID: ${newTransaction.transaction_uuid}`,
-      });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
       toast({
@@ -290,10 +325,23 @@ export default function GenerateQRPage() {
         title: "Error Creating Transaction",
         description: errorMessage,
       });
+      // If creation fails, generate a new reference number for the next attempt
+      generateReferenceNumber();
     } finally {
       setIsSubmitting(false);
     }
   };
+  
+  const debouncedCreateTransaction = useRef(
+    debounce(handleCreateTransaction, 500)
+  ).current;
+
+  useEffect(() => {
+    return () => {
+      debouncedCreateTransaction.cancel();
+    };
+  }, [debouncedCreateTransaction]);
+
 
   const handleSimulateWebhook = async (status: "SUCCESS" | "FAILED") => {
     if (!currentTransaction) return;
@@ -320,7 +368,7 @@ export default function GenerateQRPage() {
     <main className="p-4 sm:p-6 lg:p-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
             <div className="lg:col-span-1 space-y-8">
-              <TransactionForm onSubmit={handleCreateTransaction} isSubmitting={isSubmitting} />
+              <TransactionForm onAmountChange={debouncedCreateTransaction} isSubmitting={isSubmitting} referenceNumber={referenceNumber} />
             </div>
             <div className="lg:col-span-2">
             {isSubmitting ? (
@@ -334,7 +382,13 @@ export default function GenerateQRPage() {
                     </CardContent>
                 </Card>
             ) : currentTransaction ? (
-                <TransactionStatus transaction={currentTransaction} onSimulateWebhook={handleSimulateWebhook} isSimulating={isSimulating} />
+                <TransactionStatus 
+                    transaction={currentTransaction} 
+                    onSimulateWebhook={handleSimulateWebhook} 
+                    onVerifyTransaction={handleVerifyTransaction}
+                    isSimulating={isSimulating}
+                    isVerifying={isVerifying}
+                />
             ) : (
                 <Card className="flex flex-col items-center justify-center h-full min-h-[500px] border-dashed">
                     <CardContent className="text-center">
@@ -351,3 +405,5 @@ export default function GenerateQRPage() {
     </main>
   );
 }
+
+    

@@ -15,9 +15,9 @@ export interface ApiField {
 export const allApiFields: ApiField[] = [
   // This now represents the two merchants from the examples
   { id: 'merchant_id', label: 'Merchant', defaultValue: 'm_12345' }, 
-  { id: 'merchant_name', label: 'Merchant Name', defaultValue: 'LVMSiraiva'},
-  { id: 'merchant_city', label: 'Merchant City', defaultValue: 'MANNAR'},
-  { id: 'mcc', label: 'Merchant Category Code', defaultValue: '5999'},
+  { id: 'merchant_name', label: 'Merchant Name', defaultValue: 'LVMSiraiva', readOnly: true},
+  { id: 'merchant_city', label: 'Merchant City', defaultValue: 'MANNAR', readOnly: true},
+  { id: 'mcc', label: 'Merchant Category Code', defaultValue: '5999', readOnly: true},
   { id: 'currency', label: 'Currency', defaultValue: 'LKR', readOnly: true },
   { id: 'currency_code', label: 'Currency Code (ISO 4217)', defaultValue: '144', readOnly: true},
   { id: 'reference_number', label: 'Reference Number', readOnly: true },
@@ -64,12 +64,14 @@ export const useSettingsStore = create<SettingsState>()(
                 newFields = newFields.map(sf => {
                     if (sf.id === 'merchant_name') return { ...sf, value: 'LVMSiraiva' };
                     if (sf.id === 'merchant_city') return { ...sf, value: 'MANNAR' };
+                    if (sf.id === 'mcc') return { ...sf, value: '5999' };
                     return sf;
                 });
             } else if (value === 'm_54321') { // AlbertBenigiusSiraiva
                  newFields = newFields.map(sf => {
                     if (sf.id === 'merchant_name') return { ...sf, value: 'AlbertBenigiusSiraiva' };
                     if (sf.id === 'merchant_city') return { ...sf, value: 'MANNAR' };
+                     if (sf.id === 'mcc') return { ...sf, value: '5999' };
                     return sf;
                 });
             }
@@ -101,7 +103,7 @@ export const useSettingsStore = create<SettingsState>()(
         // Ensure all fields from allApiFields are present
         const finalFields = allApiFields.map(field => {
             const existing = mergedFields.find(f => f.id === field.id);
-            return existing || { id: field.id, value: f.defaultValue ?? '', enabled: !f.readOnly };
+            return existing || { id: f.id, value: f.defaultValue ?? '', enabled: !f.readOnly };
         });
 
         // Also, make sure readonly fields are not user-disabled
@@ -121,3 +123,5 @@ export const useSettingsStore = create<SettingsState>()(
     }
   )
 );
+
+    
