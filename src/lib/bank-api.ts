@@ -90,9 +90,12 @@ export async function callBankCreateQR(params: CreateQrRequest): Promise<CreateQ
   const merchantName = buildTag('59', params.merchant_name);
   const merchantCity = buildTag('60', params.merchant_city);
 
-  // Correctly construct the nested Additional Data Field for Reference Number
-  const referenceNumberTagContent = buildTag('05', params.reference_number);
-  const fullAdditionalDataTag = buildTag('62', referenceNumberTagContent);
+  // Correctly construct the nested Additional Data Field for Reference Number (Tag 62 -> Sub-Tag 05)
+  // Step 1: Create the inner Sub-Tag 05 payload
+  const referenceNumberSubTagContent = buildTag('05', params.reference_number);
+
+  // Step 2: Wrap the inner content with the main Tag 62
+  const fullAdditionalDataTag = buildTag('62', referenceNumberSubTagContent);
 
 
   const payloadWithoutCrc = [
