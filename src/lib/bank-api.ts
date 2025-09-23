@@ -24,23 +24,24 @@ interface CreateQrResponse {
 }
 
 /**
- * Calculates CRC16-CCITT checksum.
+ * Calculates CRC16 checksum based on the provided Java reference.
+ * This is equivalent to CRC-16/KERMIT.
  * @param data The string to calculate the checksum for.
  * @returns A 4-character uppercase hex string representing the checksum.
  */
 function crc16(data: string): string {
     let crc = 0xFFFF;
-    for (const c of data) {
-        crc ^= c.charCodeAt(0) << 8;
-        for (let i = 0; i < 8; i++) {
-            if ((crc & 0x8000) !== 0) {
-                crc = (crc << 1) ^ 0x1021;
-            } else {
-                crc <<= 1;
-            }
-        }
+    const buffer = Buffer.from(data, 'utf-8');
+
+    for (const byte of buffer) {
+        crc = ((crc >>> 8) | (crc << 8)) & 0xFFFF;
+        crc ^= byte;
+        crc ^= (crc & 0xFF) >> 4;
+        crc ^= (crc << 12) & 0xFFFF;
+        crc ^= (crc & 0xFF) << 5;
     }
-    return ('0000' + (crc & 0xFFFF).toString(16).toUpperCase()).slice(-4);
+    crc &= 0xFFFF;
+    return crc.toString(16).toUpperCase().padStart(4, '0');
 }
 
 
@@ -77,8 +78,8 @@ export async function callBankCreateQR(params: CreateQrRequest): Promise<CreateQ
   const merchantName = buildTag('59', params.merchant_name);
   const merchantCity = buildTag('60', params.merchant_city);
 
-  const additionalData = buildTag('05', params.reference_number);
-  const fullAdditionalDataTag = buildTag('62', additionalData);
+  const additionalDataContent = buildTag('05', params.reference_number);
+  const fullAdditionalDataTag = buildTag('62', additionalDataContent);
 
   const payloadWithoutCrc = [
     payloadIndicator,
