@@ -13,9 +13,10 @@ export interface ApiField {
 
 // Updated to include all fields for LankaQR
 export const allApiFields: ApiField[] = [
-  { id: 'merchant_id', label: 'Merchant ID', defaultValue: 'm_12345' },
-  { id: 'merchant_name', label: 'Merchant Name', defaultValue: 'My Awesome Store'},
-  { id: 'merchant_city', label: 'Merchant City', defaultValue: 'Colombo'},
+  // This now represents the two merchants from the examples
+  { id: 'merchant_id', label: 'Merchant', defaultValue: 'm_12345' }, 
+  { id: 'merchant_name', label: 'Merchant Name', defaultValue: 'LVMSiraiva'},
+  { id: 'merchant_city', label: 'Merchant City', defaultValue: 'MANNAR'},
   { id: 'mcc', label: 'Merchant Category Code', defaultValue: '5999'},
   { id: 'currency', label: 'Currency', defaultValue: 'LKR', readOnly: true },
   { id: 'currency_code', label: 'Currency Code (ISO 4217)', defaultValue: '144', readOnly: true},
@@ -51,11 +52,31 @@ export const useSettingsStore = create<SettingsState>()(
     (set) => ({
       supportedFields: getDefaultSettings(),
       secretKey: '',
-      setFieldValue: (id, value) => set(state => ({
-        supportedFields: state.supportedFields.map(sf => 
+      setFieldValue: (id, value) => set(state => {
+        
+        let newFields = state.supportedFields.map(sf => 
             sf.id === id ? { ...sf, value } : sf
-        )
-      })),
+        );
+        
+        // When merchant_id changes, update name and city
+        if (id === 'merchant_id') {
+            if (value === 'm_12345') { // LVMSiraiva
+                newFields = newFields.map(sf => {
+                    if (sf.id === 'merchant_name') return { ...sf, value: 'LVMSiraiva' };
+                    if (sf.id === 'merchant_city') return { ...sf, value: 'MANNAR' };
+                    return sf;
+                });
+            } else if (value === 'm_54321') { // AlbertBenigiusSiraiva
+                 newFields = newFields.map(sf => {
+                    if (sf.id === 'merchant_name') return { ...sf, value: 'AlbertBenigiusSiraiva' };
+                    if (sf.id === 'merchant_city') return { ...sf, value: 'MANNAR' };
+                    return sf;
+                });
+            }
+        }
+        
+        return { supportedFields: newFields };
+      }),
       toggleFieldEnabled: (id) =>
         set((state) => ({
           supportedFields: state.supportedFields.map(sf =>

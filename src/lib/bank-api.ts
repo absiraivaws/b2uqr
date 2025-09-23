@@ -46,6 +46,7 @@ function crc16(data: string): string {
 
 
 function buildTag(tag: string, value: string): string {
+  if (value === null || value === undefined) return '';
   const len = value.length.toString().padStart(2, '0');
   return `${tag}${len}${value}`;
 }
@@ -60,17 +61,30 @@ export async function callBankCreateQR(params: CreateQrRequest): Promise<CreateQ
   // Simulate network delay
   await new Promise(resolve => setTimeout(resolve, 500));
 
-  // --- LankaQR Payload Construction ---
+  // --- LankaQR Payload Construction based on provided examples ---
   
+  // These values appear to be static or derived from merchant details
+  // In a real app, these would come from a secure config/database
+  const merchantData: Record<string, {appId: string, merchantAccount: string}> = {
+    'm_12345': { // Corresponds to LVMSiraiva
+        appId: '4225800049969011',
+        merchantAccount: '00281613500000000079600280050001'
+    },
+    'm_54321': { // Corresponds to AlbertBenigiusSiraiva
+        appId: '4225800049968013',
+        merchantAccount: '00281613500000000079600280040001'
+    }
+  }
+  
+  const selectedMerchant = merchantData[params.merchant_id] || merchantData['m_12345']; // Fallback
+
+
   const payloadIndicator = buildTag('00', '01');
   const pointOfInitiation = buildTag('01', '12'); // 12 for Dynamic QR
   
-  const merchantAccountInfo = 
-    buildTag('00', 'org.lankaclear.lankaqr') + // LankaQR GUID
-    buildTag('01', params.merchant_id);
-    
-  const fullMerchantAccountTag = buildTag('26', merchantAccountInfo);
-
+  const applicationIdentifier = buildTag('02', selectedMerchant.appId);
+  const merchantAccountInformation = buildTag('26', selectedMerchant.merchantAccount);
+  
   const merchantCategoryCode = buildTag('52', params.mcc);
   const transactionCurrency = buildTag('53', params.currency_code);
   const transactionAmount = buildTag('54', params.amount);
@@ -78,13 +92,14 @@ export async function callBankCreateQR(params: CreateQrRequest): Promise<CreateQ
   const merchantName = buildTag('59', params.merchant_name);
   const merchantCity = buildTag('60', params.merchant_city);
 
-  const additionalDataContent = buildTag('05', params.reference_number);
+  const additionalDataContent = buildTag('05', '***'); // Use static reference for now
   const fullAdditionalDataTag = buildTag('62', additionalDataContent);
 
   const payloadWithoutCrc = [
     payloadIndicator,
     pointOfInitiation,
-    fullMerchantAccountTag,
+    applicationIdentifier,
+    merchantAccountInformation,
     merchantCategoryCode,
     transactionCurrency,
     transactionAmount,

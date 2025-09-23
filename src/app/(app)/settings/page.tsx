@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useSettingsStore, allApiFields, type ApiFieldSetting } from "@/hooks/use-settings";
 import { useToast } from "@/hooks/use-toast";
 
@@ -16,6 +17,22 @@ function ApiDetailsTab() {
         <div className="space-y-6">
             {allApiFields.filter(f => !f.readOnly).map((field) => {
                  const setting = supportedFields.find(sf => sf.id === field.id);
+                 if (field.id === 'merchant_id') {
+                     return (
+                         <div key={field.id} className="space-y-2">
+                             <Label htmlFor={field.id}>{field.label}</Label>
+                              <Select onValueChange={(value) => setFieldValue(field.id, value)} defaultValue={setting?.value ?? ''}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select a merchant" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="m_12345">LVMSiraiva</SelectItem>
+                                    <SelectItem value="m_54321">AlbertBenigiusSiraiva</SelectItem>
+                                </SelectContent>
+                            </Select>
+                         </div>
+                     )
+                 }
                  return (
                     <div key={field.id} className="space-y-2">
                         <Label htmlFor={field.id}>{field.label}</Label>
@@ -24,6 +41,8 @@ function ApiDetailsTab() {
                             value={setting?.value ?? ''}
                             onChange={(e) => setFieldValue(field.id, e.target.value)}
                             placeholder={`Enter default ${field.label.toLowerCase()}`}
+                            // Make name and city readonly as they are derived from merchant
+                            readOnly={field.id === 'merchant_name' || field.id === 'merchant_city'}
                         />
                     </div>
                 );
@@ -122,5 +141,3 @@ export default function SettingsPage() {
     </main>
   );
 }
-
-    
