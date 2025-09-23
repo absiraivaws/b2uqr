@@ -128,19 +128,7 @@ function TransactionStatus({
 
   return (
     <Card className="overflow-hidden">
-      <CardHeader>
-        <div className="flex justify-between items-start">
-            <div>
-                <CardTitle>Transaction Active</CardTitle>
-                <CardDescription className="mt-1">Scan the QR code to complete payment.</CardDescription>
-            </div>
-            <Badge variant={getStatusVariant(transaction.status)} className="capitalize flex items-center gap-2">
-                <StatusIcon status={transaction.status} />
-                {transaction.status}
-            </Badge>
-        </div>
-      </CardHeader>
-      <CardContent>
+      <CardContent className="pt-6">
         <div className="flex flex-col items-center justify-center p-6 bg-muted/50 rounded-lg">
           {transaction.status === "PENDING" ? (
              <Image
@@ -161,7 +149,7 @@ function TransactionStatus({
             </div>
           )}
           
-          <Button onClick={onVerifyTransaction} className="mt-4" variant="outline" disabled={isVerifying || transaction.status !== 'PENDING'}>
+          <Button onClick={onVerifyTransaction} className="mt-4" variant="default" disabled={isVerifying || transaction.status !== 'PENDING'}>
              {isVerifying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
              Verify Transaction
           </Button>
