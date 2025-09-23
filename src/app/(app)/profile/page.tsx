@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useSettingsStore, allApiFields } from "@/hooks/use-settings";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 
 export default function ProfilePage() {
@@ -50,23 +49,21 @@ export default function ProfilePage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                  <div className="space-y-2">
-                    <Label htmlFor="merchant_id">Merchant</Label>
-                    <Select onValueChange={(value) => setFieldValue('merchant_id', value)} defaultValue={supportedFields.find(sf => sf.id === 'merchant_id')?.value ?? ''}>
-                        <SelectTrigger>
-                            <SelectValue placeholder="Select a merchant" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="m_12345">LVMSiraiva</SelectItem>
-                            <SelectItem value="m_54321">AlbertBenigiusSiraiva</SelectItem>
-                        </SelectContent>
-                    </Select>
+                    <Label htmlFor="merchant_id">Merchant ID</Label>
+                     <Input
+                        id="merchant_id"
+                        type="number"
+                        value={supportedFields.find(sf => sf.id === 'merchant_id')?.value ?? ''}
+                        onChange={(e) => setFieldValue('merchant_id', e.target.value)}
+                        placeholder="Enter Merchant ID"
+                    />
                 </div>
                  <div className="space-y-2">
                     <Label htmlFor="merchant_name">Merchant Name</Label>
                     <Input
                         id="merchant_name"
                         value={supportedFields.find(sf => sf.id === 'merchant_name')?.value ?? ''}
-                        readOnly
+                        onChange={(e) => setFieldValue('merchant_name', e.target.value)}
                     />
                 </div>
                  <div className="space-y-2">
@@ -74,7 +71,7 @@ export default function ProfilePage() {
                     <Input
                         id="merchant_city"
                         value={supportedFields.find(sf => sf.id === 'merchant_city')?.value ?? ''}
-                        readOnly
+                        onChange={(e) => setFieldValue('merchant_city', e.target.value)}
                     />
                 </div>
                  <div className="space-y-2">

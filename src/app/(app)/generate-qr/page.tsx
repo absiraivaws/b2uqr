@@ -33,7 +33,9 @@ function TransactionForm({
   const { supportedFields } = useSettingsStore();
 
   const visibleFields = allApiFields.filter(field => 
-    !field.readOnly && supportedFields.some(sf => sf.id === field.id && sf.enabled)
+    !field.readOnly && 
+    supportedFields.some(sf => sf.id === field.id && sf.enabled) &&
+    field.id !== 'merchant_id' // Exclude merchant_id from form
   );
 
   return (
