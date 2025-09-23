@@ -21,7 +21,7 @@ const TransactionSchema = z.object({
   amount: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid amount format"),
   currency: z.string().length(3),
   reference_number: z.string(),
-  customer_email: z.string().email().optional(),
+  customer_email: z.string().optional(),
   customer_name: z.string().optional(),
   // For LankaQR
   merchant_name: z.string().optional(),
