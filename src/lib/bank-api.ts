@@ -63,25 +63,25 @@ export async function callBankCreateQR(params: CreateQrRequest): Promise<CreateQ
 
   // --- LankaQR Payload Construction based on provided examples ---
   
-  const merchantData: Record<string, {appId: string, merchantAccount: string}> = {
-    'm_12345': { // Corresponds to LVMSiraiva
+  const merchantData: Record<string, {appId: string, merchantAccountInfo: string}> = {
+    '12345': { // Corresponds to LVMSiraiva
         appId: '4225800049969011',
-        merchantAccount: '00281613500000000079600280050001'
+        merchantAccountInfo: '00281613500000000079600280050001'
     },
-    'm_54321': { // Corresponds to AlbertBenigiusSiraiva
+    '54321': { // Corresponds to AlbertBenigiusSiraiva
         appId: '4225800049968013',
-        merchantAccount: '00281613500000000079600280040001'
+        merchantAccountInfo: '00281613500000000079600280040001'
     }
   }
   
-  const selectedMerchant = merchantData[params.merchant_id] || merchantData['m_12345']; // Fallback
+  const selectedMerchant = merchantData[params.merchant_id] || merchantData['12345']; // Fallback
 
 
   const payloadIndicator = buildTag('00', '01');
   const pointOfInitiation = buildTag('01', '12'); // 12 for Dynamic QR
   
   const applicationIdentifier = buildTag('02', selectedMerchant.appId);
-  const merchantAccountInformation = buildTag('26', selectedMerchant.merchantAccount);
+  const merchantAccountInformation = buildTag('26', selectedMerchant.merchantAccountInfo);
   
   const merchantCategoryCode = buildTag('52', params.mcc);
   const transactionCurrency = buildTag('53', params.currency_code);
@@ -144,3 +144,4 @@ export async function callBankReconciliationAPI(uuid: string): Promise<{ status:
         return { status: 'PENDING' };
     }
 }
+
