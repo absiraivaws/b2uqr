@@ -97,15 +97,11 @@ function TransactionForm({
 
 function TransactionStatus({
   transaction,
-  onSimulateWebhook,
   onVerifyTransaction,
-  isSimulating,
   isVerifying,
 }: {
   transaction: Transaction;
-  onSimulateWebhook: (status: "SUCCESS" | "FAILED") => void;
   onVerifyTransaction: () => void;
-  isSimulating: boolean;
   isVerifying: boolean;
 }) {
   
@@ -144,7 +140,7 @@ function TransactionStatus({
             </Badge>
         </div>
       </CardHeader>
-      <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <CardContent>
         <div className="flex flex-col items-center justify-center p-6 bg-muted/50 rounded-lg">
           {transaction.status === "PENDING" ? (
              <Image
@@ -164,56 +160,11 @@ function TransactionStatus({
                 </p>
             </div>
           )}
-          <p className="font-code text-xs text-muted-foreground mt-4 break-all">
-            {transaction.qr_payload}
-          </p>
+          
           <Button onClick={onVerifyTransaction} className="mt-4" variant="outline" disabled={isVerifying || transaction.status !== 'PENDING'}>
              {isVerifying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
              Verify Transaction
           </Button>
-        </div>
-        <div className="space-y-4">
-          <div>
-            <h3 className="text-sm font-medium text-muted-foreground">Transaction UUID</h3>
-            <p className="font-code text-base">{transaction.transaction_uuid}</p>
-          </div>
-          <Separator />
-          <div>
-            <h3 className="text-sm font-medium text-muted-foreground">Amount</h3>
-            <p className="text-base font-semibold">{transaction.currency} {transaction.amount}</p>
-          </div>
-          <Separator />
-          <div>
-            <h3 className="text-sm font-medium text-muted-foreground">Reference</h3>
-            <p className="text-base">{transaction.reference_number}</p>
-          </div>
-          <Separator />
-          {transaction.status === 'PENDING' && (
-            <div className="pt-4">
-                <h3 className="text-sm font-semibold mb-2">Simulate Webhook</h3>
-                <p className="text-xs text-muted-foreground mb-3">
-                    In a real scenario, the bank sends a webhook. Here you can simulate that call.
-                </p>
-                <div className="flex space-x-2">
-                <Button
-                    onClick={() => onSimulateWebhook("SUCCESS")}
-                    variant="outline"
-                    size="sm"
-                    disabled={isSimulating}
-                >
-                    Simulate SUCCESS
-                </Button>
-                <Button
-                    onClick={() => onSimulateWebhook("FAILED")}
-                    variant="destructive"
-                    size="sm"
-                    disabled={isSimulating}
-                >
-                    Simulate FAILED
-                </Button>
-                </div>
-            </div>
-          )}
         </div>
       </CardContent>
     </Card>
@@ -386,9 +337,7 @@ export default function GenerateQRPage() {
             ) : currentTransaction ? (
                 <TransactionStatus 
                     transaction={currentTransaction} 
-                    onSimulateWebhook={handleSimulateWebhook} 
                     onVerifyTransaction={handleVerifyTransaction}
-                    isSimulating={isSimulating}
                     isVerifying={isVerifying}
                 />
             ) : (
@@ -407,5 +356,3 @@ export default function GenerateQRPage() {
     </main>
   );
 }
-
-    
