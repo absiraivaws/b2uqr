@@ -45,8 +45,8 @@ function crc16(data: string): string {
 }
 
 
-function buildTag(tag: string, value: string): string {
-  if (value === null || value === undefined) return '';
+function buildTag(tag: string, value: string | undefined | null): string {
+  if (value === null || value === undefined || value === '') return '';
   const len = value.length.toString().padStart(2, '0');
   return `${tag}${len}${value}`;
 }
@@ -63,8 +63,6 @@ export async function callBankCreateQR(params: CreateQrRequest): Promise<CreateQ
 
   // --- LankaQR Payload Construction based on provided examples ---
   
-  // These values appear to be static or derived from merchant details
-  // In a real app, these would come from a secure config/database
   const merchantData: Record<string, {appId: string, merchantAccount: string}> = {
     'm_12345': { // Corresponds to LVMSiraiva
         appId: '4225800049969011',
@@ -92,7 +90,7 @@ export async function callBankCreateQR(params: CreateQrRequest): Promise<CreateQ
   const merchantName = buildTag('59', params.merchant_name);
   const merchantCity = buildTag('60', params.merchant_city);
 
-  const additionalDataContent = buildTag('05', '***'); // Use static reference for now
+  const additionalDataContent = buildTag('05', params.reference_number);
   const fullAdditionalDataTag = buildTag('62', additionalDataContent);
 
   const payloadWithoutCrc = [
