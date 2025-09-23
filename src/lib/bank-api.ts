@@ -90,13 +90,16 @@ export async function callBankCreateQR(params: CreateQrRequest): Promise<CreateQ
   const merchantName = buildTag('59', params.merchant_name);
   const merchantCity = buildTag('60', params.merchant_city);
 
-  // Correctly construct the nested Additional Data Field for Reference Number (Tag 62 -> Sub-Tag 05)
-  // Step 1: Create the inner Sub-Tag 05 payload
-  const referenceNumberSubTagContent = buildTag('05', params.reference_number);
+  // --- Correctly construct Tag 62 with nested Sub-Tag 05 ---
+  // Step 1: Create the inner Sub-Tag 05 payload (Reference Label)
+  const refNumValue = params.reference_number;
+  const refNumLength = refNumValue.length.toString().padStart(2, '0');
+  const referenceNumberSubTagContent = `05${refNumLength}${refNumValue}`;
 
-  // Step 2: Wrap the inner content with the main Tag 62
-  const fullAdditionalDataTag = buildTag('62', referenceNumberSubTagContent);
-
+  // Step 2: Wrap the inner content with the main Tag 62 (Additional Data Field)
+  const additionalDataLength = referenceNumberSubTagContent.length.toString().padStart(2, '0');
+  const fullAdditionalDataTag = `62${additionalDataLength}${referenceNumberSubTagContent}`;
+  // --- End of Tag 62 construction ---
 
   const payloadWithoutCrc = [
     payloadIndicator,
@@ -109,7 +112,7 @@ export async function callBankCreateQR(params: CreateQrRequest): Promise<CreateQ
     countryCode,
     merchantName,
     merchantCity,
-    fullAdditionalDataTag,
+    fullAdditionalDataTag, // <-- This is now correctly constructed and included
     '6304' // CRC Tag and Length placeholder
   ].join('');
 
