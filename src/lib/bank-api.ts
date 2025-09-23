@@ -85,7 +85,7 @@ export async function callBankCreateQR(params: CreateQrRequest): Promise<CreateQ
   
   const merchantCategoryCode = buildTag('52', params.mcc);
   const transactionCurrency = buildTag('53', params.currency_code);
-  const transactionAmount = buildTag('54', params.amount);
+  const transactionAmount = buildTag('54', parseFloat(params.amount).toFixed(2));
   const countryCode = buildTag('58', 'LK');
   const merchantName = buildTag('59', params.merchant_name);
   const merchantCity = buildTag('60', params.merchant_city);
