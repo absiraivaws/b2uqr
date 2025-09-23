@@ -66,11 +66,11 @@ export async function callBankCreateQR(params: CreateQrRequest): Promise<CreateQ
   const merchantData: Record<string, {appId: string, merchantAccountInfo: string}> = {
     '12345': { // Corresponds to LVMSiraiva
         appId: '4225800049969011',
-        merchantAccountInfo: '00281613500000000079600280050001'
+        merchantAccountInfo: '0028161350000000007960028005'
     },
     '54321': { // Corresponds to AlbertBenigiusSiraiva
         appId: '4225800049968013',
-        merchantAccountInfo: '00281613500000000079600280040001'
+        merchantAccountInfo: '0028161350000000007960028004'
     }
   }
   
@@ -81,7 +81,7 @@ export async function callBankCreateQR(params: CreateQrRequest): Promise<CreateQ
   const pointOfInitiation = buildTag('01', '12'); // 12 for Dynamic QR
   
   const applicationIdentifier = buildTag('02', selectedMerchant.appId);
-  const merchantAccountInformation = buildTag('26', selectedMerchant.merchantAccountInfo);
+  const merchantAccountInformation = buildTag('26', selectedMerchant.merchantAccountInfo + params.merchant_id.slice(-4) + '0001');
   
   const merchantCategoryCode = buildTag('52', params.mcc);
   const transactionCurrency = buildTag('53', params.currency_code);
@@ -90,8 +90,10 @@ export async function callBankCreateQR(params: CreateQrRequest): Promise<CreateQ
   const merchantName = buildTag('59', params.merchant_name);
   const merchantCity = buildTag('60', params.merchant_city);
 
-  const additionalDataContent = buildTag('05', params.reference_number);
-  const fullAdditionalDataTag = buildTag('62', additionalDataContent);
+  // Correctly construct the nested Additional Data Field
+  const referenceNumberTag = buildTag('05', params.reference_number); // Tag 05 for Reference Number
+  const fullAdditionalDataTag = buildTag('62', referenceNumberTag);
+
 
   const payloadWithoutCrc = [
     payloadIndicator,
@@ -144,4 +146,5 @@ export async function callBankReconciliationAPI(uuid: string): Promise<{ status:
         return { status: 'PENDING' };
     }
 }
+
 
