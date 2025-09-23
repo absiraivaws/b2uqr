@@ -81,7 +81,7 @@ export async function callBankCreateQR(params: CreateQrRequest): Promise<CreateQ
   const pointOfInitiation = buildTag('01', '12'); // 12 for Dynamic QR
   
   const applicationIdentifier = buildTag('02', selectedMerchant.appId);
-  const merchantAccountInformation = buildTag('26', selectedMerchant.merchantAccountInfo + params.merchant_id.slice(-4) + '0001');
+  const merchantAccountInformation = buildTag('26', selectedMerchant.merchantAccountInfo + '0001');
   
   const merchantCategoryCode = buildTag('52', params.mcc);
   const transactionCurrency = buildTag('53', params.currency_code);
@@ -90,9 +90,9 @@ export async function callBankCreateQR(params: CreateQrRequest): Promise<CreateQ
   const merchantName = buildTag('59', params.merchant_name);
   const merchantCity = buildTag('60', params.merchant_city);
 
-  // Correctly construct the nested Additional Data Field
-  const referenceNumberTag = buildTag('05', params.reference_number); // Tag 05 for Reference Number
-  const fullAdditionalDataTag = buildTag('62', referenceNumberTag);
+  // Correctly construct the nested Additional Data Field for Reference Number
+  const referenceNumberTagContent = buildTag('05', params.reference_number);
+  const fullAdditionalDataTag = buildTag('62', referenceNumberTagContent);
 
 
   const payloadWithoutCrc = [
@@ -146,5 +146,3 @@ export async function callBankReconciliationAPI(uuid: string): Promise<{ status:
         return { status: 'PENDING' };
     }
 }
-
-
