@@ -10,24 +10,25 @@ import {
   updateDbTransactionStatus,
   findPendingTransactions,
 } from "./db";
-import { callBankCreateQR, callBankReconciliationAPI } from "./bank-api";
+import { callBankCreateQR } from "./bank-api";
 import { verifyWebhookSignature } from "./security";
 import { alertFailures, type AlertFailuresOutput } from "@/ai/flows/alert-failures";
 import crypto from "crypto";
 
 
 const TransactionSchema = z.object({
-  merchant_id: z.string(),
   amount: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid amount format"),
-  currency: z.string().length(3),
   reference_number: z.string(),
-  customer_email: z.string().optional(),
-  customer_name: z.string().optional(),
-  // For LankaQR
-  merchant_name: z.string().optional(),
-  merchant_city: z.string().optional(),
-  mcc: z.string().optional(),
-  currency_code: z.string().optional(),
+  // From settings
+  merchant_id: z.string(),
+  merchant_name: z.string(),
+  merchant_city: z.string(),
+  mcc: z.string(),
+  currency_code: z.string(),
+  bank_code: z.string(),
+  terminal_id: z.string(),
+  country_code: z.string(),
+  currency: z.string(),
 });
 
 export async function createTransaction(formData: FormData): Promise<Transaction> {
@@ -51,7 +52,10 @@ export async function createTransaction(formData: FormData): Promise<Transaction
     status: "PENDING",
     qr_payload: "", // Will be filled after bank call
     expires_at: "", // Will be filled after bank call
-    ...data,
+    amount: data.amount,
+    reference_number: data.reference_number,
+    merchant_id: data.merchant_id,
+    currency: data.currency
   };
 
   // 3. Call Bank API to create QR
@@ -60,10 +64,13 @@ export async function createTransaction(formData: FormData): Promise<Transaction
     amount: data.amount,
     reference_number: data.reference_number,
     merchant_id: data.merchant_id,
-    merchant_name: data.merchant_name || 'My Store', // Fallback
-    merchant_city: data.merchant_city || 'Colombo', // Fallback
-    mcc: data.mcc || '5999', // Fallback
-    currency_code: data.currency_code || '144' // LKR
+    bank_code: data.bank_code,
+    terminal_id: data.terminal_id,
+    merchant_name: data.merchant_name,
+    merchant_city: data.merchant_city,
+    mcc: data.mcc,
+    currency_code: data.currency_code,
+    country_code: data.country_code,
   });
 
   // 4. Update transaction with QR data from bank

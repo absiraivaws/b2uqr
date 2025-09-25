@@ -9,11 +9,14 @@ interface CreateQrRequest {
   amount: string;
   reference_number: string;
   // Merchant details that would typically come from settings or a database
-  merchant_id: string; // From settings
-  merchant_name: string; // From settings
-  merchant_city: string; // From settings
-  mcc: string; // From settings
-  currency_code: string; // From settings
+  merchant_id: string; // 19 digits
+  bank_code: string; // 5 digits
+  terminal_id: string; // 4 digits
+  merchant_name: string; // max 25
+  merchant_city: string; // max 15
+  mcc: string; // 4 digits
+  currency_code: string; // 3 digits (e.g. 144 for LKR)
+  country_code: string; // 2 chars (e.g. LK)
 }
 
 interface CreateQrResponse {
@@ -61,36 +64,28 @@ export async function callBankCreateQR(params: CreateQrRequest): Promise<CreateQ
   // Simulate network delay
   await new Promise(resolve => setTimeout(resolve, 500));
 
-  // --- LankaQR Payload Construction based on provided examples ---
+  // --- LankaQR Payload Construction based on your requirements ---
   
-  const merchantData: Record<string, {appId: string, bankCode: string}> = {
-    '12345': { // Corresponds to LVMSiraiva
-        appId: '4225800049969011',
-        bankCode: '16135'
-    },
-    '54321': { // Corresponds to AlbertBenigiusSiraiva
-        appId: '4225800049968013',
-        bankCode: '16135'
-    }
-  }
-  
-  const selectedMerchant = merchantData[params.merchant_id] || merchantData['12345']; // Fallback
-
-
   const payloadIndicator = buildTag('00', '01');
   const pointOfInitiation = buildTag('01', '12'); // 12 for Dynamic QR
   
-  const applicationIdentifier = buildTag('02', selectedMerchant.appId);
+  // Tag 26: Merchant Account Information
+  const appId = `422580004996${params.bank_code}`; // Assuming appId is constructed this way
+  const applicationIdentifier = buildTag('02', appId);
 
-  // Correctly construct Tag 26
-  // Structure: 00 (GUID) + 28 (length) + 16 (bank code length) + bank code + 000000000 (padding) + merchant_id + 0001
-  const merchantInfoValue = `0028${selectedMerchant.bankCode.length.toString().padStart(2,'0')}${selectedMerchant.bankCode}000000000${params.merchant_id}0001`;
+  // Constructing Tag 26 value dynamically
+  // Structure: 00(GUID)+28(len)+16(bank_code_len)+bank_code+000000000+merchant_id_last_10+terminal_id
+  const merchantIdLast10 = params.merchant_id.slice(-10);
+  const bankCodeSubTag = buildTag('00', params.bank_code);
+  const merchantIdSubTag = buildTag('01', merchantIdLast10);
+  const terminalIdSubTag = buildTag('02', params.terminal_id);
+  const merchantInfoValue = `${bankCodeSubTag}${merchantIdSubTag}${terminalIdSubTag}`;
   const merchantAccountInformation = buildTag('26', merchantInfoValue);
   
   const merchantCategoryCode = buildTag('52', params.mcc);
   const transactionCurrency = buildTag('53', params.currency_code);
   const transactionAmount = buildTag('54', parseFloat(params.amount).toFixed(2));
-  const countryCode = buildTag('58', 'LK');
+  const countryCode = buildTag('58', params.country_code);
   const merchantName = buildTag('59', params.merchant_name);
   const merchantCity = buildTag('60', params.merchant_city);
 

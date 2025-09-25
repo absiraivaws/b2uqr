@@ -19,6 +19,14 @@ export default function ProfilePage() {
             description: "Your profile and merchant details have been updated.",
         });
     }
+    
+    const getField = (id: string) => {
+        return supportedFields.find(sf => sf.id === id);
+    }
+    
+    const getFieldDef = (id: string) => {
+        return allApiFields.find(f => f.id === id);
+    }
 
   return (
     <main className="p-4 sm:p-6 lg:p-8">
@@ -52,37 +60,63 @@ export default function ProfilePage() {
                     <Label htmlFor="merchant_id">Merchant ID</Label>
                      <Input
                         id="merchant_id"
-                        type="number"
-                        value={supportedFields.find(sf => sf.id === 'merchant_id')?.value ?? ''}
+                        value={getField('merchant_id')?.value ?? ''}
                         onChange={(e) => setFieldValue('merchant_id', e.target.value)}
-                        placeholder="Enter Merchant ID"
+                        placeholder={getFieldDef('merchant_id')?.placeholder}
+                        maxLength={getFieldDef('merchant_id')?.maxLength}
                     />
+                    <p className="text-xs text-muted-foreground">Must be {getFieldDef('merchant_id')?.maxLength} digits.</p>
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="bank_code">Bank Code</Label>
+                     <Input
+                        id="bank_code"
+                        value={getField('bank_code')?.value ?? ''}
+                        onChange={(e) => setFieldValue('bank_code', e.target.value)}
+                        placeholder={getFieldDef('bank_code')?.placeholder}
+                        maxLength={getFieldDef('bank_code')?.maxLength}
+                    />
+                    <p className="text-xs text-muted-foreground">Must be {getFieldDef('bank_code')?.maxLength} digits.</p>
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="terminal_id">Terminal ID</Label>
+                     <Input
+                        id="terminal_id"
+                        value={getField('terminal_id')?.value ?? ''}
+                        onChange={(e) => setFieldValue('terminal_id', e.target.value)}
+                        placeholder={getFieldDef('terminal_id')?.placeholder}
+                        maxLength={getFieldDef('terminal_id')?.maxLength}
+                    />
+                    <p className="text-xs text-muted-foreground">Must be {getFieldDef('terminal_id')?.maxLength} digits.</p>
                 </div>
                  <div className="space-y-2">
                     <Label htmlFor="merchant_name">Merchant Name</Label>
                     <Input
                         id="merchant_name"
-                        value={supportedFields.find(sf => sf.id === 'merchant_name')?.value ?? ''}
+                        value={getField('merchant_name')?.value ?? ''}
                         onChange={(e) => setFieldValue('merchant_name', e.target.value)}
+                        maxLength={getFieldDef('merchant_name')?.maxLength}
                     />
+                     <p className="text-xs text-muted-foreground">Max {getFieldDef('merchant_name')?.maxLength} characters.</p>
                 </div>
                  <div className="space-y-2">
                     <Label htmlFor="merchant_city">Merchant City</Label>
                     <Input
                         id="merchant_city"
-                        value={supportedFields.find(sf => sf.id === 'merchant_city')?.value ?? ''}
+                        value={getField('merchant_city')?.value ?? ''}
                         onChange={(e) => setFieldValue('merchant_city', e.target.value)}
+                        maxLength={getFieldDef('merchant_city')?.maxLength}
                     />
+                    <p className="text-xs text-muted-foreground">Max {getFieldDef('merchant_city')?.maxLength} characters.</p>
                 </div>
                  <div className="space-y-2">
                     <Label htmlFor="mcc">Merchant Category Code</Label>
                     <Input
                         id="mcc"
-                        value={supportedFields.find(sf => sf.id === 'mcc')?.value ?? ''}
+                        value={getField('mcc')?.value ?? ''}
                         readOnly
                         className="bg-muted"
                     />
-                     <p className="text-xs text-muted-foreground">MDR applicable. Cannot be edited.</p>
                 </div>
             </div>
 
@@ -92,5 +126,3 @@ export default function ProfilePage() {
     </main>
   );
 }
-
-    

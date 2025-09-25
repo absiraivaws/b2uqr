@@ -9,17 +9,21 @@ export interface ApiField {
     label: string;
     defaultValue?: string;
     readOnly?: boolean;
+    maxLength?: number;
+    placeholder?: string;
 }
 
 // Updated to include all fields for LankaQR
 export const allApiFields: ApiField[] = [
-  // This now represents the two merchants from the examples
-  { id: 'merchant_id', label: 'Merchant ID', defaultValue: '12345' }, 
-  { id: 'merchant_name', label: 'Merchant Name', defaultValue: 'LVMSiraiva'},
-  { id: 'merchant_city', label: 'Merchant City', defaultValue: 'MANNAR'},
-  { id: 'mcc', label: 'Merchant Category Code', defaultValue: '5999', readOnly: true},
+  { id: 'merchant_id', label: 'Merchant ID', defaultValue: '0000000007960028005', maxLength: 19, placeholder: '19-digit Merchant ID' }, 
+  { id: 'bank_code', label: 'Bank Code', defaultValue: '16135', maxLength: 5, placeholder: '5-digit Bank Code'},
+  { id: 'terminal_id', label: 'Terminal ID', defaultValue: '0001', maxLength: 4, placeholder: '4-digit Terminal ID'},
+  { id: 'merchant_name', label: 'Merchant Name', defaultValue: 'LVMSiraiva', maxLength: 25 },
+  { id: 'merchant_city', label: 'Merchant City', defaultValue: 'MANNAR', maxLength: 15 },
+  { id: 'mcc', label: 'Merchant Category Code', defaultValue: '5999', readOnly: true, maxLength: 4 },
   { id: 'currency', label: 'Currency', defaultValue: 'LKR', readOnly: true },
-  { id: 'currency_code', label: 'Currency Code (ISO 4217)', defaultValue: '144', readOnly: true},
+  { id: 'currency_code', label: 'Currency Code (ISO 4217)', defaultValue: '144', readOnly: true },
+  { id: 'country_code', label: 'Country Code', defaultValue: 'LK', readOnly: true},
   { id: 'reference_number', label: 'Reference Number', readOnly: true },
   { id: 'customer_email', label: 'Customer Email' },
   { id: 'customer_name', label: 'Customer Name' },
@@ -84,7 +88,7 @@ export const useSettingsStore = create<SettingsState>()(
         // Ensure all fields from allApiFields are present
         const finalFields = allApiFields.map(field => {
             const existing = mergedFields.find(f => f.id === field.id);
-            return existing || { id: f.id, value: f.defaultValue ?? '', enabled: !field.readOnly };
+            return existing || { id: f.id, value: f.defaultValue ?? '', enabled: !f.readOnly };
         });
 
         // Also, make sure readonly fields are not user-disabled
@@ -104,5 +108,3 @@ export const useSettingsStore = create<SettingsState>()(
     }
   )
 );
-
-    

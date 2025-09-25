@@ -10,7 +10,7 @@ import {
 } from "@/lib/actions";
 import type { Transaction } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
-import { useSettingsStore, allApiFields } from "@/hooks/use-settings";
+import { useSettingsStore } from "@/hooks/use-settings";
 import { debounce } from 'lodash';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -30,14 +30,6 @@ function TransactionForm({
   isSubmitting: boolean;
   referenceNumber: string;
 }) {
-  const { supportedFields } = useSettingsStore();
-
-  const visibleFields = allApiFields.filter(field => 
-    !field.readOnly && 
-    supportedFields.some(sf => sf.id === field.id && sf.enabled) &&
-    field.id !== 'merchant_id' // Exclude merchant_id from form
-  );
-
   return (
     <Card>
       <CardHeader>
@@ -72,23 +64,6 @@ function TransactionForm({
                   />
              </div>
           </div>
-          {visibleFields.map(field => {
-            if (field.id === 'customer_email' || field.id === 'customer_name') {
-              return null;
-            }
-            return (
-              <div className="space-y-2" key={field.id}>
-                  <Label htmlFor={field.id}>{field.label}</Label>
-                  <Input 
-                    id={field.id} 
-                    name={field.id} 
-                    defaultValue={supportedFields.find(sf => sf.id === field.id)?.value}
-                    placeholder={`Enter ${field.label.toLowerCase()}`}
-                    readOnly
-                    />
-              </div>
-            );
-          })}
         </form>
       </CardContent>
     </Card>
@@ -249,10 +224,10 @@ export default function GenerateQRPage() {
     formData.set('amount', amount);
     formData.set('reference_number', referenceNumber);
 
-    allApiFields.forEach(field => {
-      const supportedField = supportedFields.find(sf => sf.id === field.id);
-      if (supportedField) {
-         formData.set(field.id, supportedField.value);
+    // Add all supported fields from settings to the form data
+    supportedFields.forEach(field => {
+      if (field.enabled || field.readOnly) {
+         formData.set(field.id, field.value);
       }
     });
 
