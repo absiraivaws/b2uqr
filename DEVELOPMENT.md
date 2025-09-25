@@ -77,3 +77,28 @@ Here is an overview of the key directories and files in the project:
 -   `npm run start`: Starts the production server.
 -   `npm run lint`: Runs ESLint to check for code quality issues.
 -   `npm run genkit:dev`: Starts the Genkit development server for AI flows.
+
+## 6. Key Application Logic
+
+This section details the core logic that powers the QR Bridge application.
+
+### Transaction Flow
+
+1.  **Generation**: A user enters an amount on the `/generate-qr` page. A unique `reference_number` is generated on the client.
+2.  **Server Action**: The `createTransaction` Server Action in `src/lib/actions.ts` is called with the amount and other details from the settings store.
+3.  **Bank API Mock**: `createTransaction` calls the `callBankCreateQR` function in `src/lib/bank-api.ts`. This function constructs the LankaQR payload string.
+4.  **Database**: A new transaction record is created with a `PENDING` status in the in-memory database (`src/lib/db.ts`).
+5.  **Polling**: The client-side polls the `getTransactionStatus` action every few seconds to check for updates.
+6.  **Webhook**: The bank sends a `POST` request to `/api/bank/webhook` to confirm the transaction status. The `handleWebhook` action validates the signature and updates the transaction status to `SUCCESS` or `FAILED`.
+
+### State Management (Zustand)
+
+Global application settings are managed using Zustand. The store is defined in `src/hooks/use-settings.ts`. This store holds all the merchant details (Merchant ID, Bank Code, etc.) and is persisted in `localStorage`. This allows user settings to be remembered across sessions.
+
+### LankaQR Payload Generation
+
+The core logic for building the QR string is in `src/lib/bank-api.ts`. The `callBankCreateQR` function assembles the payload according to the LankaQR specification, builds each required data tag (e.g., Merchant Info, Amount, Reference Number), and calculates the final CRC checksum.
+
+### Webhook Security
+
+Incoming webhooks are secured using an HMAC-SHA256 signature. The `verifyWebhookSignature` function in `src/lib/security.ts` compares the signature from the `X-Bank-Signature` header against a signature generated using a shared secret, preventing unauthorized requests.
