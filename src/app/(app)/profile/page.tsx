@@ -45,6 +45,18 @@ export default function ProfilePage() {
                     <Label htmlFor="email">Email Address</Label>
                     <Input id="email" type="email" defaultValue="john.doe@example.com" />
                 </div>
+                <div className="space-y-2">
+                    <Label htmlFor="contact_number">Contact Number</Label>
+                    <Input id="contact_number" type="tel" placeholder="Enter contact number" />
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="whatsapp_number">Whatsapp Number</Label>
+                    <Input id="whatsapp_number" type="tel" placeholder="Enter Whatsapp number" />
+                </div>
+                 <div className="space-y-2">
+                    <Label htmlFor="dob">Date of Birth</Label>
+                    <Input id="dob" type="date" />
+                </div>
             </div>
             <div className="space-y-2">
                 <Label htmlFor="address">Address</Label>
