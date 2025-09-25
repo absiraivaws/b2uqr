@@ -133,8 +133,6 @@ export default function GenerateQRPage() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [referenceNumber, setReferenceNumber] = useState("");
   const [lastTxNumber, setLastTxNumber] = useState(0);
-  const successSoundRef = useRef<HTMLAudioElement>(null);
-
 
   const { toast } = useToast();
   const settings = useSettingsStore();
@@ -166,7 +164,8 @@ export default function GenerateQRPage() {
             setCurrentTransaction(prevTx => {
               if (prevTx?.status !== updatedTx.status) {
                 if (updatedTx.status === 'SUCCESS') {
-                    successSoundRef.current?.play();
+                    // Temporarily removed sound while fixing source issue
+                    // successSoundRef.current?.play();
                 }
                 if (interval) clearInterval(interval);
                 generateReferenceNumber(); 
@@ -241,7 +240,8 @@ export default function GenerateQRPage() {
     try {
         const updatedTx = await verifyTransaction(currentTransaction.transaction_uuid);
         if (updatedTx.status === 'SUCCESS') {
-            successSoundRef.current?.play();
+            // Temporarily removed sound while fixing source issue
+            // successSoundRef.current?.play();
             toast({ title: "Verification Success", description: "The payment has been confirmed." });
         } else if (updatedTx.status === 'FAILED') {
             toast({ variant: "destructive", title: "Verification Failed", description: "The payment was not successful." });
@@ -274,9 +274,6 @@ export default function GenerateQRPage() {
 
   return (
     <main className="p-4 sm:p-6 lg:p-8">
-        {/* Bell sound for success */}
-        <audio ref={successSoundRef} src="/success-bell.mp3" preload="auto"></audio>
-
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
             <div className="lg:col-span-1 space-y-8">
               <TransactionForm onAmountChange={debouncedCreateTransaction} isSubmitting={isSubmitting} referenceNumber={referenceNumber} />
