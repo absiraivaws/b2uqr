@@ -63,14 +63,14 @@ export async function callBankCreateQR(params: CreateQrRequest): Promise<CreateQ
 
   // --- LankaQR Payload Construction based on provided examples ---
   
-  const merchantData: Record<string, {appId: string, merchantAccountInfo: string}> = {
+  const merchantData: Record<string, {appId: string, bankCode: string}> = {
     '12345': { // Corresponds to LVMSiraiva
         appId: '4225800049969011',
-        merchantAccountInfo: '0028161350000000007960028005'
+        bankCode: '16135'
     },
     '54321': { // Corresponds to AlbertBenigiusSiraiva
         appId: '4225800049968013',
-        merchantAccountInfo: '0028161350000000007960028004'
+        bankCode: '16135'
     }
   }
   
@@ -81,7 +81,11 @@ export async function callBankCreateQR(params: CreateQrRequest): Promise<CreateQ
   const pointOfInitiation = buildTag('01', '12'); // 12 for Dynamic QR
   
   const applicationIdentifier = buildTag('02', selectedMerchant.appId);
-  const merchantAccountInformation = buildTag('26', selectedMerchant.merchantAccountInfo + '0001');
+
+  // Correctly construct Tag 26
+  // Structure: 00 (GUID) + 28 (length) + 16 (bank code length) + bank code + 000000000 (padding) + merchant_id + 0001
+  const merchantInfoValue = `0028${selectedMerchant.bankCode.length.toString().padStart(2,'0')}${selectedMerchant.bankCode}000000000${params.merchant_id}0001`;
+  const merchantAccountInformation = buildTag('26', merchantInfoValue);
   
   const merchantCategoryCode = buildTag('52', params.mcc);
   const transactionCurrency = buildTag('53', params.currency_code);
@@ -90,17 +94,9 @@ export async function callBankCreateQR(params: CreateQrRequest): Promise<CreateQ
   const merchantName = buildTag('59', params.merchant_name);
   const merchantCity = buildTag('60', params.merchant_city);
 
-  // --- Correctly construct Tag 62 with nested Sub-Tag 05 ---
-  // Step 1: Create the inner Sub-Tag 05 payload (Reference Label)
-  const refNumValue = params.reference_number;
-  const refNumLength = refNumValue.length.toString().padStart(2, '0');
-  const referenceNumberSubTagContent = `05${refNumLength}${refNumValue}`;
-
-  // Step 2: Wrap the inner content with the main Tag 62 (Additional Data Field)
-  const additionalDataLength = referenceNumberSubTagContent.length.toString().padStart(2, '0');
-  const fullAdditionalDataTag = `62${additionalDataLength}${referenceNumberSubTagContent}`;
-  // --- End of Tag 62 construction ---
-
+  const referenceNumberSubTagContent = buildTag('05', params.reference_number);
+  const fullAdditionalDataTag = buildTag('62', referenceNumberSubTagContent);
+  
   const payloadWithoutCrc = [
     payloadIndicator,
     pointOfInitiation,
@@ -112,7 +108,7 @@ export async function callBankCreateQR(params: CreateQrRequest): Promise<CreateQ
     countryCode,
     merchantName,
     merchantCity,
-    fullAdditionalDataTag, // <-- This is now correctly constructed and included
+    fullAdditionalDataTag,
     '6304' // CRC Tag and Length placeholder
   ].join('');
 
