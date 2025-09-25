@@ -69,11 +69,9 @@ export async function callBankCreateQR(params: CreateQrRequest): Promise<CreateQ
   const networkReference = buildTag('02', '4225800049969011');
 
   // Tag 26: Merchant Account Information
-  // This is a nested structure.
-  const guid = '00' + '28'; // GUID tag and length of content
+  const guid = '0028'; // GUID and length
   const merchantInfoValue = `${guid}${params.bank_code}${params.merchant_id}${params.terminal_id}`;
   const merchantAccountInformation = buildTag('26', merchantInfoValue);
-
   
   const merchantCategoryCode = buildTag('52', params.mcc);
   const transactionCurrency = buildTag('53', params.currency_code);
@@ -87,8 +85,10 @@ export async function callBankCreateQR(params: CreateQrRequest): Promise<CreateQ
   const merchantCity = buildTag('60', params.merchant_city);
 
   // Tag 62: Additional Data (with nested Reference Number)
-  const referenceNumberSubTag = buildTag('05', params.reference_number);
-  const additionalData = buildTag('62', referenceNumberSubTag);
+  const refLabel = '05';
+  const refValue = params.reference_number.slice(0, 25);
+  const refNumberSubTag = buildTag(refLabel, refValue);
+  const additionalData = buildTag('62', refNumberSubTag);
   
   const payloadWithoutCrc = [
     payloadIndicator,
@@ -126,18 +126,15 @@ export async function callBankReconciliationAPI(uuid: string): Promise<{ status:
     console.log(`Mock Bank API: Reconciling status for ${uuid}`);
 
     // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 300));
+    await new Promise(resolve => setTimeout(resolve, 1500));
 
     // In this mock, we'll randomly decide if a transaction has "settled" at the bank
-    // This simulates finding a transaction that we missed the webhook for.
     const rand = Math.random();
-    if (rand < 0.2) { // 20% chance it succeeded
+    if (rand < 0.7) { // 70% chance it succeeded
         console.log(`Mock Bank API: Reconciled ${uuid} to SUCCESS`);
         return { status: 'SUCCESS' };
-    } else if (rand < 0.3) { // 10% chance it failed
+    } else { // 30% chance it failed
         console.log(`Mock Bank API: Reconciled ${uuid} to FAILED`);
         return { status: 'FAILED' };
-    } else { // 70% chance it's still pending at the bank
-        return { status: 'PENDING' };
     }
 }

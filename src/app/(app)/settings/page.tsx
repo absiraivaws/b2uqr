@@ -26,6 +26,7 @@ function ApiDetailsTab() {
         <div className="space-y-6">
             {otherFields.map((field) => {
                  const setting = supportedFields.find(sf => sf.id === field.id);
+                 const fieldDef = allApiFields.find(f => f.id === field.id);
                  return (
                     <div key={field.id} className="space-y-2">
                         <Label htmlFor={field.id}>{field.label}</Label>
@@ -33,8 +34,10 @@ function ApiDetailsTab() {
                             id={field.id}
                             value={setting?.value ?? ''}
                             onChange={(e) => setFieldValue(field.id, e.target.value)}
-                            placeholder={`Enter default ${field.label.toLowerCase()}`}
+                            placeholder={fieldDef?.placeholder ?? `Enter default ${field.label.toLowerCase()}`}
+                            maxLength={fieldDef?.maxLength}
                         />
+                         {fieldDef?.maxLength && <p className="text-xs text-muted-foreground">Must be {fieldDef.maxLength} digits.</p>}
                     </div>
                 );
             })}
@@ -135,5 +138,3 @@ export default function SettingsPage() {
     </main>
   );
 }
-
-    

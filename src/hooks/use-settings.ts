@@ -15,9 +15,10 @@ export interface ApiField {
 
 // Updated to include all fields for LankaQR
 export const allApiFields: ApiField[] = [
-  { id: 'merchant_id', label: 'Merchant ID', defaultValue: '0000000007960028005', maxLength: 19, placeholder: '19-digit Merchant ID' }, 
+  { id: 'merchant_id', label: 'Merchant ID', defaultValue: '0000000007960028005', maxLength: 19, placeholder: '19-digit Merchant ID' },
   { id: 'bank_code', label: 'Bank Code', defaultValue: '16135', maxLength: 5, placeholder: '5-digit Bank Code'},
   { id: 'terminal_id', label: 'Terminal ID', defaultValue: '0001', maxLength: 4, placeholder: '4-digit Terminal ID'},
+  { id: 'account_number', label: 'Account Number', defaultValue: '', maxLength: 15, placeholder: '15-digit Account Number'},
   { id: 'merchant_name', label: 'Merchant Name', defaultValue: 'LVMSiraiva', maxLength: 25 },
   { id: 'merchant_city', label: 'Merchant City', defaultValue: 'MANNAR', maxLength: 15 },
   { id: 'mcc', label: 'Merchant Category Code', defaultValue: '5999', readOnly: true, maxLength: 4 },

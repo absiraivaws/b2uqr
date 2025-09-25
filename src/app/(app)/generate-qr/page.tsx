@@ -6,6 +6,7 @@ import Image from "next/image";
 import {
   createTransaction,
   getTransactionStatus,
+  verifyTransaction,
 } from "@/lib/actions";
 import type { Transaction } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
@@ -16,8 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Loader2, QrCode, AlertTriangle, CheckCircle, Clock } from "lucide-react";
+import { Loader2, QrCode, AlertTriangle, CheckCircle, Clock, BellRing, ShieldCheck } from "lucide-react";
 
 function TransactionForm({
   onAmountChange,
@@ -70,24 +70,14 @@ function TransactionForm({
 
 function TransactionStatus({
   transaction,
+  onVerify,
   isVerifying,
 }: {
   transaction: Transaction;
+  onVerify: () => void;
   isVerifying: boolean;
 }) {
   
-  const getStatusVariant = (status: Transaction["status"]) => {
-    switch (status) {
-      case "SUCCESS":
-        return "default";
-      case "FAILED":
-        return "destructive";
-      case "PENDING":
-      default:
-        return "secondary";
-    }
-  };
-
   const StatusIcon = ({ status }: { status: Transaction["status"] }) => {
     switch (status) {
       case "SUCCESS": return <CheckCircle className="h-5 w-5 text-green-500" />;
@@ -113,13 +103,25 @@ function TransactionStatus({
           ) : (
             <div className="w-[250px] h-[250px] flex flex-col items-center justify-center text-center bg-background rounded-lg shadow-md">
                 <StatusIcon status={transaction.status} />
-                <p className="mt-4 font-medium text-lg">Payment {transaction.status}</p>
+                <p className={`mt-4 font-medium text-lg ${transaction.status === 'SUCCESS' ? 'text-green-600' : 'text-red-600'}`}>
+                    Payment {transaction.status}
+                </p>
                 <p className="text-muted-foreground text-sm mt-1">
                     {transaction.status === 'SUCCESS' ? 'Transaction completed successfully.' : 'Transaction has failed.'}
                 </p>
             </div>
           )}
         </div>
+
+        {transaction.status === "PENDING" && (
+           <div className="mt-4 flex flex-col items-center">
+              <Button onClick={onVerify} disabled={isVerifying}>
+                {isVerifying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
+                Verify Transaction
+              </Button>
+              <p className="text-xs text-muted-foreground mt-2">Click to manually check the transaction status.</p>
+           </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -131,6 +133,8 @@ export default function GenerateQRPage() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [referenceNumber, setReferenceNumber] = useState("");
   const [lastTxNumber, setLastTxNumber] = useState(0);
+  const successSoundRef = useRef<HTMLAudioElement>(null);
+
 
   const { toast } = useToast();
   const settings = useSettingsStore();
@@ -154,13 +158,16 @@ export default function GenerateQRPage() {
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
 
-    if (currentTransaction && currentTransaction.status === "PENDING") {
+    if (currentTransaction && currentTransaction.status === "PENDING" && !isVerifying) {
       interval = setInterval(async () => {
         try {
           const updatedTx = await getTransactionStatus(currentTransaction.transaction_uuid);
           if (updatedTx) {
             setCurrentTransaction(prevTx => {
               if (prevTx?.status !== updatedTx.status) {
+                if (updatedTx.status === 'SUCCESS') {
+                    successSoundRef.current?.play();
+                }
                 if (interval) clearInterval(interval);
                 generateReferenceNumber(); 
                 return updatedTx;
@@ -171,13 +178,13 @@ export default function GenerateQRPage() {
         } catch (error) {
           console.error("Failed to fetch transaction status:", error);
         }
-      }, 3000);
+      }, 5000); // Poll less frequently
     }
 
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [currentTransaction, generateReferenceNumber]);
+  }, [currentTransaction, generateReferenceNumber, isVerifying]);
 
 
   const handleCreateTransaction = async (amount: string) => {
@@ -193,9 +200,22 @@ export default function GenerateQRPage() {
     formData.set('amount', amount);
     formData.set('reference_number', referenceNumber);
 
-    // Add all supported fields from settings to the form data
+    // Add all enabled fields from settings to the form data
     settings.supportedFields.forEach(field => {
-      formData.set(field.id, field.value);
+      if (field.enabled && field.value) {
+        formData.set(field.id, field.value);
+      }
+    });
+
+     // Add fields that might not be in the 'enabled' list but are required
+    const requiredFields = ['merchant_id', 'bank_code', 'terminal_id', 'merchant_name', 'merchant_city', 'mcc'];
+    requiredFields.forEach(id => {
+      if (!formData.has(id)) {
+        const field = settings.supportedFields.find(f => f.id === id);
+        if (field?.value) {
+          formData.set(id, field.value);
+        }
+      }
     });
 
     try {
@@ -213,6 +233,33 @@ export default function GenerateQRPage() {
       setIsSubmitting(false);
     }
   };
+
+  const handleVerifyTransaction = async () => {
+    if (!currentTransaction) return;
+
+    setIsVerifying(true);
+    try {
+        const updatedTx = await verifyTransaction(currentTransaction.transaction_uuid);
+        if (updatedTx.status === 'SUCCESS') {
+            successSoundRef.current?.play();
+            toast({ title: "Verification Success", description: "The payment has been confirmed." });
+        } else if (updatedTx.status === 'FAILED') {
+            toast({ variant: "destructive", title: "Verification Failed", description: "The payment was not successful." });
+        }
+        setCurrentTransaction(updatedTx);
+        generateReferenceNumber();
+
+    } catch (error) {
+       const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+       toast({
+        variant: "destructive",
+        title: "Error Verifying Transaction",
+        description: errorMessage,
+      });
+    } finally {
+      setIsVerifying(false);
+    }
+  };
   
   const debouncedCreateTransaction = useRef(
     debounce(handleCreateTransaction, 500)
@@ -227,6 +274,9 @@ export default function GenerateQRPage() {
 
   return (
     <main className="p-4 sm:p-6 lg:p-8">
+        {/* Bell sound for success */}
+        <audio ref={successSoundRef} src="/success-bell.mp3" preload="auto"></audio>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
             <div className="lg:col-span-1 space-y-8">
               <TransactionForm onAmountChange={debouncedCreateTransaction} isSubmitting={isSubmitting} referenceNumber={referenceNumber} />
@@ -245,6 +295,7 @@ export default function GenerateQRPage() {
             ) : currentTransaction ? (
                 <TransactionStatus 
                     transaction={currentTransaction} 
+                    onVerify={handleVerifyTransaction}
                     isVerifying={isVerifying}
                 />
             ) : (

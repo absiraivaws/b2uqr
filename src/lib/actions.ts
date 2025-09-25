@@ -8,8 +8,9 @@ import {
   getDbTransaction,
   updateDbTransactionStatus,
   findPendingTransactions,
+  getLastDbTransaction,
 } from "./db";
-import { callBankCreateQR } from "./bank-api";
+import { callBankCreateQR, callBankReconciliationAPI } from "./bank-api";
 import { verifyWebhookSignature } from "./security";
 import { alertFailures, type AlertFailuresOutput } from "@/ai/flows/alert-failures";
 import crypto from "crypto";
@@ -19,15 +20,14 @@ const TransactionSchema = z.object({
   reference_number: z.string(),
   // From settings
   merchant_id: z.string().min(1, "Merchant ID is required."),
+  bank_code: z.string().min(1, "Bank Code is required."),
+  terminal_id: z.string().min(1, "Terminal ID is required."),
   merchant_name: z.string().min(1, "Merchant Name is required."),
   merchant_city: z.string().min(1, "Merchant City is required."),
   mcc: z.string().min(1, "MCC is required."),
-  bank_code: z.string().min(1, "Bank Code is required."),
-  terminal_id: z.string().min(1, "Terminal ID is required."),
-  // These are not user-configurable but need to be present for form submission
-  currency: z.string(),
-  currency_code: z.string(),
-  country_code: z.string(),
+  currency: z.string().optional(), // Not on form, but in settings
+  currency_code: z.string().optional(), // Not on form, but in settings
+  country_code: z.string().optional(), // Not on form, but in settings
   customer_email: z.string().optional(),
   customer_name: z.string().optional(),
 });
@@ -74,8 +74,8 @@ export async function createTransaction(formData: FormData): Promise<Transaction
     merchant_name: data.merchant_name,
     merchant_city: data.merchant_city,
     mcc: data.mcc,
-    currency_code: data.currency_code,
-    country_code: data.country_code,
+    currency_code: data.currency_code ?? '144', // Default to LKR
+    country_code: data.country_code ?? 'LK', // Default to LK
   });
 
   // 4. Update transaction with QR data from bank
@@ -92,6 +92,37 @@ export async function getTransactionStatus(uuid: string): Promise<Transaction | 
     const tx = await getDbTransaction(uuid);
     return tx || null;
 }
+
+export async function getLastTransaction(): Promise<Transaction | null> {
+  const tx = await getLastDbTransaction();
+  return tx || null;
+}
+
+
+export async function verifyTransaction(uuid: string): Promise<Transaction> {
+    console.log(`Verifying transaction ${uuid}`);
+    const bankStatus = await callBankReconciliationAPI(uuid);
+
+    if (!bankStatus) {
+        throw new Error("Could not verify transaction with the bank.");
+    }
+    
+    // In a real scenario, you'd get more details from the bank.
+    // Here we're just updating the status.
+    const bankResponsePayload = {
+      status: bankStatus.status,
+      verified_at: new Date().toISOString()
+    }
+    
+    const updatedTx = await updateDbTransactionStatus(uuid, bankStatus.status, bankResponsePayload);
+
+    if (!updatedTx) {
+      throw new Error("Transaction not found after verification.");
+    }
+    
+    return updatedTx;
+}
+
 
 // This function simulates the bank calling our webhook.
 export async function simulateWebhook(uuid: string, status: "SUCCESS" | "FAILED"): Promise<void> {

@@ -1,7 +1,10 @@
+
 import type { Transaction } from "./types";
 
 // In-memory store to simulate a database like Firestore
 const transactions = new Map<string, Transaction>();
+let lastTransactionUUID: string | null = null;
+
 
 export async function createDbTransaction(tx: Omit<Transaction, 'created_at' | 'updated_at'>): Promise<Transaction> {
   const now = new Date().toISOString();
@@ -11,11 +14,19 @@ export async function createDbTransaction(tx: Omit<Transaction, 'created_at' | '
     updated_at: now,
   };
   transactions.set(newTx.transaction_uuid, newTx);
+  lastTransactionUUID = newTx.transaction_uuid;
   return newTx;
 }
 
 export async function getDbTransaction(uuid: string): Promise<Transaction | undefined> {
   return transactions.get(uuid);
+}
+
+export async function getLastDbTransaction(): Promise<Transaction | undefined> {
+    if (!lastTransactionUUID) {
+        return undefined;
+    }
+    return transactions.get(lastTransactionUUID);
 }
 
 export async function updateDbTransactionStatus(uuid: string, status: 'SUCCESS' | 'FAILED', bankResponse: any): Promise<Transaction | undefined> {
