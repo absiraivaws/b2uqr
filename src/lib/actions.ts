@@ -152,9 +152,11 @@ export async function simulateWebhook(uuid: string, status: "SUCCESS" | "FAILED"
   const secret = process.env.BANK_WEBHOOK_SECRET || 'fake-webhook-secret';
   const signature = crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
 
-  const webhookUrl = new URL('/api/bank/webhook', process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:9002');
+  // Use a relative path for the fetch call inside a server component/action
+  const webhookUrl = '/api/bank/webhook';
+  const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:9002';
   
-  await fetch(webhookUrl.toString(), {
+  await fetch(new URL(webhookUrl, baseUrl), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
