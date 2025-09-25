@@ -85,9 +85,9 @@ export async function callBankCreateQR(params: CreateQrRequest): Promise<CreateQ
   const merchantName = buildTag('59', params.merchant_name);
   const merchantCity = buildTag('60', params.merchant_city);
 
-  // Tag 62: Additional Data (with nested Reference Number)
-  const refSubTag = buildTag('05', params.reference_number.slice(0, 25));
-  const additionalData = buildTag('62', refSubTag);
+  // Tag 62: Additional Data (with nested Reference Number) as per user's last instruction
+  // The value is now a fixed string `0503***`
+  const additionalData = '62070503***';
   
   const payloadWithoutCrc = [
     payloadIndicator,
@@ -137,5 +137,3 @@ export async function callBankReconciliationAPI(uuid: string): Promise<{ status:
         return { status: 'FAILED' };
     }
 }
-
-    

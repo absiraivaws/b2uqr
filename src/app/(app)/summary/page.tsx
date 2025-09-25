@@ -20,6 +20,8 @@ const data = [
 
 export default function SummaryPage() {
     const [terminalId, setTerminalId] = useState('all');
+    const terminalIdOptions = ['all', ...Array.from({ length: 10 }, (_, i) => String(i + 1).padStart(4, '0'))];
+
   return (
     <main className="p-4 sm:p-6 lg:p-8 space-y-8">
         <Card>
@@ -38,9 +40,11 @@ export default function SummaryPage() {
                                 <SelectValue placeholder="Select Terminal" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">All Terminals</SelectItem>
-                                <SelectItem value="0001">0001</SelectItem>
-                                <SelectItem value="0002">0002</SelectItem>
+                                {terminalIdOptions.map(option => (
+                                     <SelectItem key={option} value={option}>
+                                        {option === 'all' ? 'All Terminals' : option}
+                                     </SelectItem>
+                                ))}
                             </SelectContent>
                         </Select>
                     </div>
