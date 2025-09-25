@@ -23,11 +23,11 @@ const TransactionSchema = z.object({
   merchant_name: z.string(),
   merchant_city: z.string(),
   mcc: z.string(),
-  currency_code: z.string(),
+  currency_code: z.string().optional(),
   bank_code: z.string(),
   terminal_id: z.string(),
-  country_code: z.string(),
-  currency: z.string(),
+  country_code: z.string().optional(),
+  currency: z.string().optional(),
 });
 
 export async function createTransaction(formData: FormData): Promise<Transaction> {
@@ -52,7 +52,7 @@ export async function createTransaction(formData: FormData): Promise<Transaction
     amount: data.amount,
     reference_number: data.reference_number,
     merchant_id: data.merchant_id,
-    currency: data.currency
+    currency: data.currency ?? 'LKR'
   };
 
   // 3. Call Bank API to create QR
@@ -65,8 +65,6 @@ export async function createTransaction(formData: FormData): Promise<Transaction
     merchant_name: data.merchant_name,
     merchant_city: data.merchant_city,
     mcc: data.mcc,
-    currency_code: data.currency_code,
-    country_code: data.country_code,
   });
 
   // 4. Update transaction with QR data from bank
