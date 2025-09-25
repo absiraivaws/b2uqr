@@ -1,7 +1,9 @@
+
 export interface Transaction {
   transaction_id: string;
   transaction_uuid: string;
   merchant_id: string;
+  terminal_id?: string;
   amount: string;
   currency: string;
   reference_number: string;
@@ -25,4 +27,5 @@ export interface BankWebhookPayload {
   status: 'SUCCESS' | 'FAILED';
   auth_code: string;
   paid_at: string;
+  terminal_id?: string;
 }

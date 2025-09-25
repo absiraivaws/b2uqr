@@ -15,11 +15,19 @@ export async function createDbTransaction(tx: Omit<Transaction, 'created_at' | '
   };
   transactions.set(newTx.transaction_uuid, newTx);
   lastTransactionUUID = newTx.transaction_uuid;
+  // Also pass terminal ID in bankResponse for consistency
+  if (tx.terminal_id) {
+    newTx.bankResponse = { ...newTx.bankResponse, terminal_id: tx.terminal_id };
+  }
   return newTx;
 }
 
 export async function getDbTransaction(uuid: string): Promise<Transaction | undefined> {
   return transactions.get(uuid);
+}
+
+export async function getAllDbTransactions(): Promise<Transaction[]> {
+  return Array.from(transactions.values()).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 }
 
 export async function getLastDbTransaction(): Promise<Transaction | undefined> {

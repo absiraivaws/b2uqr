@@ -9,6 +9,7 @@ import {
   updateDbTransactionStatus,
   findPendingTransactions,
   getLastDbTransaction,
+  getAllDbTransactions,
 } from "./db";
 import { callBankCreateQR, callBankReconciliationAPI } from "./bank-api";
 import { verifyWebhookSignature } from "./security";
@@ -61,6 +62,7 @@ export async function createTransaction(formData: FormData): Promise<Transaction
     amount: data.amount,
     reference_number: data.reference_number,
     merchant_id: data.merchant_id,
+    terminal_id: data.terminal_id, // Pass terminal_id
     currency: 'LKR'
   };
 
@@ -91,6 +93,10 @@ export async function createTransaction(formData: FormData): Promise<Transaction
 export async function getTransactionStatus(uuid: string): Promise<Transaction | null> {
     const tx = await getDbTransaction(uuid);
     return tx || null;
+}
+
+export async function getAllTransactions(): Promise<Transaction[]> {
+    return await getAllDbTransactions();
 }
 
 export async function getLastTransaction(): Promise<Transaction | null> {
@@ -139,6 +145,7 @@ export async function simulateWebhook(uuid: string, status: "SUCCESS" | "FAILED"
     status: status,
     auth_code: status === 'SUCCESS' ? `auth_${crypto.randomBytes(4).toString('hex')}` : 'N/A',
     paid_at: new Date().toISOString(),
+    terminal_id: tx.terminal_id, // Include terminal_id in webhook
   };
 
   const rawBody = JSON.stringify(payload);

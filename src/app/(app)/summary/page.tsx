@@ -1,7 +1,10 @@
+
 'use client'
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BarChart, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Bar, Line, ResponsiveContainer } from 'recharts';
 
 
@@ -16,6 +19,7 @@ const data = [
 ];
 
 export default function SummaryPage() {
+    const [terminalId, setTerminalId] = useState('all');
   return (
     <main className="p-4 sm:p-6 lg:p-8 space-y-8">
         <Card>
@@ -24,10 +28,22 @@ export default function SummaryPage() {
                 <CardDescription>View transaction summary and statistics.</CardDescription>
             </CardHeader>
              <CardContent className="space-y-4">
-                <div className="flex items-center gap-4">
-                    <Input type="date" className="w-[200px]" />
-                    <span>-</span>
-                    <Input type="date" className="w-[200px]" />
+                <div className="flex flex-wrap items-center gap-4">
+                    <Input type="date" className="w-full sm:w-[200px]" />
+                    <span className="hidden sm:inline">-</span>
+                    <Input type="date" className="w-full sm:w-[200px]" />
+                    <div className="w-full sm:w-auto">
+                        <Select value={terminalId} onValueChange={setTerminalId}>
+                            <SelectTrigger className="w-full sm:w-[180px]">
+                                <SelectValue placeholder="Select Terminal" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Terminals</SelectItem>
+                                <SelectItem value="0001">0001</SelectItem>
+                                <SelectItem value="0002">0002</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
                     <Button>Filter</Button>
                 </div>
 
@@ -55,7 +71,7 @@ export default function SummaryPage() {
             <CardHeader>
                 <CardTitle>Transaction Chart</CardTitle>
                 <CardDescription>Bar with line chart for transaction count and amount.</CardDescription>
-            </CardHeader>
+            </Header>
             <CardContent>
                  <ResponsiveContainer width="100%" height={300}>
                     <LineChart data={data} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
