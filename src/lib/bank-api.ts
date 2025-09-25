@@ -2,10 +2,7 @@
 // This file mocks the server-to-server API calls to the bank.
 // It now includes a full implementation for LankaQR dynamic QR payload generation.
 
-import crypto from 'crypto';
-
 interface CreateQrRequest {
-  transaction_uuid: string;
   amount: string;
   reference_number: string;
   // Merchant details that would typically come from settings or a database
@@ -21,7 +18,6 @@ interface CreateQrRequest {
 
 interface CreateQrResponse {
   qr_payload: string;
-  qr_image_url?: string;
   expires_at: string;
   transaction_ref: string;
 }
@@ -69,33 +65,35 @@ export async function callBankCreateQR(params: CreateQrRequest): Promise<CreateQ
   const payloadIndicator = buildTag('00', '01');
   const pointOfInitiation = buildTag('01', '12'); // 12 for Dynamic QR
   
-  // Tag 26: Merchant Account Information
-  const appId = `422580004996${params.bank_code}`; // Assuming appId is constructed this way
-  const applicationIdentifier = buildTag('02', appId);
+  // Tag 02: Merchant ID / Network Reference (Fixed for LankaPay/People's Bank)
+  const networkReference = buildTag('02', '4225800049969011');
 
-  // Constructing Tag 26 value dynamically
-  // Structure: 00(GUID)+28(len)+16(bank_code_len)+bank_code+000000000+merchant_id_last_10+terminal_id
-  const merchantIdLast10 = params.merchant_id.slice(-10);
-  const bankCodeSubTag = buildTag('00', params.bank_code);
-  const merchantIdSubTag = buildTag('01', merchantIdLast10);
-  const terminalIdSubTag = buildTag('02', params.terminal_id);
-  const merchantInfoValue = `${bankCodeSubTag}${merchantIdSubTag}${terminalIdSubTag}`;
+  // Tag 26: Merchant Account Information
+  // This is a nested structure.
+  const guid = '00' + '28'; // GUID tag and length of content
+  const merchantInfoValue = `${guid}${params.bank_code}${params.merchant_id}${params.terminal_id}`;
   const merchantAccountInformation = buildTag('26', merchantInfoValue);
+
   
   const merchantCategoryCode = buildTag('52', params.mcc);
   const transactionCurrency = buildTag('53', params.currency_code);
-  const transactionAmount = buildTag('54', parseFloat(params.amount).toFixed(2));
+  
+  // Amount must be formatted to 2 decimal places.
+  const formattedAmount = parseFloat(params.amount).toFixed(2);
+  const transactionAmount = buildTag('54', formattedAmount);
+  
   const countryCode = buildTag('58', params.country_code);
   const merchantName = buildTag('59', params.merchant_name);
   const merchantCity = buildTag('60', params.merchant_city);
 
-  const referenceNumberSubTagContent = buildTag('05', params.reference_number);
-  const fullAdditionalDataTag = buildTag('62', referenceNumberSubTagContent);
+  // Tag 62: Additional Data (with nested Reference Number)
+  const referenceNumberSubTag = buildTag('05', params.reference_number);
+  const additionalData = buildTag('62', referenceNumberSubTag);
   
   const payloadWithoutCrc = [
     payloadIndicator,
     pointOfInitiation,
-    applicationIdentifier,
+    networkReference,
     merchantAccountInformation,
     merchantCategoryCode,
     transactionCurrency,
@@ -103,7 +101,7 @@ export async function callBankCreateQR(params: CreateQrRequest): Promise<CreateQ
     countryCode,
     merchantName,
     merchantCity,
-    fullAdditionalDataTag,
+    additionalData,
     '6304' // CRC Tag and Length placeholder
   ].join('');
 

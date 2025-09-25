@@ -2,7 +2,6 @@
 'use server';
 
 import { z } from "zod";
-import { format } from "date-fns";
 import type { Transaction, BankWebhookPayload } from "./types";
 import {
   createDbTransaction,
@@ -39,10 +38,8 @@ export async function createTransaction(formData: FormData): Promise<Transaction
   }
   const data = parsed.data;
 
-  // 1. Generate transaction_uuid
-  const timestamp = format(new Date(), "yyyyMMdd");
-  const randomPart = Math.floor(100000 + Math.random() * 900000);
-  const transaction_uuid = `${timestamp}${randomPart}`;
+  // 1. Generate transaction_uuid (if not already part of form)
+   const transaction_uuid = `uuid_${crypto.randomBytes(12).toString('hex')}`;
 
   // 2. Persist transaction in Firestore with status: PENDING
   // This is a pre-save object. The actual DB layer will add created_at etc.
@@ -60,7 +57,6 @@ export async function createTransaction(formData: FormData): Promise<Transaction
 
   // 3. Call Bank API to create QR
   const bankResponse = await callBankCreateQR({
-    transaction_uuid,
     amount: data.amount,
     reference_number: data.reference_number,
     merchant_id: data.merchant_id,
@@ -189,24 +185,17 @@ export async function runReconciliation(): Promise<{ message: string; alert?: Al
 
     console.log(`Found ${pendingTxs.length} stale transaction(s) to reconcile.`);
 
-    let reconciledCount = 0;
+    // This is a mock reconciliation. In a real app, you'd call the bank's API.
+    // Here we just fail them.
     for (const tx of pendingTxs) {
-        const bankStatus = await callBankReconciliationAPI(tx.transaction_uuid);
-
-        if (bankStatus && bankStatus.status !== 'PENDING') {
-            console.log(`Reconciling ${tx.transaction_uuid} to ${bankStatus.status}`);
-            await updateDbTransactionStatus(tx.transaction_uuid, bankStatus.status, { reconciled_at: new Date().toISOString() });
-            reconciledCount++;
-        }
+        console.log(`Failing stale transaction ${tx.transaction_uuid}`);
+        await updateDbTransactionStatus(tx.transaction_uuid, 'FAILED', { reconciled_at: new Date().toISOString(), reason: 'Stale' });
     }
     
-    if (reconciledCount < pendingTxs.length) {
-         const alert = await alertFailures({
-            failureType: 'Reconciliation Failure',
-            details: `Found ${pendingTxs.length} stale transactions, but only reconciled ${reconciledCount}. ${pendingTxs.length - reconciledCount} transactions remain in a pending state at both our end and the bank's end after the timeout window.`,
-        });
-        return { message: `Reconciled ${reconciledCount} of ${pendingTxs.length} stale transactions. Some could not be resolved.`, alert };
-    }
+    const alert = await alertFailures({
+        failureType: 'Reconciliation Complete',
+        details: `Found and failed ${pendingTxs.length} stale transactions that were older than 10 minutes.`,
+    });
 
-    return { message: `Reconciliation complete. Processed ${reconciledCount} stale transactions.` };
+    return { message: `Reconciliation complete. Failed ${pendingTxs.length} stale transactions.`, alert };
 }
