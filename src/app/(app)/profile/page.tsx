@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useSettingsStore, allApiFields } from "@/hooks/use-settings";
 import { useToast } from "@/hooks/use-toast";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 
 export default function ProfilePage() {
     const { supportedFields, setFieldValue } = useSettingsStore();
@@ -27,6 +29,9 @@ export default function ProfilePage() {
     const getFieldDef = (id: string) => {
         return allApiFields.find(f => f.id === id);
     }
+
+    const terminalIdOptions = Array.from({ length: 10 }, (_, i) => String(i + 1).padStart(4, '0'));
+
 
   return (
     <main className="p-4 sm:p-6 lg:p-8">
@@ -92,14 +97,19 @@ export default function ProfilePage() {
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="terminal_id">Terminal ID</Label>
-                     <Input
-                        id="terminal_id"
+                    <Select
                         value={getField('terminal_id')?.value ?? ''}
-                        onChange={(e) => setFieldValue('terminal_id', e.target.value)}
-                        placeholder={getFieldDef('terminal_id')?.placeholder}
-                        maxLength={getFieldDef('terminal_id')?.maxLength}
-                    />
-                    <p className="text-xs text-muted-foreground">Must be {getFieldDef('terminal_id')?.maxLength} digits.</p>
+                        onValueChange={(value) => setFieldValue('terminal_id', value)}
+                    >
+                        <SelectTrigger>
+                            <SelectValue placeholder="Select Terminal ID" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {terminalIdOptions.map(option => (
+                                <SelectItem key={option} value={option}>{option}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 </div>
                  <div className="space-y-2">
                     <Label htmlFor="merchant_name">Merchant Name</Label>
@@ -138,3 +148,5 @@ export default function ProfilePage() {
     </main>
   );
 }
+
+    

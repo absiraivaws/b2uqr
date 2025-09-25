@@ -69,7 +69,8 @@ export async function callBankCreateQR(params: CreateQrRequest): Promise<CreateQ
   const networkReference = buildTag('02', '4225800049969011');
 
   // Tag 26: Merchant Account Information
-  const guid = '0028'; // GUID and length
+  const guid = '0028'; // GUID for People's Bank QR
+  // Value = GUID (4) + Bank Code (5) + Merchant ID (19) + Terminal ID (4)
   const merchantInfoValue = `${guid}${params.bank_code}${params.merchant_id}${params.terminal_id}`;
   const merchantAccountInformation = buildTag('26', merchantInfoValue);
   
@@ -85,10 +86,8 @@ export async function callBankCreateQR(params: CreateQrRequest): Promise<CreateQ
   const merchantCity = buildTag('60', params.merchant_city);
 
   // Tag 62: Additional Data (with nested Reference Number)
-  const refLabel = '05';
-  const refValue = params.reference_number.slice(0, 25);
-  const refNumberSubTag = buildTag(refLabel, refValue);
-  const additionalData = buildTag('62', refNumberSubTag);
+  const refSubTag = buildTag('05', params.reference_number.slice(0, 25));
+  const additionalData = buildTag('62', refSubTag);
   
   const payloadWithoutCrc = [
     payloadIndicator,
@@ -138,3 +137,5 @@ export async function callBankReconciliationAPI(uuid: string): Promise<{ status:
         return { status: 'FAILED' };
     }
 }
+
+    

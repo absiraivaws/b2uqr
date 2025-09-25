@@ -23,10 +23,12 @@ function TransactionForm({
   onAmountChange,
   isSubmitting,
   referenceNumber,
+  terminalId,
 }: {
   onAmountChange: (amount: string) => void;
   isSubmitting: boolean;
   referenceNumber: string;
+  terminalId: string;
 }) {
   return (
     <Card>
@@ -39,8 +41,7 @@ function TransactionForm({
           onSubmit={(e) => e.preventDefault()}
           className="space-y-6"
         >
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
+          <div className="space-y-2">
               <Label htmlFor="amount">Amount</Label>
               <Input 
                 id="amount" 
@@ -52,13 +53,25 @@ function TransactionForm({
                 step="0.01"
               />
             </div>
-            <div className="space-y-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+             <div className="space-y-2">
                 <Label htmlFor="reference_number">Reference Number</Label>
                 <Input 
                   id="reference_number" 
                   name="reference_number" 
                   value={referenceNumber}
                   readOnly
+                  className="bg-muted"
+                  />
+             </div>
+             <div className="space-y-2">
+                <Label htmlFor="terminal_id">Terminal ID</Label>
+                <Input 
+                  id="terminal_id" 
+                  name="terminal_id" 
+                  value={terminalId}
+                  readOnly
+                  className="bg-muted font-bold text-primary"
                   />
              </div>
           </div>
@@ -136,6 +149,7 @@ export default function GenerateQRPage() {
 
   const { toast } = useToast();
   const settings = useSettingsStore();
+  const terminalId = settings.supportedFields.find(f => f.id === 'terminal_id')?.value ?? '0001';
 
   const generateReferenceNumber = useCallback(() => {
     const date = new Date();
@@ -207,7 +221,7 @@ export default function GenerateQRPage() {
     });
 
      // Add fields that might not be in the 'enabled' list but are required
-    const requiredFields = ['merchant_id', 'bank_code', 'terminal_id', 'merchant_name', 'merchant_city', 'mcc'];
+    const requiredFields = ['merchant_id', 'bank_code', 'terminal_id', 'merchant_name', 'merchant_city', 'mcc', 'currency_code', 'country_code'];
     requiredFields.forEach(id => {
       if (!formData.has(id)) {
         const field = settings.supportedFields.find(f => f.id === id);
@@ -276,7 +290,7 @@ export default function GenerateQRPage() {
     <main className="p-4 sm:p-6 lg:p-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
             <div className="lg:col-span-1 space-y-8">
-              <TransactionForm onAmountChange={debouncedCreateTransaction} isSubmitting={isSubmitting} referenceNumber={referenceNumber} />
+              <TransactionForm onAmountChange={debouncedCreateTransaction} isSubmitting={isSubmitting} referenceNumber={referenceNumber} terminalId={terminalId}/>
             </div>
             <div className="lg:col-span-2">
             {isSubmitting ? (
@@ -311,3 +325,5 @@ export default function GenerateQRPage() {
     </main>
   );
 }
+
+    
