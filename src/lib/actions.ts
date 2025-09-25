@@ -14,35 +14,44 @@ import { verifyWebhookSignature } from "./security";
 import { alertFailures, type AlertFailuresOutput } from "@/ai/flows/alert-failures";
 import crypto from "crypto";
 
-
 const TransactionSchema = z.object({
   amount: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid amount format"),
   reference_number: z.string(),
   // From settings
-  merchant_id: z.string(),
-  merchant_name: z.string(),
-  merchant_city: z.string(),
-  mcc: z.string(),
-  currency_code: z.string().optional(),
-  bank_code: z.string(),
-  terminal_id: z.string(),
-  country_code: z.string().optional(),
-  currency: z.string().optional(),
+  merchant_id: z.string().min(1, "Merchant ID is required."),
+  merchant_name: z.string().min(1, "Merchant Name is required."),
+  merchant_city: z.string().min(1, "Merchant City is required."),
+  mcc: z.string().min(1, "MCC is required."),
+  bank_code: z.string().min(1, "Bank Code is required."),
+  terminal_id: z.string().min(1, "Terminal ID is required."),
+  // These are not user-configurable but need to be present for form submission
+  currency: z.string(),
+  currency_code: z.string(),
+  country_code: z.string(),
+  customer_email: z.string().optional(),
+  customer_name: z.string().optional(),
 });
 
+
 export async function createTransaction(formData: FormData): Promise<Transaction> {
-  const parsed = TransactionSchema.safeParse(Object.fromEntries(formData.entries()));
+  const dataToParse = Object.fromEntries(formData.entries());
+  console.log("Data being parsed:", dataToParse);
+  const parsed = TransactionSchema.safeParse(dataToParse);
 
   if (!parsed.success) {
-    throw new Error(parsed.error.errors.map((e) => e.message).join(", "));
+    // Log the detailed error for debugging
+    console.error("Zod validation failed:", parsed.error.flatten().fieldErrors);
+    // Provide a more specific error message to the user
+    const firstError = parsed.error.errors[0];
+    const errorMessage = `${firstError.path.join('.')} - ${firstError.message}`;
+    throw new Error(errorMessage || "Invalid transaction data.");
   }
   const data = parsed.data;
 
-  // 1. Generate transaction_uuid (if not already part of form)
+  // 1. Generate transaction_uuid
    const transaction_uuid = `uuid_${crypto.randomBytes(12).toString('hex')}`;
 
-  // 2. Persist transaction in Firestore with status: PENDING
-  // This is a pre-save object. The actual DB layer will add created_at etc.
+  // 2. Pre-save transaction object
   let pendingTx: Omit<Transaction, 'created_at' | 'updated_at'> = {
     transaction_id: `tx_${crypto.randomBytes(8).toString('hex')}`,
     transaction_uuid,
@@ -52,7 +61,7 @@ export async function createTransaction(formData: FormData): Promise<Transaction
     amount: data.amount,
     reference_number: data.reference_number,
     merchant_id: data.merchant_id,
-    currency: data.currency ?? 'LKR'
+    currency: 'LKR'
   };
 
   // 3. Call Bank API to create QR
@@ -65,6 +74,8 @@ export async function createTransaction(formData: FormData): Promise<Transaction
     merchant_name: data.merchant_name,
     merchant_city: data.merchant_city,
     mcc: data.mcc,
+    currency_code: data.currency_code,
+    country_code: data.country_code,
   });
 
   // 4. Update transaction with QR data from bank
@@ -83,7 +94,6 @@ export async function getTransactionStatus(uuid: string): Promise<Transaction | 
 }
 
 // This function simulates the bank calling our webhook.
-// It's a helper for the demo UI.
 export async function simulateWebhook(uuid: string, status: "SUCCESS" | "FAILED"): Promise<void> {
   const tx = await getDbTransaction(uuid);
   if (!tx) {
@@ -104,7 +114,6 @@ export async function simulateWebhook(uuid: string, status: "SUCCESS" | "FAILED"
   const secret = process.env.BANK_WEBHOOK_SECRET || 'fake-webhook-secret';
   const signature = crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
 
-  // Simulate a fetch call to our own webhook endpoint
   const webhookUrl = new URL('/api/bank/webhook', process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:9002');
   
   await fetch(webhookUrl.toString(), {
@@ -150,7 +159,6 @@ export async function handleWebhook(request: Request) {
         return { status: 404, body: { error: 'Transaction not found' } };
     }
     
-    // In LankaQR amount comparison needs to be precise
     if (parseFloat(tx.amount).toFixed(2) !== parseFloat(payload.amount).toFixed(2)) {
         await alertFailures({
             failureType: "unmatched transaction",
@@ -183,8 +191,6 @@ export async function runReconciliation(): Promise<{ message: string; alert?: Al
 
     console.log(`Found ${pendingTxs.length} stale transaction(s) to reconcile.`);
 
-    // This is a mock reconciliation. In a real app, you'd call the bank's API.
-    // Here we just fail them.
     for (const tx of pendingTxs) {
         console.log(`Failing stale transaction ${tx.transaction_uuid}`);
         await updateDbTransactionStatus(tx.transaction_uuid, 'FAILED', { reconciled_at: new Date().toISOString(), reason: 'Stale' });

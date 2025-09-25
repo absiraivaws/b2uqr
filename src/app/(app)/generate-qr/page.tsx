@@ -6,7 +6,6 @@ import Image from "next/image";
 import {
   createTransaction,
   getTransactionStatus,
-  simulateWebhook,
 } from "@/lib/actions";
 import type { Transaction } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
@@ -18,7 +17,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Loader2, QrCode, AlertTriangle, CheckCircle, Clock } from "lucide-react";
 
 function TransactionForm({
@@ -72,11 +70,9 @@ function TransactionForm({
 
 function TransactionStatus({
   transaction,
-  onVerifyTransaction,
   isVerifying,
 }: {
   transaction: Transaction;
-  onVerifyTransaction: () => void;
   isVerifying: boolean;
 }) {
   
@@ -123,11 +119,6 @@ function TransactionStatus({
                 </p>
             </div>
           )}
-          
-          <Button onClick={onVerifyTransaction} className="mt-4" variant="default" disabled={isVerifying || transaction.status !== 'PENDING'}>
-             {isVerifying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-             Verify Transaction
-          </Button>
         </div>
       </CardContent>
     </Card>
@@ -137,13 +128,12 @@ function TransactionStatus({
 export default function GenerateQRPage() {
   const [currentTransaction, setCurrentTransaction] = useState<Transaction | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSimulating, setIsSimulating] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [referenceNumber, setReferenceNumber] = useState("");
   const [lastTxNumber, setLastTxNumber] = useState(0);
 
   const { toast } = useToast();
-  const { supportedFields } = useSettingsStore();
+  const settings = useSettingsStore();
 
   const generateReferenceNumber = useCallback(() => {
     const date = new Date();
@@ -157,28 +147,8 @@ export default function GenerateQRPage() {
   }, [lastTxNumber]);
 
   useEffect(() => {
-    // Generate initial reference number on mount
     generateReferenceNumber();
   }, []); // Eslint-disable-line react-hooks/exhaustive-deps, this should only run once
-
-  const handleVerifyTransaction = async () => {
-      if (!currentTransaction) return;
-      setIsVerifying(true);
-      try {
-          const updatedTx = await getTransactionStatus(currentTransaction.transaction_uuid);
-          if (updatedTx) {
-              setCurrentTransaction(updatedTx);
-              toast({
-                  title: "Transaction Status Updated",
-                  description: `Status is now: ${updatedTx.status}`,
-              });
-          }
-      } catch (error) {
-          toast({ variant: "destructive", title: "Error", description: "Could not verify transaction status." });
-      } finally {
-          setIsVerifying(false);
-      }
-  };
 
 
   useEffect(() => {
@@ -190,13 +160,12 @@ export default function GenerateQRPage() {
           const updatedTx = await getTransactionStatus(currentTransaction.transaction_uuid);
           if (updatedTx) {
             setCurrentTransaction(prevTx => {
-              // If status changes, update and stop polling
               if (prevTx?.status !== updatedTx.status) {
                 if (interval) clearInterval(interval);
-                generateReferenceNumber(); // Generate new ref for next transaction
+                generateReferenceNumber(); 
                 return updatedTx;
               }
-              return prevTx; // Keep the old state to avoid re-renders
+              return prevTx; 
             });
           }
         } catch (error) {
@@ -225,10 +194,8 @@ export default function GenerateQRPage() {
     formData.set('reference_number', referenceNumber);
 
     // Add all supported fields from settings to the form data
-    supportedFields.forEach(field => {
-      if (field.enabled || field.readOnly) {
-         formData.set(field.id, field.value);
-      }
+    settings.supportedFields.forEach(field => {
+      formData.set(field.id, field.value);
     });
 
     try {
@@ -241,7 +208,6 @@ export default function GenerateQRPage() {
         title: "Error Creating Transaction",
         description: errorMessage,
       });
-      // If creation fails, generate a new reference number for the next attempt
       generateReferenceNumber();
     } finally {
       setIsSubmitting(false);
@@ -258,27 +224,6 @@ export default function GenerateQRPage() {
     };
   }, [debouncedCreateTransaction]);
 
-
-  const handleSimulateWebhook = async (status: "SUCCESS" | "FAILED") => {
-    if (!currentTransaction) return;
-    setIsSimulating(true);
-    try {
-      await simulateWebhook(currentTransaction.transaction_uuid, status);
-      toast({
-        title: `Webhook Simulated: ${status}`,
-        description: `Transaction status should update shortly.`,
-      });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
-      toast({
-        variant: "destructive",
-        title: "Webhook Simulation Failed",
-        description: errorMessage,
-      });
-    } finally {
-        setIsSimulating(false);
-    }
-  };
 
   return (
     <main className="p-4 sm:p-6 lg:p-8">
@@ -300,7 +245,6 @@ export default function GenerateQRPage() {
             ) : currentTransaction ? (
                 <TransactionStatus 
                     transaction={currentTransaction} 
-                    onVerifyTransaction={handleVerifyTransaction}
                     isVerifying={isVerifying}
                 />
             ) : (
