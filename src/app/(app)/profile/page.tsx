@@ -140,6 +140,25 @@ export default function ProfilePage() {
                         className="bg-muted"
                     />
                 </div>
+                <div className="space-y-2">
+                    <Label htmlFor="merchant_reference_label">Merchant Reference Number</Label>
+                    <Input
+                        id="merchant_reference_label"
+                        value={getField('merchant_reference_label')?.value ?? ''}
+                        onChange={(e) => setFieldValue('merchant_reference_label', e.target.value)}
+                        placeholder={getFieldDef('merchant_reference_label')?.placeholder}
+                    />
+                    <p className="text-xs text-muted-foreground">{getFieldDef('merchant_reference_label')?.placeholder}</p>
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="customer_reference_label">Customer Reference Number</Label>
+                    <Input
+                        id="customer_reference_label"
+                        value={getField('customer_reference_label')?.value ?? ''}
+                        onChange={(e) => setFieldValue('customer_reference_label', e.target.value)}
+                        placeholder={getFieldDef('customer_reference_label')?.placeholder}
+                    />
+                </div>
             </div>
 
             <Button onClick={handleSave}>Save Changes</Button>
@@ -148,5 +167,3 @@ export default function ProfilePage() {
     </main>
   );
 }
-
-    

@@ -28,6 +28,8 @@ export const allApiFields: ApiField[] = [
   { id: 'reference_number', label: 'Reference Number', readOnly: true },
   { id: 'customer_email', label: 'Customer Email' },
   { id: 'customer_name', label: 'Customer Name' },
+  { id: 'merchant_reference_label', label: 'Merchant Reference Number', defaultValue: '', placeholder: 'e.g., INV-' },
+  { id: 'customer_reference_label', label: 'Customer Reference Number', defaultValue: '', placeholder: 'e.g., CUST-' },
 ];
 
 export interface ApiFieldSetting {
