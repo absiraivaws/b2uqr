@@ -11,6 +11,8 @@ import {
 import type { Transaction } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { useSettingsStore } from "@/hooks/use-settings";
+import { useDebounce } from 'use-debounce';
+
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,25 +21,24 @@ import { Label } from "@/components/ui/label";
 import { Loader2, QrCode, AlertTriangle, CheckCircle, Clock, ShieldCheck } from "lucide-react";
 
 function TransactionForm({
-  onSubmit,
   isSubmitting,
   referenceNumber,
   setReferenceNumber,
   terminalId,
+  amount,
+  onAmountChange,
+  referenceType,
+  manualReferencePlaceholder
 }: {
-  onSubmit: (amount: string, ref: string) => void;
   isSubmitting: boolean;
   referenceNumber: string;
   setReferenceNumber: (ref: string) => void;
   terminalId: string;
+  amount: string;
+  onAmountChange: (amount: string) => void;
+  referenceType: 'serial' | 'invoice';
+  manualReferencePlaceholder: string;
 }) {
-
-  const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const amount = formData.get('amount') as string;
-    onSubmit(amount, referenceNumber);
-  };
 
   return (
     <Card>
@@ -47,7 +48,6 @@ function TransactionForm({
       </CardHeader>
       <CardContent>
         <form
-          onSubmit={handleFormSubmit}
           className="space-y-6"
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -57,8 +57,10 @@ function TransactionForm({
                   id="reference_number" 
                   name="reference_number" 
                   value={referenceNumber}
+                  readOnly={referenceType === 'serial'}
                   onChange={(e) => setReferenceNumber(e.target.value)}
-                  className="font-mono"
+                  className={`font-mono ${referenceType === 'serial' ? 'bg-muted' : ''}`}
+                  placeholder={referenceType === 'invoice' ? manualReferencePlaceholder : ''}
                   />
              </div>
              <div className="space-y-2">
@@ -77,17 +79,15 @@ function TransactionForm({
               <Input 
                 id="amount" 
                 name="amount" 
-                placeholder="Enter amount" 
+                placeholder="Enter amount to generate QR" 
                 required 
                 type="number"
                 step="0.01"
+                value={amount}
+                onChange={(e) => onAmountChange(e.target.value)}
                 disabled={isSubmitting}
               />
             </div>
-          <Button type="submit" className="w-full" disabled={isSubmitting}>
-            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <QrCode className="mr-2 h-4 w-4" />}
-            Generate QR Code
-          </Button>
         </form>
       </CardContent>
     </Card>
@@ -159,12 +159,16 @@ export default function GenerateQRPage() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [referenceNumber, setReferenceNumber] = useState("");
   const [lastTxNumber, setLastTxNumber] = useState(0);
+  const [amount, setAmount] = useState("");
+  const [debouncedAmount] = useDebounce(amount, 800); // 800ms debounce delay
 
   const { toast } = useToast();
-  const settings = useSettingsStore();
-  const terminalId = settings.supportedFields.find(f => f.id === 'terminal_id')?.value ?? '0001';
+  const { referenceType, supportedFields } = useSettingsStore();
+  const terminalId = supportedFields.find(f => f.id === 'terminal_id')?.value ?? '0001';
+  const manualReferencePlaceholder = supportedFields.find(f => f.id === 'merchant_reference_label')?.value ?? 'INV-';
 
   const generateReferenceNumber = useCallback(() => {
+    if (referenceType !== 'serial') return;
     const date = new Date();
     const yyyy = date.getFullYear();
     const mm = String(date.getMonth() + 1).padStart(2, '0');
@@ -173,47 +177,18 @@ export default function GenerateQRPage() {
     const randomPart = String(nextTxNumber).padStart(6, '0');
     setReferenceNumber(`${yyyy}${mm}${dd}${randomPart}`);
     setLastTxNumber(nextTxNumber);
-  }, [lastTxNumber]);
+  }, [lastTxNumber, referenceType]);
 
   useEffect(() => {
-    generateReferenceNumber();
-  }, []); // Eslint-disable-line react-hooks/exhaustive-deps, this should only run once
-
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
-
-    if (currentTransaction && currentTransaction.status === "PENDING" && !isVerifying) {
-      interval = setInterval(async () => {
-        try {
-          const updatedTx = await getTransactionStatus(currentTransaction.transaction_uuid);
-          if (updatedTx) {
-            setCurrentTransaction(prevTx => {
-              if (prevTx?.status !== updatedTx.status) {
-                if (updatedTx.status === 'SUCCESS') {
-                    // Temporarily removed sound while fixing source issue
-                    // successSoundRef.current?.play();
-                }
-                if (interval) clearInterval(interval);
-                generateReferenceNumber(); 
-                return updatedTx;
-              }
-              return prevTx; 
-            });
-          }
-        } catch (error) {
-          console.error("Failed to fetch transaction status:", error);
-        }
-      }, 5000); // Poll less frequently
+    if(referenceType === 'serial') {
+        generateReferenceNumber();
+    } else {
+        setReferenceNumber('');
     }
-
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [currentTransaction, generateReferenceNumber, isVerifying]);
+  }, [referenceType]); // Eslint-disable-line react-hooks/exhaustive-deps, generate new ref when type changes
 
 
-  const handleCreateTransaction = async (amount: string, ref: string) => {
+  const handleCreateTransaction = useCallback(async (amount: string, ref: string) => {
     if (!amount || parseFloat(amount) <= 0 || !ref) {
       setCurrentTransaction(null);
       return;
@@ -237,11 +212,56 @@ export default function GenerateQRPage() {
         title: "Error Creating Transaction",
         description: errorMessage,
       });
-      generateReferenceNumber();
+      if (referenceType === 'serial') {
+        generateReferenceNumber();
+      }
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [toast, referenceType, generateReferenceNumber]);
+
+  useEffect(() => {
+    handleCreateTransaction(debouncedAmount, referenceNumber);
+  }, [debouncedAmount, referenceNumber, handleCreateTransaction]);
+
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+
+    if (currentTransaction && currentTransaction.status === "PENDING" && !isVerifying) {
+      interval = setInterval(async () => {
+        try {
+          const updatedTx = await getTransactionStatus(currentTransaction.transaction_uuid);
+          if (updatedTx) {
+            setCurrentTransaction(prevTx => {
+              if (prevTx?.status !== updatedTx.status) {
+                if (updatedTx.status === 'SUCCESS') {
+                    // Temporarily removed sound while fixing source issue
+                    // successSoundRef.current?.play();
+                }
+                if (interval) clearInterval(interval);
+                if (referenceType === 'serial') {
+                    generateReferenceNumber(); 
+                } else {
+                    setReferenceNumber('');
+                }
+                setAmount('');
+                return updatedTx;
+              }
+              return prevTx; 
+            });
+          }
+        } catch (error) {
+          console.error("Failed to fetch transaction status:", error);
+        }
+      }, 5000);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [currentTransaction, generateReferenceNumber, isVerifying, referenceType]);
+
 
   const handleVerifyTransaction = async () => {
     if (!currentTransaction) return;
@@ -250,15 +270,18 @@ export default function GenerateQRPage() {
     try {
         const updatedTx = await verifyTransaction(currentTransaction.transaction_uuid);
         if (updatedTx.status === 'SUCCESS') {
-            // Temporarily removed sound while fixing source issue
-            // successSoundRef.current?.play();
             toast({ title: "Verification Success", description: "The payment has been confirmed." });
+            setAmount('');
         } else if (updatedTx.status === 'FAILED') {
             toast({ variant: "destructive", title: "Verification Failed", description: "The payment was not successful." });
         }
         setCurrentTransaction(updatedTx);
         if (updatedTx.status !== 'PENDING') {
-            generateReferenceNumber();
+            if (referenceType === 'serial') {
+                generateReferenceNumber();
+            } else {
+                setReferenceNumber('');
+            }
         }
 
     } catch (error) {
@@ -279,11 +302,14 @@ export default function GenerateQRPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
             <div className="lg:col-span-1 space-y-8">
               <TransactionForm 
-                onSubmit={handleCreateTransaction} 
                 isSubmitting={isSubmitting} 
                 referenceNumber={referenceNumber}
                 setReferenceNumber={setReferenceNumber}
                 terminalId={terminalId}
+                amount={amount}
+                onAmountChange={setAmount}
+                referenceType={referenceType}
+                manualReferencePlaceholder={manualReferencePlaceholder}
               />
             </div>
             <div className="lg:col-span-2">
@@ -309,7 +335,7 @@ export default function GenerateQRPage() {
                         <QrCode className="mx-auto h-12 w-12 text-muted-foreground" />
                         <h3 className="mt-4 text-lg font-medium">Waiting for transaction</h3>
                         <p className="mt-1 text-sm text-muted-foreground">
-                        Use the form to generate a new QR code payment.
+                        Enter an amount in the form to generate a new QR code payment.
                         </p>
                     </CardContent>
                 </Card>
@@ -319,3 +345,4 @@ export default function GenerateQRPage() {
     </main>
   );
 }
+
