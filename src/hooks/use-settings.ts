@@ -1,4 +1,3 @@
-
 'use client';
 
 import { create } from 'zustand';
@@ -28,8 +27,8 @@ export const allApiFields: ApiField[] = [
   { id: 'reference_number', label: 'Reference Number', readOnly: true },
   { id: 'customer_email', label: 'Customer Email' },
   { id: 'customer_name', label: 'Customer Name' },
-  { id: 'merchant_reference_label', label: 'Merchant Reference Number', defaultValue: '', placeholder: 'e.g., INV-' },
-  { id: 'customer_reference_label', label: 'Customer Reference Number', defaultValue: '', placeholder: 'e.g., CUST-' },
+  { id: 'merchant_reference_label', label: 'Merchant Reference Label', defaultValue: '', placeholder: 'e.g., INV-' },
+  { id: 'customer_reference_label', label: 'Customer Reference Label', defaultValue: '', placeholder: 'e.g., CUST-' },
 ];
 
 export interface ApiFieldSetting {
@@ -41,9 +40,13 @@ export interface ApiFieldSetting {
 type SettingsState = {
   supportedFields: ApiFieldSetting[];
   secretKey: string;
+  referenceType: 'serial' | 'invoice';
+  isCustomerReferenceEnabled: boolean;
   setFieldValue: (id: string, value: string) => void;
   toggleFieldEnabled: (id: string) => void;
   setSecretKey: (key: string) => void;
+  setReferenceType: (type: 'serial' | 'invoice') => void;
+  setIsCustomerReferenceEnabled: (enabled: boolean) => void;
 };
 
 const getDefaultSettings = (): ApiFieldSetting[] => {
@@ -59,6 +62,8 @@ export const useSettingsStore = create<SettingsState>()(
     (set) => ({
       supportedFields: getDefaultSettings(),
       secretKey: '',
+      referenceType: 'serial',
+      isCustomerReferenceEnabled: true,
       setFieldValue: (id, value) => set(state => {
         
         let newFields = state.supportedFields.map(sf => 
@@ -74,6 +79,8 @@ export const useSettingsStore = create<SettingsState>()(
           )
         })),
       setSecretKey: (key) => set({ secretKey: key }),
+      setReferenceType: (type) => set({ referenceType: type }),
+      setIsCustomerReferenceEnabled: (enabled) => set({ isCustomerReferenceEnabled: enabled }),
     }),
     {
       name: 'qr-bridge-settings', 

@@ -9,10 +9,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { useSettingsStore, allApiFields } from "@/hooks/use-settings";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 
 
 export default function ProfilePage() {
-    const { supportedFields, setFieldValue } = useSettingsStore();
+    const { 
+        supportedFields, 
+        setFieldValue, 
+        referenceType, 
+        setReferenceType,
+        isCustomerReferenceEnabled,
+        setIsCustomerReferenceEnabled
+    } = useSettingsStore();
     const { toast } = useToast();
 
     const handleSave = () => {
@@ -141,23 +149,40 @@ export default function ProfilePage() {
                     />
                 </div>
                 <div className="space-y-2">
-                    <Label htmlFor="merchant_reference_label">Merchant Reference Number</Label>
+                    <Label htmlFor="reference_type">Reference Number Type</Label>
+                    <Select
+                        value={referenceType}
+                        onValueChange={(value: 'serial' | 'invoice') => setReferenceType(value)}
+                    >
+                        <SelectTrigger>
+                            <SelectValue placeholder="Select reference type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="serial">Auto-generate Serial Number</SelectItem>
+                            <SelectItem value="invoice">Manual Invoice Number</SelectItem>
+                        </SelectContent>
+                    </Select>
+                     <p className="text-xs text-muted-foreground">Determines how reference numbers are generated on the QR page.</p>
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="merchant_reference_label">Manual Invoice Prefix/Placeholder</Label>
                     <Input
                         id="merchant_reference_label"
                         value={getField('merchant_reference_label')?.value ?? ''}
                         onChange={(e) => setFieldValue('merchant_reference_label', e.target.value)}
                         placeholder={getFieldDef('merchant_reference_label')?.placeholder}
                     />
-                    <p className="text-xs text-muted-foreground">{getFieldDef('merchant_reference_label')?.placeholder}</p>
+                    <p className="text-xs text-muted-foreground">Placeholder for manual invoice entry mode.</p>
                 </div>
-                <div className="space-y-2">
-                    <Label htmlFor="customer_reference_label">Customer Reference Number</Label>
-                    <Input
-                        id="customer_reference_label"
-                        value={getField('customer_reference_label')?.value ?? ''}
-                        onChange={(e) => setFieldValue('customer_reference_label', e.target.value)}
-                        placeholder={getFieldDef('customer_reference_label')?.placeholder}
+                <div className="flex items-center space-x-2 pt-6">
+                    <Checkbox
+                        id="customer_reference_enabled"
+                        checked={isCustomerReferenceEnabled}
+                        onCheckedChange={(checked) => setIsCustomerReferenceEnabled(Boolean(checked))}
                     />
+                    <Label htmlFor="customer_reference_enabled" className="font-normal">
+                        Include Customer Reference in QR Code
+                    </Label>
                 </div>
             </div>
 
