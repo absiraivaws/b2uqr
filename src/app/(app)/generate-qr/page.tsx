@@ -11,25 +11,34 @@ import {
 import type { Transaction } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { useSettingsStore } from "@/hooks/use-settings";
-import { debounce } from 'lodash';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, QrCode, AlertTriangle, CheckCircle, Clock, BellRing, ShieldCheck } from "lucide-react";
+import { Loader2, QrCode, AlertTriangle, CheckCircle, Clock, ShieldCheck } from "lucide-react";
 
 function TransactionForm({
-  onAmountChange,
+  onSubmit,
   isSubmitting,
   referenceNumber,
+  setReferenceNumber,
   terminalId,
 }: {
-  onAmountChange: (amount: string) => void;
+  onSubmit: (amount: string, ref: string) => void;
   isSubmitting: boolean;
   referenceNumber: string;
+  setReferenceNumber: (ref: string) => void;
   terminalId: string;
 }) {
+
+  const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const amount = formData.get('amount') as string;
+    onSubmit(amount, referenceNumber);
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -38,21 +47,9 @@ function TransactionForm({
       </CardHeader>
       <CardContent>
         <form
-          onSubmit={(e) => e.preventDefault()}
+          onSubmit={handleFormSubmit}
           className="space-y-6"
         >
-          <div className="space-y-2">
-              <Label htmlFor="amount">Amount</Label>
-              <Input 
-                id="amount" 
-                name="amount" 
-                placeholder="Enter amount" 
-                onChange={(e) => onAmountChange(e.target.value)}
-                required 
-                type="number"
-                step="0.01"
-              />
-            </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
              <div className="space-y-2">
                 <Label htmlFor="reference_number">Reference Number</Label>
@@ -60,8 +57,8 @@ function TransactionForm({
                   id="reference_number" 
                   name="reference_number" 
                   value={referenceNumber}
-                  readOnly
-                  className="bg-muted"
+                  onChange={(e) => setReferenceNumber(e.target.value)}
+                  className="font-mono"
                   />
              </div>
              <div className="space-y-2">
@@ -75,6 +72,22 @@ function TransactionForm({
                   />
              </div>
           </div>
+          <div className="space-y-2">
+              <Label htmlFor="amount">Amount</Label>
+              <Input 
+                id="amount" 
+                name="amount" 
+                placeholder="Enter amount" 
+                required 
+                type="number"
+                step="0.01"
+                disabled={isSubmitting}
+              />
+            </div>
+          <Button type="submit" className="w-full" disabled={isSubmitting}>
+            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <QrCode className="mr-2 h-4 w-4" />}
+            Generate QR Code
+          </Button>
         </form>
       </CardContent>
     </Card>
@@ -200,8 +213,8 @@ export default function GenerateQRPage() {
   }, [currentTransaction, generateReferenceNumber, isVerifying]);
 
 
-  const handleCreateTransaction = async (amount: string) => {
-    if (!amount || parseFloat(amount) <= 0) {
+  const handleCreateTransaction = async (amount: string, ref: string) => {
+    if (!amount || parseFloat(amount) <= 0 || !ref) {
       setCurrentTransaction(null);
       return;
     }
@@ -209,30 +222,13 @@ export default function GenerateQRPage() {
     setIsSubmitting(true);
     setCurrentTransaction(null);
     
-    const formData = new FormData();
-    formData.set('amount', amount);
-    formData.set('reference_number', referenceNumber);
-
-    // Add all enabled fields from settings to the form data
-    settings.supportedFields.forEach(field => {
-      if (field.enabled && field.value) {
-        formData.set(field.id, field.value);
-      }
-    });
-
-     // Add fields that might not be in the 'enabled' list but are required
-    const requiredFields = ['merchant_id', 'bank_code', 'terminal_id', 'merchant_name', 'merchant_city', 'mcc', 'currency_code', 'country_code'];
-    requiredFields.forEach(id => {
-      if (!formData.has(id)) {
-        const field = settings.supportedFields.find(f => f.id === id);
-        if (field?.value) {
-          formData.set(id, field.value);
-        }
-      }
-    });
+    const transactionData = {
+        amount,
+        reference_number: ref
+    };
 
     try {
-      const newTransaction = await createTransaction(formData);
+      const newTransaction = await createTransaction(transactionData);
       setCurrentTransaction(newTransaction);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
@@ -261,7 +257,9 @@ export default function GenerateQRPage() {
             toast({ variant: "destructive", title: "Verification Failed", description: "The payment was not successful." });
         }
         setCurrentTransaction(updatedTx);
-        generateReferenceNumber();
+        if (updatedTx.status !== 'PENDING') {
+            generateReferenceNumber();
+        }
 
     } catch (error) {
        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
@@ -275,22 +273,18 @@ export default function GenerateQRPage() {
     }
   };
   
-  const debouncedCreateTransaction = useRef(
-    debounce(handleCreateTransaction, 500)
-  ).current;
-
-  useEffect(() => {
-    return () => {
-      debouncedCreateTransaction.cancel();
-    };
-  }, [debouncedCreateTransaction]);
-
 
   return (
     <main className="p-4 sm:p-6 lg:p-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
             <div className="lg:col-span-1 space-y-8">
-              <TransactionForm onAmountChange={debouncedCreateTransaction} isSubmitting={isSubmitting} referenceNumber={referenceNumber} terminalId={terminalId}/>
+              <TransactionForm 
+                onSubmit={handleCreateTransaction} 
+                isSubmitting={isSubmitting} 
+                referenceNumber={referenceNumber}
+                setReferenceNumber={setReferenceNumber}
+                terminalId={terminalId}
+              />
             </div>
             <div className="lg:col-span-2">
             {isSubmitting ? (
@@ -325,5 +319,3 @@ export default function GenerateQRPage() {
     </main>
   );
 }
-
-    
