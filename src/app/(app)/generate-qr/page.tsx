@@ -11,16 +11,16 @@ import {
 import type { Transaction } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { useSettingsStore } from "@/hooks/use-settings";
-import { useDebounce } from 'use-debounce';
 
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, QrCode, AlertTriangle, CheckCircle, Clock, ShieldCheck } from "lucide-react";
+import { Loader2, QrCode, AlertTriangle, CheckCircle, Clock, ShieldCheck, Send } from "lucide-react";
 
 function TransactionForm({
+  onSubmit,
   isSubmitting,
   referenceNumber,
   setReferenceNumber,
@@ -30,6 +30,7 @@ function TransactionForm({
   referenceType,
   manualReferencePlaceholder
 }: {
+  onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   isSubmitting: boolean;
   referenceNumber: string;
   setReferenceNumber: (ref: string) => void;
@@ -48,6 +49,7 @@ function TransactionForm({
       </CardHeader>
       <CardContent>
         <form
+          onSubmit={onSubmit}
           className="space-y-6"
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -88,6 +90,15 @@ function TransactionForm({
                 disabled={isSubmitting}
               />
             </div>
+
+            <Button type="submit" disabled={isSubmitting || !amount || !referenceNumber} className="w-full">
+              {isSubmitting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="mr-2 h-4 w-4" />
+              )}
+              Generate QR Code
+            </Button>
         </form>
       </CardContent>
     </Card>
@@ -160,7 +171,6 @@ export default function GenerateQRPage() {
   const [referenceNumber, setReferenceNumber] = useState("");
   const [lastTxNumber, setLastTxNumber] = useState(0);
   const [amount, setAmount] = useState("");
-  const [debouncedAmount] = useDebounce(amount, 800); // 800ms debounce delay
 
   const { toast } = useToast();
   const { referenceType, supportedFields } = useSettingsStore();
@@ -188,9 +198,14 @@ export default function GenerateQRPage() {
   }, [referenceType]); // Eslint-disable-line react-hooks/exhaustive-deps, generate new ref when type changes
 
 
-  const handleCreateTransaction = useCallback(async (amount: string, ref: string) => {
-    if (!amount || parseFloat(amount) <= 0 || !ref) {
-      setCurrentTransaction(null);
+  const handleCreateTransaction = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!amount || parseFloat(amount) <= 0 || !referenceNumber) {
+      toast({
+        variant: "destructive",
+        title: "Missing Information",
+        description: "Please provide a valid amount and reference number.",
+      });
       return;
     }
     
@@ -199,7 +214,7 @@ export default function GenerateQRPage() {
     
     const transactionData = {
         amount,
-        reference_number: ref
+        reference_number: referenceNumber
     };
 
     try {
@@ -218,11 +233,7 @@ export default function GenerateQRPage() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [toast, referenceType, generateReferenceNumber]);
-
-  useEffect(() => {
-    handleCreateTransaction(debouncedAmount, referenceNumber);
-  }, [debouncedAmount, referenceNumber, handleCreateTransaction]);
+  };
 
 
   useEffect(() => {
@@ -302,6 +313,7 @@ export default function GenerateQRPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
             <div className="lg:col-span-1 space-y-8">
               <TransactionForm 
+                onSubmit={handleCreateTransaction}
                 isSubmitting={isSubmitting} 
                 referenceNumber={referenceNumber}
                 setReferenceNumber={setReferenceNumber}
@@ -313,7 +325,7 @@ export default function GenerateQRPage() {
               />
             </div>
             <div className="lg:col-span-2">
-            {isSubmitting ? (
+            {isSubmitting && !currentTransaction ? ( // Show loader only during initial submission
                  <Card className="flex flex-col items-center justify-center h-full min-h-[500px] border-dashed">
                     <CardContent className="text-center">
                         <Loader2 className="mx-auto h-12 w-12 text-muted-foreground animate-spin" />
@@ -335,7 +347,7 @@ export default function GenerateQRPage() {
                         <QrCode className="mx-auto h-12 w-12 text-muted-foreground" />
                         <h3 className="mt-4 text-lg font-medium">Waiting for transaction</h3>
                         <p className="mt-1 text-sm text-muted-foreground">
-                        Enter an amount in the form to generate a new QR code payment.
+                        Enter an amount and click "Generate QR Code" to start.
                         </p>
                     </CardContent>
                 </Card>
@@ -346,3 +358,4 @@ export default function GenerateQRPage() {
   );
 }
 
+    
