@@ -123,7 +123,7 @@ export async function callBankCreateQR(params: CreateQrRequest): Promise<CreateQ
 /**
  * Mocks calling a bank reconciliation API to check the status of a transaction.
  */
-export async function callBankReconciliationAPI(uuid: string): Promise<{ status: 'SUCCESS' | 'FAILED' | 'PENDING' } | null> {
+export async function callBankReconciliationAPI(uuid: string): Promise<{ status: 'PENDING' | 'SUCCESS' | 'FAILED' } | null> {
     console.log(`Mock Bank API: Reconciling status for ${uuid}`);
 
     // Simulate network delay
