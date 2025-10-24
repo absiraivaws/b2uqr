@@ -1,4 +1,3 @@
-
 'use client'
 import {
   Sidebar,
@@ -37,10 +36,25 @@ export default function AppLayout({
 
   return (
     <SidebarProvider>
+      {/* Mobile fixed header: place open button above all on small screens */}
+      <header className="fixed inset-x-0 top-0 z-50 flex items-center justify-center p-3 md:hidden">
+        {/* left: trigger */}
+        <div className="absolute left-3">
+          <SidebarTrigger />
+        </div>
+        {/* center: logo + title (visible on mobile header) */}
+        <div className="flex items-center gap-2">
+          <QrCode className="h-6 w-6 text-primary" />
+          <h1 className="text-lg font-bold">QR Bridge</h1>
+        </div>
+      </header>
+
       <Sidebar>
         <SidebarHeader>
           <div className="flex items-center gap-2">
-            <SidebarTrigger />
+            <div className="hidden md:block">
+              <SidebarTrigger />
+            </div>
             <div className="flex items-center gap-2 group-data-[collapsible=icon]:-ml-1 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:opacity-0 transition-all duration-200">
                 <QrCode className="h-6 w-6 text-primary" />
                 <h1 className="text-lg font-bold">QR Bridge</h1>
@@ -85,7 +99,8 @@ export default function AppLayout({
             </SidebarGroup>
         </SidebarContent>
       </Sidebar>
-      <SidebarInset>{children}</SidebarInset>
+      {/* Add mobile top padding so content is not covered by the fixed header */}
+      <SidebarInset className="pt-14 md:pt-0">{children}</SidebarInset>
     </SidebarProvider>
   )
 }

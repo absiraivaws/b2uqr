@@ -205,6 +205,22 @@ const Sidebar = React.forwardRef<
               } as React.CSSProperties
             }
             side={side}
+            onClickCapture={(e) => {
+              // Close mobile sidebar when a navigation link is clicked inside it.
+              const target = e.target as HTMLElement | null
+              try {
+                const anchor = target?.closest?.("a")
+                if (
+                  anchor &&
+                  // ignore links that explicitly open in a new tab
+                  (anchor.getAttribute("target") ?? "") !== "_blank"
+                ) {
+                  setOpenMobile(false)
+                }
+              } catch {
+                // swallowing errors is fine here - don't block navigation
+              }
+            }}
           >
             <div className="flex h-full w-full flex-col">{children}</div>
           </SheetContent>
@@ -263,7 +279,7 @@ const SidebarTrigger = React.forwardRef<
   React.ElementRef<typeof Button>,
   React.ComponentProps<typeof Button>
 >(({ className, onClick, ...props }, ref) => {
-  const { toggleSidebar } = useSidebar()
+  const { isMobile, toggleSidebar } = useSidebar()
 
   return (
     <Button
@@ -271,7 +287,7 @@ const SidebarTrigger = React.forwardRef<
       data-sidebar="trigger"
       variant="ghost"
       size="icon"
-      className={cn("h-7 w-7", className)}
+      className={cn("h-8 w-8", !isMobile && "md:hidden", className)}
       onClick={(event) => {
         onClick?.(event)
         toggleSidebar()
