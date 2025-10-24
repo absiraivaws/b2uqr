@@ -1,14 +1,13 @@
-
 'use client'
 
 import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Search, Loader2 } from "lucide-react";
-import { getAllTransactions } from '@/lib/actions';
+import { db } from '@/lib/firebase';
+import { collection, getDocs } from "firebase/firestore";
 import type { Transaction } from '@/lib/types';
 import { format } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -27,7 +26,8 @@ export default function TransactionsPage() {
         async function fetchTransactions() {
             try {
                 setIsLoading(true);
-                const fetchedTransactions = await getAllTransactions();
+                const snap = await getDocs(collection(db, "transactions"));
+                const fetchedTransactions = snap.docs.map(doc => doc.data() as Transaction);
                 setTransactions(fetchedTransactions);
                 setError(null);
             } catch (err) {
@@ -43,9 +43,9 @@ export default function TransactionsPage() {
     const filteredTransactions = useMemo(() => {
         return transactions.filter(tx => {
             const searchMatch = searchTerm === '' || 
-                tx.amount.includes(searchTerm) || 
-                tx.reference_number.includes(searchTerm) ||
-                tx.transaction_id.includes(searchTerm) ||
+                (typeof tx.amount === 'string' ? tx.amount : String(tx.amount)).includes(searchTerm) || 
+                (tx.reference_number && tx.reference_number.includes(searchTerm)) ||
+                (tx.transaction_id && tx.transaction_id.includes(searchTerm)) ||
                 (tx.bankResponse?.terminal_id && tx.bankResponse.terminal_id.includes(searchTerm));
 
             const dateMatch = date === '' || format(new Date(tx.created_at), 'yyyy-MM-dd') === date;
