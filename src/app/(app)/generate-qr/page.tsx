@@ -357,7 +357,3 @@ export default function GenerateQRPage() {
     </main>
   );
 }
-
-    
-
-    
