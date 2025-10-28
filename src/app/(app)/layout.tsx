@@ -1,4 +1,5 @@
 'use client'
+import { useState } from 'react';
 import {
   Sidebar,
   SidebarContent,
@@ -12,9 +13,11 @@ import {
   SidebarGroup,
   SidebarGroupLabel,
 } from '@/components/ui/sidebar'
-import { QrCode, History, BarChart, User, Settings as SettingsIcon } from 'lucide-react'
-import { usePathname } from 'next/navigation'
+import { QrCode, History, BarChart, User, Settings as SettingsIcon, LogOutIcon, Loader2 } from 'lucide-react'
+import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { signOut } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 
 export default function AppLayout({
   children,
@@ -22,6 +25,8 @@ export default function AppLayout({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
+  const router = useRouter()
+  const [signingOut, setSigningOut] = useState(false)
   
   const menuItems = [
     { href: '/generate-qr', label: 'Generate QR', icon: QrCode },
@@ -32,7 +37,22 @@ export default function AppLayout({
   const accountItems = [
       { href: '/profile', label: 'Profile', icon: User },
       { href: '/settings', label: 'Settings', icon: SettingsIcon },
+      { href: '/signout', label: 'Sign Out', icon: LogOutIcon },
   ]
+
+  const handleSignOut = async (e?: React.MouseEvent) => {
+    e?.preventDefault()
+    if (signingOut) return
+    setSigningOut(true)
+    try {
+      await signOut(auth)
+      router.push('/signin')
+    } catch (err) {
+      // optionally report error
+      console.error('Sign out failed', err)
+      setSigningOut(false)
+    }
+  }
 
   return (
     <SidebarProvider>
@@ -88,10 +108,21 @@ export default function AppLayout({
                             isActive={pathname === item.href}
                             tooltip={item.label}
                             >
-                                <Link href={item.href}>
+                                {item.href === '/signout' ? (
+                                  <button
+                                    onClick={handleSignOut}
+                                    className="flex items-center gap-2"
+                                    disabled={signingOut}
+                                  >
+                                    {signingOut ? <Loader2 className="animate-spin h-4 w-4" /> : <item.icon />}
+                                    <span>{item.label}</span>
+                                  </button>
+                                ) : (
+                                  <Link href={item.href}>
                                     <item.icon />
                                     <span>{item.label}</span>
-                                </Link>
+                                  </Link>
+                                )}
                             </SidebarMenuButton>
                         </SidebarMenuItem>
                     ))}

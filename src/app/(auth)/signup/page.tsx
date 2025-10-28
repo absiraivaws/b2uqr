@@ -14,8 +14,12 @@ import {
   EmailAuthProvider,
   linkWithCredential
 } from "firebase/auth";
+import { db } from '@/lib/firebase';
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { useRouter } from 'next/navigation';
 
 export default function SignUpPage() {
+  const router = useRouter();
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -27,6 +31,15 @@ export default function SignUpPage() {
   const [otp, setOtp] = useState('');
   const [socialLoading, setSocialLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [verifiedUser, setVerifiedUser] = useState<{
+    uid: string;
+    phone: string | null;
+    displayName?: string | null;
+    email?: string | null;
+  } | null>(null);
+  const [pin, setPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const [savingUser, setSavingUser] = useState(false);
   const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
   const recaptchaWidgetIdRef = useRef<number | null>(null);
 
@@ -129,9 +142,15 @@ export default function SignUpPage() {
         }
       }
 
-      // Success - you can redirect or show a success state here
+      // Success: keep user info and prompt to create a PIN before redirect
       console.log('Phone sign-up successful', userCredential.user.uid);
-      // Clear confirmation and recaptcha
+      setVerifiedUser({
+        uid: userCredential.user.uid,
+        phone: userCredential.user.phoneNumber ?? phone,
+        displayName: userCredential.user.displayName ?? fullName ?? null,
+        email: userCredential.user.email ?? email ?? null,
+      });
+      // clear confirmation result and recaptcha (we still keep user signed-in)
       setConfirmationResult(null);
       resetRecaptcha();
     } catch (err: any) {
@@ -141,6 +160,51 @@ export default function SignUpPage() {
       resetRecaptcha();
     } finally {
       setVerifyingOtp(false);
+    }
+  };
+
+  // Hash PIN (SHA-256) before saving to Firestore
+  const hashPin = async (p: string) => {
+    const enc = new TextEncoder();
+    const data = enc.encode(p);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  };
+
+  const handleSavePinAndCreateUser = async () => {
+    setError(null);
+    if (!verifiedUser) {
+      setError('No verified user available.');
+      return;
+    }
+    if (!/^\d{4,6}$/.test(pin)) {
+      setError('PIN must be 4 to 6 digits.');
+      return;
+    }
+    if (pin !== confirmPin) {
+      setError('PINs do not match.');
+      return;
+    }
+    setSavingUser(true);
+    try {
+      const pinHash = await hashPin(pin);
+      const userDocRef = doc(db, 'users', verifiedUser.uid);
+      await setDoc(userDocRef, {
+        uid: verifiedUser.uid,
+        phone: verifiedUser.phone,
+        displayName: verifiedUser.displayName ?? null,
+        email: verifiedUser.email ?? null,
+        pinHash,
+        created_at: serverTimestamp()
+      });
+      // redirect after save
+      try { router.push('/generate-qr'); } catch (e) { /* ignore */ }
+    } catch (err: any) {
+      console.error(err);
+      setError(err?.message || 'Failed to save user.');
+    } finally {
+      setSavingUser(false);
     }
   };
 
@@ -204,7 +268,7 @@ export default function SignUpPage() {
               </div>
             </div>
 
-            {confirmationResult && (
+            {confirmationResult && !verifiedUser && (
               <div>
                 <label className="text-sm">Enter OTP</label>
                 <div className="flex gap-2">
@@ -216,23 +280,39 @@ export default function SignUpPage() {
               </div>
             )}
 
+            {verifiedUser && (
+              <>
+                <div className="text-sm">Phone verified: <strong>{verifiedUser.phone}</strong></div>
+                <div>
+                  <label className="text-sm">Create 4-6 digit PIN</label>
+                  <div className="flex gap-2">
+                    <Input value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, ''))} placeholder="1234" maxLength={6} />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm">Confirm PIN</label>
+                  <div className="flex gap-2">
+                    <Input value={confirmPin} onChange={e => setConfirmPin(e.target.value.replace(/\D/g, ''))} placeholder="1234" maxLength={6} />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button type="button" className="flex-1" onClick={handleSavePinAndCreateUser} disabled={savingUser}>
+                    {savingUser ? <Loader2 className="animate-spin h-4 w-4" /> : <UserPlus className="h-4 w-4 mr-2" />}
+                    {savingUser ? 'Saving...' : 'Save PIN & Continue'}
+                  </Button>
+                </div>
+              </>
+            )}
+
             <Separator />
 
-            
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-
-            </div>
-
-            <div className="flex gap-2">
-              <Button type="button" className="flex-1" onClick={() => console.log('Use phone OTP flow above to sign up')} disabled={sendingCode || verifyingOtp}>
-                <UserPlus className="h-4 w-4 mr-2" />
-                Continue
-              </Button>
-            </div>
           </form>
         </CardContent>
       </Card>
+
+      <p className="text-center text-sm text-muted-foreground mt-4">
+        Already have an account? <Button variant="link" className="p-0" onClick={() => router.push('/signin')}>Sign in</Button>
+      </p>
     </main>
   );
 }
