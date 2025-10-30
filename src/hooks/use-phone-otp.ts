@@ -79,6 +79,17 @@ export function usePhoneOtp({ phone, fullName, onVerified }: { phone: string; fu
       };
       setConfirmationResult(null);
       resetRecaptcha();
+      // userCredential.user is signed in client-side; create a server session cookie
+      try {
+        const idToken = await userCredential.user.getIdToken();
+        await fetch('/api/session/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ idToken }),
+        });
+      } catch (e) {
+        console.warn('session create failed for phone user', e);
+      }
       onVerified(verifiedUser);
     } catch (err: any) {
       console.error(err);

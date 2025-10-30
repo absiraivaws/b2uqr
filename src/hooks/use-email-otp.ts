@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { auth } from '@/lib/firebase';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { signInWithCustomToken } from 'firebase/auth';
 
 type VerifiedUser = {
   uid: string;
@@ -59,34 +59,50 @@ export function useEmailOtp({ email, fullName, onVerified }: { email: string; fu
       const res = await fetch('/api/email/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, code: emailOtp }),
+        body: JSON.stringify({ email, code: emailOtp, fullName }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setEmailOtpError((data && data.message) || 'OTP verification failed.');
       } else {
-        // create Firebase Auth user client-side (temporary password)
-        try {
-          const pw = Array.from(window.crypto.getRandomValues(new Uint8Array(16))).map(b => (b % 36).toString(36)).join('') + '!A1';
-          const userCredential = await createUserWithEmailAndPassword(auth, email, pw);
-          try { if (fullName) await updateProfile(userCredential.user, { displayName: fullName }); } catch (e) { console.warn('updateProfile failed', e); }
-
+        // server created user and returned custom token
+        const customToken = data.customToken as string | undefined;
+        const uid = data.uid as string | undefined;
+        if (customToken) {
+          // sign in client with custom token
+          const userCred = await signInWithCustomToken(auth, customToken);
+          try {
+            // create session cookie on server
+            const idToken = await userCred.user.getIdToken();
+            await fetch('/api/session/create', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ idToken }),
+            });
+          } catch (e) {
+            console.warn('session create failed', e);
+          }
           const verifiedUser = {
-            uid: userCredential.user.uid,
-            phone: userCredential.user.phoneNumber ?? null,
-            displayName: userCredential.user.displayName ?? fullName ?? null,
-            email: userCredential.user.email ?? email ?? null,
+            uid: userCred.user.uid,
+            phone: userCred.user.phoneNumber ?? null,
+            displayName: userCred.user.displayName ?? fullName ?? null,
+            email: userCred.user.email ?? email ?? null,
           };
           setEmailVerified(true);
           setEmailOtpSent(false);
           onVerified(verifiedUser);
-        } catch (authErr: any) {
-          console.error('createUserWithEmailAndPassword failed', authErr);
-          if (authErr?.code === 'auth/email-already-in-use') {
-            setEmailOtpError('Email already in use. Please sign in instead.');
-          } else {
-            setEmailOtpError(authErr?.message || 'Failed to create auth user.');
-          }
+        } else {
+          // fallback: use uid returned but client not signed in
+          const displayName = data.displayName as string | undefined;
+          const verifiedUser = {
+            uid: uid || '',
+            phone: null,
+            displayName: displayName ?? fullName ?? null,
+            email: email ?? null,
+          };
+          setEmailVerified(true);
+          setEmailOtpSent(false);
+          onVerified(verifiedUser);
         }
       }
     } catch (err: any) {
