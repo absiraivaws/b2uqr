@@ -14,6 +14,7 @@ import {
   EmailAuthProvider,
   linkWithCredential
 } from "firebase/auth";
+import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { db } from '@/lib/firebase';
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { useRouter } from 'next/navigation';
@@ -23,14 +24,18 @@ export default function SignUpPage() {
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
   const [sendingCode, setSendingCode] = useState(false);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
   const [otp, setOtp] = useState('');
   const [socialLoading, setSocialLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailOtpSent, setEmailOtpSent] = useState(false);
+  const [emailOtpError, setEmailOtpError] = useState<string | null>(null);
+  const [emailOtp, setEmailOtp] = useState('');
+  const [emailVerifying, setEmailVerifying] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(false);
   const [verifiedUser, setVerifiedUser] = useState<{
     uid: string;
     phone: string | null;
@@ -126,22 +131,6 @@ export default function SignUpPage() {
         }
       }
 
-      // Optionally link email/password if provided and passwords match
-      if (email && password && password === confirm) {
-        try {
-          const emailCred = EmailAuthProvider.credential(email, password);
-          await linkWithCredential(userCredential.user, emailCred);
-        } catch (linkErr: any) {
-          // linking may fail if email already in use; surface useful message
-          console.error('link error', linkErr);
-          if (linkErr?.code === 'auth/email-already-in-use') {
-            setError('Email already in use; account created with phone. You can sign in with phone.');
-          } else {
-            setError(linkErr?.message || 'Failed to link email credential.');
-          }
-        }
-      }
-
       // Success: keep user info and prompt to create a PIN before redirect
       console.log('Phone sign-up successful', userCredential.user.uid);
       setVerifiedUser({
@@ -223,6 +212,93 @@ export default function SignUpPage() {
     }
   };
 
+  // Send OTP to email by calling server API which will generate and store an OTP
+  const handleSendEmailOtp = async () => {
+    setEmailOtpError(null);
+    setError(null);
+    if (!email) {
+      setEmailOtpError('Email is required.');
+      return;
+    }
+    setEmailSending(true);
+    try {
+      const res = await fetch('/api/email/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setEmailOtpError((data && data.message) || 'Failed to send OTP.');
+      } else {
+        setEmailOtpSent(true);
+      }
+    } catch (err: any) {
+      console.error(err);
+      setEmailOtpError(err?.message || 'Failed to send OTP.');
+    } finally {
+      setEmailSending(false);
+    }
+  };
+
+  // Verify email OTP by calling server API
+  const handleVerifyEmailOtp = async () => {
+    setEmailOtpError(null);
+    setError(null);
+    if (!email) {
+      setEmailOtpError('Email is required.');
+      return;
+    }
+    if (!emailOtp) {
+      setEmailOtpError('Enter OTP.');
+      return;
+    }
+    setEmailVerifying(true);
+    try {
+      const res = await fetch('/api/email/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, code: emailOtp }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setEmailOtpError((data && data.message) || 'OTP verification failed.');
+      } else {
+        // OTP verified server-side. Create a Firebase Auth user (client-side) so we have an auth uid.
+        try {
+          // generate a temporary strong password
+          const pw = Array.from(window.crypto.getRandomValues(new Uint8Array(16))).map(b => (b % 36).toString(36)).join('') + '!A1';
+          const userCredential = await createUserWithEmailAndPassword(auth, email, pw);
+          try {
+            if (fullName) await updateProfile(userCredential.user, { displayName: fullName });
+          } catch (e) { console.warn('updateProfile failed', e); }
+
+          setVerifiedUser({
+            uid: userCredential.user.uid,
+            phone: userCredential.user.phoneNumber ?? null,
+            displayName: userCredential.user.displayName ?? fullName ?? null,
+            email: userCredential.user.email ?? email ?? null,
+          });
+          setEmailVerified(true);
+          setEmailOtpSent(false);
+        } catch (authErr: any) {
+          console.error('createUserWithEmailAndPassword failed', authErr);
+          // If the email is already registered, inform the user to sign in instead.
+          if (authErr?.code === 'auth/email-already-in-use') {
+            setEmailOtpError('Email already in use. Please sign in instead.');
+          } else {
+            setEmailOtpError(authErr?.message || 'Failed to create auth user.');
+          }
+        }
+      }
+    } catch (err: any) {
+      console.error(err);
+      setEmailOtpError(err?.message || 'OTP verification failed.');
+    } finally {
+      setEmailVerifying(false);
+    }
+  };
+
   return (
     <main className="p-4 sm:p-6 lg:p-8 max-w-3xl mx-auto">
       <div id="recaptcha-container" />
@@ -251,17 +327,36 @@ export default function SignUpPage() {
           <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
             <div>
               <label className="text-sm">Full name</label>
-              <Input value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Jane Doe" />
+              <Input value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Jane Doe" required />
             </div>
             <div>
-              <label className="text-sm">Email (optional)</label>
-              <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" />
+              <label className="text-sm">Email</label>
+              <div className="flex gap-2">
+                <Input type="email" value={email} onChange={e => { setEmail(e.target.value); setEmailOtpSent(false); setEmailOtpError(null); }} placeholder="you@example.com" required />
+                <Button onClick={handleSendEmailOtp} disabled={emailSending}>
+                  {emailSending ? <Loader2 className="animate-spin h-4 w-4" /> : 'Send OTP'}
+                </Button>
+              </div>
+                {emailOtpError && <div className="text-xs text-destructive mt-1">{emailOtpError}</div>}
+                {emailOtpSent && !emailVerified && (
+                  <div className="mt-2">
+                    <label className="text-sm">Enter email OTP</label>
+                    <div className="flex gap-2 mt-1">
+                      <Input value={emailOtp} onChange={e => setEmailOtp(e.target.value)} placeholder="123456" />
+                      <Button onClick={handleVerifyEmailOtp} disabled={emailVerifying}>
+                        {emailVerifying ? <Loader2 className="animate-spin h-4 w-4" /> : 'Verify'}
+                      </Button>
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">OTP sent to {email}. Check your inbox.</div>
+                  </div>
+                )}
+                {emailVerified && <div className="text-xs text-success mt-1">Email verified ✓</div>}
             </div>
 
             <div>
               <label className="text-sm">Phone</label>
               <div className="flex gap-2">
-                <Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+94 712 345 678" />
+                <Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+94 712 345 678" required />
                 <Button onClick={handleSendCode} disabled={sendingCode}>
                   {sendingCode ? <Loader2 className="animate-spin h-4 w-4" /> : 'Send OTP'}
                 </Button>
