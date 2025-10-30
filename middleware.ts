@@ -20,9 +20,12 @@ export function middleware(req: NextRequest) {
   const isProtected = PROTECTED_PREFIXES.some(prefix => pathname === prefix || pathname.startsWith(`${prefix}/`));
   if (!isProtected) return NextResponse.next();
 
-  // Check common cookie names set by client after sign-in.
+  // Check for our server-side session cookie created at /api/session/create
+  // Note: middleware runs at the edge runtime and cannot verify the cookie's
+  // signature here (firebase-admin is Node-only). We only check presence and
+  // rely on server-side helpers to fully validate the cookie in SSR handlers.
   const cookies = req.cookies;
-  const sessionCookie = cookies.get('user_uid')?.value || cookies.get('token')?.value || cookies.get('__session')?.value;
+  const sessionCookie = cookies.get('session')?.value;
 
   if (!sessionCookie) {
     const signInUrl = req.nextUrl.clone();
@@ -31,7 +34,13 @@ export function middleware(req: NextRequest) {
     return NextResponse.redirect(signInUrl);
   }
 
-  return NextResponse.next();
+  // For protected pages, instruct browsers and intermediate caches not to store
+  // a cached copy so the back-button cannot show stale authenticated content.
+  const res = NextResponse.next();
+  res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.headers.set('Pragma', 'no-cache');
+  res.headers.set('Expires', '0');
+  return res;
 }
 
 // Run middleware only for these routes

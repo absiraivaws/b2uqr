@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Sidebar,
   SidebarContent,
@@ -16,8 +16,7 @@ import {
 import { QrCode, History, BarChart, User, Settings as SettingsIcon, LogOutIcon, Loader2 } from 'lucide-react'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { signOut } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { clientSignOut } from '@/lib/clientAuth';
 
 export default function AppLayout({
   children,
@@ -41,18 +40,38 @@ export default function AppLayout({
   ]
 
   const handleSignOut = async (e?: React.MouseEvent) => {
-    e?.preventDefault()
-    if (signingOut) return
-    setSigningOut(true)
+    e?.preventDefault();
+    if (signingOut) return;
+    setSigningOut(true);
     try {
-      await signOut(auth)
-      router.push('/signin')
+      await clientSignOut();
+      // Replace history entry so back-button won't return to a protected page
+      router.replace('/signin');
     } catch (err) {
-      // optionally report error
-      console.error('Sign out failed', err)
-      setSigningOut(false)
+      console.error('Sign out failed', err);
+      setSigningOut(false);
     }
-  }
+  };
+
+  // On mount, verify server session for this layout. If the server session
+  // is invalid or absent, redirect to /signin. This prevents the browser
+  // back-button from showing protected content that appears cached.
+  useEffect(() => {
+    let cancelled = false;
+    const verify = async () => {
+      try {
+        const res = await fetch('/api/session/verify', { credentials: 'include' });
+        if (!cancelled && (!res.ok)) {
+          router.replace('/signin');
+        }
+      } catch (err) {
+        if (!cancelled) router.replace('/signin');
+      }
+    };
+    verify();
+    return () => { cancelled = true };
+  // only run on first mount for this layout
+  }, [router]);
 
   return (
     <SidebarProvider>

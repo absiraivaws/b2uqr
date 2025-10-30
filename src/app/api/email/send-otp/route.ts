@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { adminDb } from '@/lib/firebaseAdmin';
 
 // Simple server-side API to generate and store a 6-digit OTP for an email.
 // NOTE: This implementation logs the OTP to the server console. Replace the
@@ -24,10 +23,10 @@ export async function POST(req: Request) {
     const id = `${encodeURIComponent(email)}_${Date.now()}`;
     const expiresAtMs = Date.now() + 5 * 60 * 1000; // 5 minutes
 
-    await setDoc(doc(db, 'email_otps', id), {
+    await adminDb.collection('email_otps').doc(id).set({
       email,
       codeHash: hash,
-      created_at: serverTimestamp(),
+      created_at: new Date(),
       expires_at_ms: expiresAtMs,
       attempts: 0,
     });
