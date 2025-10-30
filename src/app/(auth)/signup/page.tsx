@@ -148,8 +148,15 @@ export default function SignUpPage() {
       if (isEmailLike(v)) {
         setEmail(v.toLowerCase());
         setActiveChannel('email');
-        await handleSendEmailOtp(v.toLowerCase());
-        // success will be signaled via emailOtpSent (hook)
+        const res = await handleSendEmailOtp(v.toLowerCase());
+        // if server provided secsLeft (on success or 429), align client countdown
+        if (res?.ok || res?.data?.secsLeft) {
+          const secs = res.data?.secsLeft ?? RESEND_SECONDS;
+          setSentOnce(true);
+          setResendSecondsLeft(secs);
+          setIdentifierSent(true);
+        }
+        // emailOtpSent hook will also update other state
       } else if (isPhoneLike(v)) {
         // normalize phone minimally - keep as entered for firebase
         setPhone(v);
@@ -172,10 +179,11 @@ export default function SignUpPage() {
   useEffect(() => {
     const sent = emailOtpSent || confirmationRequested;
     if (!sent) return;
-  // mark sent and start countdown
-  setIdentifierSent(true);
-  setSentOnce(true);
-    setResendSecondsLeft(RESEND_SECONDS);
+    // mark sent and start countdown; if server already provided a TTL,
+    // keep it; otherwise initialize to default.
+    setIdentifierSent(true);
+    setSentOnce(true);
+    if (resendSecondsLeft === null) setResendSecondsLeft(RESEND_SECONDS);
     // clear any existing timer
     try { if (countdownRef && countdownRef.id) { clearInterval(countdownRef.id); countdownRef.id = undefined; } } catch (e) {}
     const id = setInterval(() => {

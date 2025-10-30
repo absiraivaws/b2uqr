@@ -21,11 +21,16 @@ export async function POST(req: Request) {
     const hash = crypto.createHash('sha256').update(code).digest('hex');
 
     // Server-side guard: disallow sending a new OTP while an unexpired OTP
-    // exists for the same email. This prevents duplicate sends / spamming.
-    const existingQ = adminDb.collection('email_otps').where('email', '==', email).where('expires_at_ms', '>', Date.now());
-    const existingSnap = await existingQ.get();
-    if (!existingSnap.empty) {
-      return NextResponse.json({ ok: false, message: 'OTP already sent. Please wait before requesting another.' }, { status: 429 });
+    // exists for the same email. Firestore may require a composite index for
+    // certain compound queries (e.g. equality + inequality). To avoid forcing
+    // an index here, query by email and do the expiry check in application code.
+    const existingSnap = await adminDb.collection('email_otps').where('email', '==', email).get();
+    const now = Date.now();
+    const unexpiredDoc = existingSnap.docs.find(d => (d.data()?.expires_at_ms || 0) > now);
+    if (unexpiredDoc) {
+      const expiresAt = (unexpiredDoc.data()?.expires_at_ms || 0) as number;
+      const secsLeft = Math.max(0, Math.ceil((expiresAt - now) / 1000));
+      return NextResponse.json({ ok: false, message: `OTP already sent. Try again in ${secsLeft}s.`, secsLeft }, { status: 429 });
     }
 
     const id = `${encodeURIComponent(email)}_${Date.now()}`;
@@ -39,10 +44,11 @@ export async function POST(req: Request) {
       attempts: 0,
     });
 
-    // Placeholder: log OTP for now. Replace with real email sending.
-    console.log(`Email OTP for ${email}: ${code} (expires in 5 minutes)`);
+  // Placeholder: log OTP for now. Replace with real email sending.
+  console.log(`Email OTP for ${email}: ${code} (expires in 5 minutes)`);
 
-    return NextResponse.json({ ok: true, message: 'OTP generated' });
+  const secsLeft = Math.max(0, Math.ceil((expiresAtMs - Date.now()) / 1000));
+  return NextResponse.json({ ok: true, message: 'OTP generated', secsLeft });
   } catch (err: any) {
     console.error('send-otp error', err);
     return NextResponse.json({ ok: false, message: err?.message || 'Server error' }, { status: 500 });

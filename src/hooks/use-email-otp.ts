@@ -34,12 +34,16 @@ export function useEmailOtp({ email, fullName, onVerified }: { email: string; fu
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setEmailOtpError((data && data.message) || 'Failed to send OTP.');
+        return { ok: false, data };
       } else {
         setEmailOtpSent(true);
+        return { ok: true, data };
       }
     } catch (err: any) {
       console.error(err);
-      setEmailOtpError(err?.message || 'Failed to send OTP.');
+      const msg = err?.message || 'Failed to send OTP.';
+      setEmailOtpError(msg);
+      return { ok: false, data: { message: msg } };
     } finally {
       setEmailSending(false);
     }
