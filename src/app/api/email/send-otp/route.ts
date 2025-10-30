@@ -20,6 +20,14 @@ export async function POST(req: Request) {
     const crypto = await import('crypto');
     const hash = crypto.createHash('sha256').update(code).digest('hex');
 
+    // Server-side guard: disallow sending a new OTP while an unexpired OTP
+    // exists for the same email. This prevents duplicate sends / spamming.
+    const existingQ = adminDb.collection('email_otps').where('email', '==', email).where('expires_at_ms', '>', Date.now());
+    const existingSnap = await existingQ.get();
+    if (!existingSnap.empty) {
+      return NextResponse.json({ ok: false, message: 'OTP already sent. Please wait before requesting another.' }, { status: 429 });
+    }
+
     const id = `${encodeURIComponent(email)}_${Date.now()}`;
     const expiresAtMs = Date.now() + 5 * 60 * 1000; // 5 minutes
 

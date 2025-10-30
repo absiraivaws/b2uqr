@@ -46,12 +46,13 @@ export function usePhoneOtp({ phone, fullName, onVerified }: { phone: string; fu
     }
   };
 
-  const handleSendCode = async () => {
-    if (!phone) return;
+  const handleSendCode = async (overridePhone?: string) => {
+    const targetPhone = (overridePhone ?? phone)?.toString().trim();
+    if (!targetPhone) return;
     setSendingCode(true);
     try {
       const appVerifier = await setupRecaptcha();
-      const result = await signInWithPhoneNumber(auth, phone, appVerifier as any);
+      const result = await signInWithPhoneNumber(auth, targetPhone, appVerifier as any);
       setConfirmationResult(result);
     } catch (err: any) {
       console.error(err);

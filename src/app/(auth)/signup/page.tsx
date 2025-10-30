@@ -1,5 +1,5 @@
  'use client'
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,14 @@ export default function SignUpPage() {
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState(''); // email or phone input
+  const [activeChannel, setActiveChannel] = useState<'email' | 'phone' | null>(null);
+  const [identifierSent, setIdentifierSent] = useState(false);
+  const [resendSecondsLeft, setResendSecondsLeft] = useState<number | null>(null);
+  const [sentOnce, setSentOnce] = useState(false);
+  const RESEND_SECONDS = 60; // seconds to wait before allowing resend
+  const countdownRef = (globalThis as any).__signup_resend_timer__ as { id?: number } | undefined;
+
   const [socialLoading, setSocialLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [verifiedUser, setVerifiedUser] = useState<{
@@ -104,6 +112,91 @@ export default function SignUpPage() {
     handleVerifyOtp,
   } = usePhoneOtp({ phone, fullName, onVerified: (u) => setVerifiedUser(u) });
 
+  useEffect(() => {
+    // reset per-channel UI when identifier changes
+    setEmailOtpSent(false);
+    setEmailOtpError(null);
+    setOtp('');
+  setIdentifierSent(false);
+  setSentOnce(false);
+    // clear any existing countdown when user edits identifier
+    setResendSecondsLeft(null);
+    try {
+      if (countdownRef && countdownRef.id) {
+        clearInterval(countdownRef.id);
+        countdownRef.id = undefined;
+      }
+    } catch (e) {
+      /* ignore */
+    }
+    // do not clear verifiedUser here
+  }, [identifier]);
+
+  const isEmailLike = (v: string) => /^\S+@\S+\.\S+$/.test(v.trim());
+  const isPhoneLike = (v: string) => /^\+?[0-9\s\-()]{6,}$/.test(v.trim());
+
+  const handleSendIdentifier = async () => {
+    setError(null);
+    const v = identifier.trim();
+    if (!v) {
+      setError('Enter an email or phone number.');
+      return;
+    }
+    // disable the button immediately to avoid duplicate submits
+    setIdentifierSent(true);
+    try {
+      if (isEmailLike(v)) {
+        setEmail(v.toLowerCase());
+        setActiveChannel('email');
+        await handleSendEmailOtp(v.toLowerCase());
+        // success will be signaled via emailOtpSent (hook)
+      } else if (isPhoneLike(v)) {
+        // normalize phone minimally - keep as entered for firebase
+        setPhone(v);
+        setActiveChannel('phone');
+        await handleSendCode(v);
+        // success will be signaled via confirmationRequested (hook)
+      } else {
+        setError('Enter a valid email or phone number.');
+        setIdentifierSent(false);
+      }
+    } catch (err: any) {
+      console.error(err);
+      setError(err?.message || 'Failed to request OTP.');
+      // allow retry on error
+      setIdentifierSent(false);
+    }
+  };
+
+  // When either hook indicates a send succeeded, start the resend countdown
+  useEffect(() => {
+    const sent = emailOtpSent || confirmationRequested;
+    if (!sent) return;
+  // mark sent and start countdown
+  setIdentifierSent(true);
+  setSentOnce(true);
+    setResendSecondsLeft(RESEND_SECONDS);
+    // clear any existing timer
+    try { if (countdownRef && countdownRef.id) { clearInterval(countdownRef.id); countdownRef.id = undefined; } } catch (e) {}
+    const id = setInterval(() => {
+      setResendSecondsLeft(prev => {
+        if (prev === null) return null;
+        if (prev <= 1) {
+          // done
+          try { if (countdownRef && countdownRef.id) { clearInterval(countdownRef.id); countdownRef.id = undefined; } } catch (e) {}
+          setIdentifierSent(false);
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000) as unknown as number;
+    // store globally to survive HMR during dev
+    try { (globalThis as any).__signup_resend_timer__ = { id }; } catch (e) {}
+    return () => {
+      try { clearInterval(id); } catch (e) {}
+    };
+  }, [emailOtpSent, confirmationRequested]);
+
   return (
     <main className="p-4 sm:p-6 lg:p-8 max-w-3xl mx-auto">
       <div id="recaptcha-container" />
@@ -135,40 +228,41 @@ export default function SignUpPage() {
               <Input value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Jane Doe" required />
             </div>
             <div>
-              <label className="text-sm">Email</label>
+              <label className="text-sm">Email or phone</label>
               <div className="flex gap-2">
-                <Input type="email" value={email} onChange={e => { setEmail(e.target.value); setEmailOtpSent(false); setEmailOtpError(null); }} placeholder="you@example.com" required />
-                <Button onClick={handleSendEmailOtp} disabled={emailSending}>
-                  {emailSending ? <Loader2 className="animate-spin h-4 w-4" /> : 'Send OTP'}
+                <Input value={identifier} onChange={e => setIdentifier(e.target.value)} placeholder="you@example.com or +94 712 345 678" />
+                <Button onClick={handleSendIdentifier} disabled={emailSending || sendingCode || identifierSent}>
+                  {emailSending || sendingCode ? (
+                    <Loader2 className="animate-spin h-4 w-4" />
+                  ) : resendSecondsLeft && resendSecondsLeft > 0 ? (
+                    `Sent (${resendSecondsLeft}s)`
+                  ) : sentOnce ? (
+                    'Resend'
+                  ) : (
+                    'Send OTP'
+                  )}
                 </Button>
               </div>
+              {error && <div className="text-xs text-destructive mt-1">{error}</div>}
+            </div>
+
+            {/* Email OTP UI */}
+            {activeChannel === 'email' && !verifiedUser && (
+              <div>
+                <label className="text-sm">Enter email OTP</label>
+                <div className="flex gap-2 mt-1">
+                  <Input value={emailOtp} onChange={e => setEmailOtp(e.target.value)} placeholder="123456" />
+                  <Button onClick={handleVerifyEmailOtp} disabled={emailVerifying}>
+                    {emailVerifying ? <Loader2 className="animate-spin h-4 w-4" /> : 'Verify'}
+                  </Button>
+                </div>
                 {emailOtpError && <div className="text-xs text-destructive mt-1">{emailOtpError}</div>}
-                {emailOtpSent && !emailVerified && (
-                  <div className="mt-2">
-                    <label className="text-sm">Enter email OTP</label>
-                    <div className="flex gap-2 mt-1">
-                      <Input value={emailOtp} onChange={e => setEmailOtp(e.target.value)} placeholder="123456" />
-                      <Button onClick={handleVerifyEmailOtp} disabled={emailVerifying}>
-                        {emailVerifying ? <Loader2 className="animate-spin h-4 w-4" /> : 'Verify'}
-                      </Button>
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">OTP sent to {email}. Check your inbox.</div>
-                  </div>
-                )}
-                {emailVerified && <div className="text-xs text-success mt-1">Email verified ✓</div>}
-            </div>
-
-            <div>
-              <label className="text-sm">Phone</label>
-              <div className="flex gap-2">
-                <Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+94 712 345 678" required />
-                <Button onClick={handleSendCode} disabled={sendingCode}>
-                  {sendingCode ? <Loader2 className="animate-spin h-4 w-4" /> : 'Send OTP'}
-                </Button>
+                <div className="text-xs text-muted-foreground mt-1">OTP sent to {email || identifier}. Check your inbox.</div>
               </div>
-            </div>
+            )}
 
-            {confirmationRequested && !verifiedUser && (
+            {/* Phone OTP UI */}
+            {activeChannel === 'phone' && confirmationRequested && !verifiedUser && (
               <div>
                 <label className="text-sm">Enter OTP</label>
                 <div className="flex gap-2">
@@ -182,7 +276,7 @@ export default function SignUpPage() {
 
             {verifiedUser && (
               <>
-                <div className="text-sm">Phone verified: <strong>{verifiedUser.phone}</strong></div>
+                <div className="text-sm">Verified: <strong>{verifiedUser.email ?? verifiedUser.phone}</strong></div>
                 <div>
                   <label className="text-sm">Create 4-6 digit PIN</label>
                   <div className="flex gap-2">

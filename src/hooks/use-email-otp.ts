@@ -17,9 +17,10 @@ export function useEmailOtp({ email, fullName, onVerified }: { email: string; fu
   const [emailVerifying, setEmailVerifying] = useState(false);
   const [emailVerified, setEmailVerified] = useState(false);
 
-  const handleSendEmailOtp = async () => {
+  const handleSendEmailOtp = async (overrideEmail?: string) => {
     setEmailOtpError(null);
-    if (!email) {
+    const targetEmail = (overrideEmail ?? email).toString().trim().toLowerCase();
+    if (!targetEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(targetEmail)) {
       setEmailOtpError('Email is required.');
       return;
     }
@@ -28,7 +29,7 @@ export function useEmailOtp({ email, fullName, onVerified }: { email: string; fu
       const res = await fetch('/api/email/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email: targetEmail }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
