@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { adminDb, adminAuth } from '@/lib/firebaseAdmin';
+import { verifyPin, hashPin, isArgonHash } from '@/lib/pinHash';
 
 export async function POST(req: Request) {
   try {
@@ -23,10 +24,31 @@ export async function POST(req: Request) {
     const storedHash = data?.pinHash;
     if (!storedHash) return NextResponse.json({ ok: false, message: 'PIN not set' }, { status: 400 });
 
-    // hash incoming pin and compare
-    const crypto = await import('crypto');
-    const hash = crypto.createHash('sha256').update(pin).digest('hex');
-    if (hash !== storedHash) return NextResponse.json({ ok: false, message: 'Invalid PIN' }, { status: 401 });
+    let valid = false;
+    // If stored hash looks like an Argon2 hash, verify using argon2
+    if (isArgonHash(storedHash)) {
+      valid = await verifyPin(pin, storedHash);
+    } else {
+      // legacy SHA-256 stored PINs: verify then upgrade to Argon2 on success
+      const crypto = await import('crypto');
+      const legacyHash = crypto.createHash('sha256').update(pin).digest('hex');
+      if (legacyHash === storedHash) {
+        valid = true;
+        try {
+          const newHash = await hashPin(pin);
+          // update user doc to store new Argon2 hash and metadata
+          await adminDb.collection('users').doc(userDocSnap.id).update({
+            pinHash: newHash,
+            pinHashAlgo: 'argon2',
+            pinHashUpdatedAt: new Date(),
+          });
+        } catch (err) {
+          console.warn('Failed to upgrade legacy pin hash', err);
+        }
+      }
+    }
+
+    if (!valid) return NextResponse.json({ ok: false, message: 'Invalid PIN' }, { status: 401 });
 
     const uid = data.uid;
     if (!uid) return NextResponse.json({ ok: false, message: 'No uid associated' }, { status: 500 });

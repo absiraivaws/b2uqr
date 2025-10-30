@@ -7,8 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { Loader2, UserPlus, LogIn } from "lucide-react";
 import { useEmailOtp } from '@/hooks/use-email-otp';
 import { usePhoneOtp } from '@/hooks/use-phone-otp';
-import { db } from '@/lib/firebase';
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+// server-side PIN hashing is done via /api/user/set-pin
 import { useRouter } from 'next/navigation';
 
 export default function SignUpPage() {
@@ -30,15 +29,6 @@ export default function SignUpPage() {
 
   // Phone OTP logic (recaptcha, send/verify) moved to `use-phone-otp` hook.
 
-  // Hash PIN (SHA-256) before saving to Firestore
-  const hashPin = async (p: string) => {
-    const enc = new TextEncoder();
-    const data = enc.encode(p);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  };
-
   const handleSavePinAndCreateUser = async () => {
     setError(null);
     if (!verifiedUser) {
@@ -55,16 +45,15 @@ export default function SignUpPage() {
     }
     setSavingUser(true);
     try {
-      const pinHash = await hashPin(pin);
-      const userDocRef = doc(db, 'users', verifiedUser.uid);
-      await setDoc(userDocRef, {
-        uid: verifiedUser.uid,
-        phone: verifiedUser.phone,
-        displayName: verifiedUser.displayName ?? null,
-        email: verifiedUser.email ?? null,
-        pinHash,
-        created_at: serverTimestamp()
+      // Call server API to hash the PIN (Argon2 + PIN_PEPPER) and store it
+      const res = await fetch('/api/user/set-pin', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin })
       });
+      const json = await res.json();
+      if (!res.ok || !json?.ok) throw new Error(json?.message || 'Failed to save PIN');
       // redirect after save
       try { router.push('/generate-qr'); } catch (e) { /* ignore */ }
     } catch (err: any) {
