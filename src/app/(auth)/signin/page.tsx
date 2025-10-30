@@ -6,15 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { AlertTriangle, Loader2, LogIn } from "lucide-react";
 import { useRouter } from 'next/navigation';
-import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { signInWithPin } from '@/hooks/use-pin-auth';
 
 export default function SignInPage() {
   const [loadingGoogle, setLoadingGoogle] = useState(false);
-  const [phone, setPhone] = useState('');
-  const [sendingCode, setSendingCode] = useState(false);
-  const [otp, setOtp] = useState('');
-  const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [identifier, setIdentifier] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [signingEmail, setSigningEmail] = useState(false);
@@ -39,43 +35,7 @@ export default function SignInPage() {
     }
   };
 
-  const handleSendCode = async () => {
-    setError(null);
-    if (!phone) {
-      setError('Please enter phone number.');
-      return;
-    }
-    setSendingCode(true);
-    try {
-      console.log('Send OTP to', phone);
-      // TODO: use Firebase Recaptcha + signInWithPhoneNumber
-      await new Promise(r => setTimeout(r, 800));
-    } catch (err) {
-      console.error(err);
-      setError('Failed to send code.');
-    } finally {
-      setSendingCode(false);
-    }
-  };
-
-  const handleVerifyCode = async () => {
-    setError(null);
-    if (!otp) {
-      setError('Please enter the OTP code.');
-      return;
-    }
-    setVerifyingOtp(true);
-    try {
-      console.log('Verify OTP', otp);
-      // TODO: confirm result from Firebase
-      await new Promise(r => setTimeout(r, 800));
-    } catch (err) {
-      console.error(err);
-      setError('OTP verification failed.');
-    } finally {
-      setVerifyingOtp(false);
-    }
-  };
+  // identifier + PIN flow handles sign-in (identifier can be email or phone)
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,8 +68,9 @@ export default function SignInPage() {
 
   const handlePinSignIn = async () => {
     setError(null);
-    if (!phone) {
-      setError('Please enter phone number.');
+    const id = identifier?.trim();
+    if (!identifier) {
+      setError('Please enter an email or phone number to sign in.');
       return;
     }
     if (!/^\d{4,6}$/.test(pin)) {
@@ -118,22 +79,9 @@ export default function SignInPage() {
     }
     setSigningPin(true);
     try {
-      // Query users collection for phone
-      const q = query(collection(db, 'users'), where('phone', '==', phone));
-      const snap = await getDocs(q);
-      if (snap.empty) {
-        setError('No account found for this phone.');
-        return;
-      }
-      const userDoc = snap.docs[0].data() as any;
-      const storedHash = userDoc.pinHash;
-      const inputHash = await hashPin(pin);
-      if (inputHash !== storedHash) {
-        setError('Invalid PIN.');
-        return;
-      }
-      // Consider user signed in: persist minimal client session and redirect
-      try { localStorage.setItem('user_uid', userDoc.uid); } catch(_) {}
+  // Call server to validate PIN and receive a custom token, then sign in
+  const user = await signInWithPin(id, pin);
+      try { localStorage.setItem('user_uid', user.uid); } catch (_) {}
       router.push('/generate-qr');
     } catch (err: any) {
       console.error(err);
@@ -171,28 +119,16 @@ export default function SignInPage() {
 
           <Separator />
 
-          {/* Phone */}
+          {/* Username (email or phone) + PIN */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-medium">Sign in with phone (OTP or PIN)</h3>
-              <span className="text-xs text-muted-foreground">SMS code or your PIN</span>
+              <h3 className="text-sm font-medium">Sign in with username (email or phone) + PIN</h3>
             </div>
             <div className="flex gap-2">
-              <Input placeholder="+94 712 345 678" value={phone} onChange={e => setPhone(e.target.value)} />
-              <Button onClick={handleSendCode} disabled={sendingCode}>
-                {sendingCode ? <Loader2 className="animate-spin h-4 w-4" /> : 'Send Code'}
-              </Button>
+              <Input placeholder="Email or phone" value={identifier} onChange={e => setIdentifier(e.target.value)} />
             </div>
-
-            <div className="flex gap-2">
-              <Input placeholder="Enter OTP" value={otp} onChange={e => setOtp(e.target.value)} />
-              <Button onClick={handleVerifyCode} disabled={verifyingOtp}>
-                {verifyingOtp ? <Loader2 className="animate-spin h-4 w-4" /> : 'Verify'}
-              </Button>
-            </div>
-
             <div className="mt-2">
-              <label className="text-sm">Or sign in with PIN</label>
+              <label className="text-sm">Enter PIN</label>
               <div className="flex gap-2 mt-1">
                 <Input placeholder="4-6 digit PIN" value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0,6))} />
                 <Button onClick={handlePinSignIn} disabled={signingPin}>
@@ -203,25 +139,6 @@ export default function SignInPage() {
           </div>
 
           <Separator />
-
-          {/* Email/password */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-medium">Email & Password</h3>
-            </div>
-            <form onSubmit={handleEmailSignIn} className="space-y-2">
-              <Input type="email" placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} />
-              <Input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} />
-              <div className="flex items-center justify-between gap-2">
-                <Button type="submit" className="flex-1" disabled={signingEmail}>
-                  {signingEmail ? <Loader2 className="animate-spin h-4 w-4" /> : 'Sign in'}
-                </Button>
-                <Button variant="ghost" className="text-sm" onClick={() => console.log('Navigate to forgot password')}>
-                  Forgot?
-                </Button>
-              </div>
-            </form>
-          </div>
         </CardContent>
       </Card>
 
