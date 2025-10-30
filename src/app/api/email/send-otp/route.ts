@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebaseAdmin';
+import nodemailer from 'nodemailer';
 
 // Simple server-side API to generate and store a 6-digit OTP for an email.
 // NOTE: This implementation logs the OTP to the server console. Replace the
@@ -44,11 +45,52 @@ export async function POST(req: Request) {
       attempts: 0,
     });
 
-  // Placeholder: log OTP for now. Replace with real email sending.
-  console.log(`Email OTP for ${email}: ${code} (expires in 5 minutes)`);
+    // Try to send via SMTP if configured; otherwise fallback to console.log.
+    const SMTP_HOST = process.env.SMTP_HOST;
+    const SMTP_PORT = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : undefined;
+    const SMTP_USER = process.env.SMTP_USER;
+    const SMTP_PASS = process.env.SMTP_PASS;
+    const SMTP_SECURE = process.env.SMTP_SECURE === 'true';
+    const FROM_EMAIL = process.env.FROM_EMAIL || SMTP_USER;
 
-  const secsLeft = Math.max(0, Math.ceil((expiresAtMs - Date.now()) / 1000));
-  return NextResponse.json({ ok: true, message: 'OTP generated', secsLeft });
+    let sendOk = false;
+    let sendError: any = null;
+    if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
+      try {
+        const transporter = nodemailer.createTransport({
+          host: SMTP_HOST,
+          port: SMTP_PORT || 587,
+          secure: SMTP_SECURE || (SMTP_PORT === 465),
+          auth: { user: SMTP_USER, pass: SMTP_PASS },
+        });
+
+        const info = await transporter.sendMail({
+          from: FROM_EMAIL,
+          to: email,
+          subject: 'Your verification code',
+          text: `Your verification code is ${code}. It expires in 5 minutes.`,
+          html: `<p>Your verification code is <strong>${code}</strong>. It expires in 5 minutes.</p>`,
+        });
+        console.log('OTP email sent:', info && (info.messageId || info.response));
+        sendOk = true;
+      } catch (err: any) {
+        console.error('Failed to send OTP email via SMTP:', err);
+        sendError = err;
+      }
+    } else {
+      console.warn('SMTP not configured (SMTP_HOST/SMTP_USER/SMTP_PASS missing). Falling back to console.log for OTP.');
+    }
+
+    // Fallback: always log OTP to server console so it can be inspected in dev
+    console.log(`Email OTP for ${email}: ${code} (expires in 5 minutes)`);
+
+    const secsLeft = Math.max(0, Math.ceil((expiresAtMs - Date.now()) / 1000));
+    // If SMTP config existed but send failed, surface an error to the client.
+    if (SMTP_HOST && SMTP_USER && SMTP_PASS && !sendOk) {
+      return NextResponse.json({ ok: false, message: 'Failed to send OTP email', error: String(sendError), secsLeft }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true, message: 'OTP generated', secsLeft });
   } catch (err: any) {
     console.error('send-otp error', err);
     return NextResponse.json({ ok: false, message: err?.message || 'Server error' }, { status: 500 });
