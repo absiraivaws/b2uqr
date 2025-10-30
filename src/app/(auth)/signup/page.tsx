@@ -1,20 +1,12 @@
-'use client'
-import { useState, useRef } from 'react';
+ 'use client'
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Loader2, UserPlus, LogIn } from "lucide-react";
-import { auth } from '@/lib/firebase';
-import {
-  RecaptchaVerifier,
-  signInWithPhoneNumber,
-  ConfirmationResult,
-  updateProfile,
-  EmailAuthProvider,
-  linkWithCredential
-} from "firebase/auth";
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { useEmailOtp } from '@/hooks/use-email-otp';
+import { usePhoneOtp } from '@/hooks/use-phone-otp';
 import { db } from '@/lib/firebase';
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { useRouter } from 'next/navigation';
@@ -24,18 +16,8 @@ export default function SignUpPage() {
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
-  const [sendingCode, setSendingCode] = useState(false);
-  const [verifyingOtp, setVerifyingOtp] = useState(false);
-  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
-  const [otp, setOtp] = useState('');
   const [socialLoading, setSocialLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [emailSending, setEmailSending] = useState(false);
-  const [emailOtpSent, setEmailOtpSent] = useState(false);
-  const [emailOtpError, setEmailOtpError] = useState<string | null>(null);
-  const [emailOtp, setEmailOtp] = useState('');
-  const [emailVerifying, setEmailVerifying] = useState(false);
-  const [emailVerified, setEmailVerified] = useState(false);
   const [verifiedUser, setVerifiedUser] = useState<{
     uid: string;
     phone: string | null;
@@ -45,112 +27,8 @@ export default function SignUpPage() {
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [savingUser, setSavingUser] = useState(false);
-  const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
-  const recaptchaWidgetIdRef = useRef<number | null>(null);
 
-  // Initialize (or reuse) invisible reCAPTCHA and render it
-  const setupRecaptcha = async () => {
-    // ensure language follows device/browser preference
-    try { auth.useDeviceLanguage(); } catch { /* ignore if not available */ }
-
-    if (recaptchaRef.current) return recaptchaRef.current;
-    // Firebase Auth version in this project expects (auth, container, params)
-    const verifier = new RecaptchaVerifier(
-      auth,
-      'recaptcha-container',
-      { size: 'invisible' }
-    );
-    recaptchaRef.current = verifier;
-    try {
-      const widgetId = await verifier.render();
-      recaptchaWidgetIdRef.current = typeof widgetId === 'number' ? widgetId : null;
-    } catch (e) {
-      // render may fail if grecaptcha isn't ready yet; keep verifier for later
-      console.warn('recaptcha render failed', e);
-      recaptchaWidgetIdRef.current = null;
-    }
-    return verifier;
-  };
-
-  const resetRecaptcha = () => {
-    try {
-      const wid = recaptchaWidgetIdRef.current;
-      // prefer grecaptcha.reset if widgetId available
-      if (typeof wid === 'number' && (window as any).grecaptcha && (window as any).grecaptcha.reset) {
-        try { (window as any).grecaptcha.reset(wid); } catch (e) { /* ignore */ }
-      } else if (recaptchaRef.current && typeof (recaptchaRef.current as any).clear === 'function') {
-        try { (recaptchaRef.current as any).clear(); } catch (e) { /* ignore */ }
-      }
-    } finally {
-      recaptchaRef.current = null;
-      recaptchaWidgetIdRef.current = null;
-    }
-  };
-
-  const handleSendCode = async () => {
-    setError(null);
-    if (!phone) {
-      setError('Phone number is required.');
-      return;
-    }
-    setSendingCode(true);
-    try {
-      const appVerifier = await setupRecaptcha();
-      const result = await signInWithPhoneNumber(auth, phone, appVerifier as any);
-      setConfirmationResult(result);
-    } catch (err: any) {
-      console.error(err);
-      setError(err?.message || 'Failed to send OTP.');
-      // Reset so user can retry
-      resetRecaptcha();
-    } finally {
-      setSendingCode(false);
-    }
-  };
-
-  const handleVerifyOtp = async () => {
-    setError(null);
-    if (!confirmationResult) {
-      setError('No OTP request found. Please request code again.');
-      return;
-    }
-    if (!otp) {
-      setError('Enter OTP.');
-      return;
-    }
-    setVerifyingOtp(true);
-    try {
-      const userCredential = await confirmationResult.confirm(otp);
-      // update profile with display name if provided
-      if (fullName) {
-        try {
-          await updateProfile(userCredential.user, { displayName: fullName });
-        } catch (e) {
-          // non-fatal
-          console.warn('updateProfile failed', e);
-        }
-      }
-
-      // Success: keep user info and prompt to create a PIN before redirect
-      console.log('Phone sign-up successful', userCredential.user.uid);
-      setVerifiedUser({
-        uid: userCredential.user.uid,
-        phone: userCredential.user.phoneNumber ?? phone,
-        displayName: userCredential.user.displayName ?? fullName ?? null,
-        email: userCredential.user.email ?? email ?? null,
-      });
-      // clear confirmation result and recaptcha (we still keep user signed-in)
-      setConfirmationResult(null);
-      resetRecaptcha();
-    } catch (err: any) {
-      console.error(err);
-      setError(err?.message || 'OTP verification failed.');
-      // On bad code allow retry by resetting verifier so a new challenge can be created
-      resetRecaptcha();
-    } finally {
-      setVerifyingOtp(false);
-    }
-  };
+  // Phone OTP logic (recaptcha, send/verify) moved to `use-phone-otp` hook.
 
   // Hash PIN (SHA-256) before saving to Firestore
   const hashPin = async (p: string) => {
@@ -212,92 +90,30 @@ export default function SignUpPage() {
     }
   };
 
-  // Send OTP to email by calling server API which will generate and store an OTP
-  const handleSendEmailOtp = async () => {
-    setEmailOtpError(null);
-    setError(null);
-    if (!email) {
-      setEmailOtpError('Email is required.');
-      return;
-    }
-    setEmailSending(true);
-    try {
-      const res = await fetch('/api/email/send-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setEmailOtpError((data && data.message) || 'Failed to send OTP.');
-      } else {
-        setEmailOtpSent(true);
-      }
-    } catch (err: any) {
-      console.error(err);
-      setEmailOtpError(err?.message || 'Failed to send OTP.');
-    } finally {
-      setEmailSending(false);
-    }
-  };
+  // Email and phone logic handled by hooks
+  const {
+    emailSending,
+    emailOtpSent,
+    emailOtpError,
+    emailOtp,
+    setEmailOtp,
+    emailVerifying,
+    emailVerified,
+    handleSendEmailOtp,
+    handleVerifyEmailOtp,
+    setEmailOtpSent,
+    setEmailOtpError,
+  } = useEmailOtp({ email, fullName, onVerified: (u) => setVerifiedUser(u) });
 
-  // Verify email OTP by calling server API
-  const handleVerifyEmailOtp = async () => {
-    setEmailOtpError(null);
-    setError(null);
-    if (!email) {
-      setEmailOtpError('Email is required.');
-      return;
-    }
-    if (!emailOtp) {
-      setEmailOtpError('Enter OTP.');
-      return;
-    }
-    setEmailVerifying(true);
-    try {
-      const res = await fetch('/api/email/verify-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, code: emailOtp }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setEmailOtpError((data && data.message) || 'OTP verification failed.');
-      } else {
-        // OTP verified server-side. Create a Firebase Auth user (client-side) so we have an auth uid.
-        try {
-          // generate a temporary strong password
-          const pw = Array.from(window.crypto.getRandomValues(new Uint8Array(16))).map(b => (b % 36).toString(36)).join('') + '!A1';
-          const userCredential = await createUserWithEmailAndPassword(auth, email, pw);
-          try {
-            if (fullName) await updateProfile(userCredential.user, { displayName: fullName });
-          } catch (e) { console.warn('updateProfile failed', e); }
-
-          setVerifiedUser({
-            uid: userCredential.user.uid,
-            phone: userCredential.user.phoneNumber ?? null,
-            displayName: userCredential.user.displayName ?? fullName ?? null,
-            email: userCredential.user.email ?? email ?? null,
-          });
-          setEmailVerified(true);
-          setEmailOtpSent(false);
-        } catch (authErr: any) {
-          console.error('createUserWithEmailAndPassword failed', authErr);
-          // If the email is already registered, inform the user to sign in instead.
-          if (authErr?.code === 'auth/email-already-in-use') {
-            setEmailOtpError('Email already in use. Please sign in instead.');
-          } else {
-            setEmailOtpError(authErr?.message || 'Failed to create auth user.');
-          }
-        }
-      }
-    } catch (err: any) {
-      console.error(err);
-      setEmailOtpError(err?.message || 'OTP verification failed.');
-    } finally {
-      setEmailVerifying(false);
-    }
-  };
+  const {
+    sendingCode,
+    verifyingOtp,
+    confirmationRequested,
+    otp,
+    setOtp,
+    handleSendCode,
+    handleVerifyOtp,
+  } = usePhoneOtp({ phone, fullName, onVerified: (u) => setVerifiedUser(u) });
 
   return (
     <main className="p-4 sm:p-6 lg:p-8 max-w-3xl mx-auto">
@@ -363,7 +179,7 @@ export default function SignUpPage() {
               </div>
             </div>
 
-            {confirmationResult && !verifiedUser && (
+            {confirmationRequested && !verifiedUser && (
               <div>
                 <label className="text-sm">Enter OTP</label>
                 <div className="flex gap-2">
