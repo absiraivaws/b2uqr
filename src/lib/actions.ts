@@ -11,6 +11,8 @@ import {
   getLastDbTransaction,
   getAllDbTransactions,
 } from "./db";
+import { cookies } from 'next/headers';
+import { adminAuth } from './firebaseAdmin';
 import { callBankCreateQR, callBankReconciliationAPI } from "./bank-api";
 import { verifyWebhookSignature } from "./security";
 import { alertFailures, type AlertFailuresOutput } from "@/ai/flows/alert-failures";
@@ -81,6 +83,22 @@ export async function createTransaction(transactionData: {amount: string, refere
   // 4. Update transaction with QR data from bank
   pendingTx.qr_payload = bankResponse.qr_payload;
   pendingTx.expires_at = bankResponse.expires_at;
+
+  // Try to attach the current user's UID from the session cookie (server-side)
+  try {
+  const cookieStore = await cookies();
+  const sessionCookie = cookieStore.get('session')?.value;
+    if (sessionCookie) {
+      const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
+      if (decoded && decoded.uid) {
+        // attach uid to transaction so we can query transactions by user later
+        (pendingTx as any).uid = decoded.uid;
+      }
+    }
+  } catch (err) {
+    // If verification fails, proceed without uid; the transaction can still be created.
+    console.warn('Could not verify session cookie when creating transaction:', err);
+  }
 
   const finalTx = await createDbTransaction(pendingTx);
 

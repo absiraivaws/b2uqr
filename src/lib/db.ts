@@ -11,7 +11,6 @@ import {
   orderBy,
   limit,
   where,
-  Timestamp
 } from "firebase/firestore";
 
 const COLLECTION = "transactions";
@@ -23,6 +22,11 @@ export async function createDbTransaction(tx: Omit<Transaction, 'created_at' | '
     created_at: now,
     updated_at: now,
   };
+  // Ensure UID from the incoming object is preserved (if provided).
+  // `tx` may include an optional `uid` attached server-side; keep it explicitly.
+  if ((tx as any).uid) {
+    (newTx as any).uid = (tx as any).uid;
+  }
   // Also pass terminal ID in bankResponse for consistency
   if (tx.terminal_id) {
     newTx.bankResponse = { ...newTx.bankResponse, terminal_id: tx.terminal_id };

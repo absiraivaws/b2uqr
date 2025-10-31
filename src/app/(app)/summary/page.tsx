@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -27,16 +27,11 @@ import {
   Line,
   ResponsiveContainer,
 } from "recharts";
-import { db } from "@/lib/firebase";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import useTransactions from '@/hooks/use-transactions';
+import type { Transaction as TxType } from '@/lib/types';
 
-type Transaction = {
-  transaction_uuid: string;
-  terminal_id: string;
-  amount: number;
-  created_at: string;
-  // ...other fields...
-};
+// Use the shared Transaction type (amount stored as string in the DB)
+type Transaction = TxType;
 
 type ChartData = {
   name: string;
@@ -48,8 +43,9 @@ export default function SummaryPage() {
   const [terminalId, setTerminalId] = useState("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(false);
+  // Subscribe to current user's transactions (hook filters by uid)
+  const { transactions: userTransactions, loading } = useTransactions();
+  const [chartLoading, setChartLoading] = useState(false);
   const [chartMode, setChartMode] = useState<"monthly" | "daily">("monthly");
 
   const terminalIdOptions = [
@@ -59,54 +55,74 @@ export default function SummaryPage() {
     ),
   ];
 
-  async function fetchTransactions() {
-    setLoading(true);
-    let q = collection(db, "transactions");
-    let constraints: any[] = [];
-    if (terminalId !== "all") {
-      constraints.push(where("terminal_id", "==", terminalId));
-    }
-    if (startDate) {
-      constraints.push(where("created_at", ">=", startDate));
-    }
-    if (endDate) {
-      const end = new Date(endDate);
-      end.setDate(end.getDate() + 1);
-      constraints.push(where("created_at", "<", end.toISOString().slice(0, 10)));
-    }
-    // Only show status=SUCCESS
-    constraints.push(where("status", "==", "SUCCESS"));
-    if (constraints.length > 0) {
-      // @ts-ignore
-      q = query(q, ...constraints);
-    }
-    const snap = await getDocs(q);
-    setTransactions(snap.docs.map((doc) => doc.data() as Transaction));
-    setLoading(false);
-  }
+  // We now compute filtered transactions from `userTransactions` returned by the hook.
 
   useEffect(() => {
-    fetchTransactions();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // nothing to do on mount — data is provided by the hook
   }, []);
 
   function handleFilter() {
-    fetchTransactions();
+    // Filters are computed reactively from `userTransactions` — no manual fetch required.
+    // Toggle a tiny loading flag to give user feedback if desired.
+    setChartLoading(true);
+    setTimeout(() => setChartLoading(false), 150); // small UX pulse
   }
 
-  // Group by month for chart
+  const filteredTransactions = useMemo(() => {
+    return (userTransactions || []).filter((tx) => {
+      // Terminal filter
+      if (terminalId !== "all") {
+        if ((tx.terminal_id ?? tx.bankResponse?.terminal_id) !== terminalId) return false;
+      }
+
+      // Parse created_at defensively (string or Firestore Timestamp)
+      let created: Date;
+      try {
+        if (typeof tx.created_at === 'string') {
+          created = new Date(tx.created_at);
+        } else if (tx.created_at && typeof (tx.created_at as any).toDate === 'function') {
+          created = (tx.created_at as any).toDate();
+        } else {
+          created = new Date(tx.created_at as any);
+        }
+      } catch (e) {
+        created = new Date();
+      }
+
+      if (startDate) {
+        const s = new Date(startDate);
+        if (created < s) return false;
+      }
+      if (endDate) {
+        const e = new Date(endDate);
+        e.setDate(e.getDate() + 1); // include endDate day
+        if (created >= e) return false;
+      }
+
+      // Only include successful transactions (as before)
+      if (tx.status !== 'SUCCESS') return false;
+
+      return true;
+    });
+  }, [userTransactions, terminalId, startDate, endDate]);
+
+  // Group by month/day for chart using filtered transactions
   const monthMap: Record<string, { count: number; amount: number }> = {};
   const dayMap: Record<string, { count: number; amount: number }> = {};
 
-  transactions.forEach((tx) => {
-    const date = new Date(tx.created_at);
-    // Monthly
-    const monthName = date.toLocaleString("default", { month: "short" });
+  filteredTransactions.forEach((tx) => {
+    // Defensive created_at parsing
+    let date: Date;
+    if (typeof tx.created_at === 'string') date = new Date(tx.created_at);
+    else if (tx.created_at && typeof (tx.created_at as any).toDate === 'function') date = (tx.created_at as any).toDate();
+    else date = new Date(tx.created_at as any);
+
+    const monthName = date.toLocaleString('default', { month: 'short' });
     if (!monthMap[monthName]) monthMap[monthName] = { count: 0, amount: 0 };
     monthMap[monthName].count += 1;
     monthMap[monthName].amount += Number(tx.amount) || 0;
-    // Daily
-    const dayName = date.toISOString().slice(0, 10); // YYYY-MM-DD
+
+    const dayName = date.toISOString().slice(0, 10);
     if (!dayMap[dayName]) dayMap[dayName] = { count: 0, amount: 0 };
     dayMap[dayName].count += 1;
     dayMap[dayName].amount += Number(tx.amount) || 0;
@@ -139,11 +155,8 @@ export default function SummaryPage() {
 
   const chartData = chartMode === "monthly" ? chartDataMonthly : chartDataDaily;
 
-  const totalCount = transactions.length;
-  const totalAmount = transactions.reduce(
-    (sum, tx) => sum + (Number(tx.amount) || 0),
-    0
-  );
+  const totalCount = filteredTransactions.length;
+  const totalAmount = filteredTransactions.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
 
   return (
     <main className="p-4 sm:p-6 lg:p-8 space-y-8">
@@ -181,8 +194,8 @@ export default function SummaryPage() {
                 </SelectContent>
               </Select>
             </div>
-            <Button onClick={handleFilter} disabled={loading}>
-              {loading ? "Loading..." : "Filter"}
+            <Button onClick={handleFilter} disabled={loading || chartLoading}>
+              {loading || chartLoading ? "Loading..." : "Filter"}
             </Button>
           </div>
 
