@@ -1,6 +1,7 @@
 
-'use client'
+"use client"
 
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,9 +11,19 @@ import { useSettingsStore, allApiFields } from "@/hooks/use-settings";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { auth, db } from '@/lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 
 export default function ProfilePage() {
+    const [name, setName] = useState('');
+    const [email, setEmail] = useState('');
+    const [contactNumber, setContactNumber] = useState('');
+    const [whatsappNumber, setWhatsappNumber] = useState('');
+    const [dob, setDob] = useState('');
+    const [address, setAddress] = useState('');
+    const [saving, setSaving] = useState(false);
     const { 
         supportedFields, 
         setFieldValue, 
@@ -22,13 +33,6 @@ export default function ProfilePage() {
         setIsCustomerReferenceEnabled
     } = useSettingsStore();
     const { toast } = useToast();
-
-    const handleSave = () => {
-        toast({
-            title: "Profile Saved",
-            description: "Your profile and merchant details have been updated.",
-        });
-    }
     
     const getField = (id: string) => {
         return supportedFields.find(sf => sf.id === id);
@@ -39,6 +43,63 @@ export default function ProfilePage() {
     }
 
     const terminalIdOptions = Array.from({ length: 10 }, (_, i) => String(i + 1).padStart(4, '0'));
+
+    useEffect(() => {
+        // Listen for auth state and load user document from `users` collection
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+            if (!user) {
+                // not signed in
+                return;
+            }
+            try {
+                const ref = doc(db, 'users', user.uid);
+                const snap = await getDoc(ref);
+                if (snap.exists()) {
+                    const data = snap.data() as any;
+                    // map expected fields from user doc
+                    if (data.displayName) setName(data.displayName);
+                    if (data.email) setEmail(data.email);
+                    if (data.phone) setContactNumber(data.phone);
+                    if (data.whatsapp_number) setWhatsappNumber(data.whatsapp_number);
+                    if (data.dob) setDob(data.dob);
+                    if (data.address) setAddress(data.address);
+                } else {
+                    // Fall back to auth profile if user doc missing
+                    if (user.displayName) setName(user.displayName);
+                    if (user.email) setEmail(user.email);
+                }
+            } catch (e) {
+                console.error('Failed to load user profile', e);
+            }
+        });
+        return () => unsubscribe();
+    }, []);
+
+    const handleSave = async () => {
+        // Persist profile fields to users/{uid}
+        const user = auth.currentUser;
+        if (!user) {
+            toast({ title: 'Not signed in', description: 'Please sign in to save your profile.' });
+            return;
+        }
+        setSaving(true);
+        const ref = doc(db, 'users', user.uid);
+        // Only persist editable fields (whatsapp_number and address)
+        const payload: any = {
+            whatsapp_number: whatsappNumber || null,
+            address: address || null,
+        };
+        try {
+            await setDoc(ref, payload, { merge: true });
+            // optimistic UI already updated via state; show success
+            toast({ title: 'Profile Saved', description: 'Your profile has been updated.' });
+        } catch (e) {
+            console.error('Failed to save profile', e);
+            toast({ title: 'Save failed', description: 'Could not save profile — try again.' });
+        } finally {
+            setSaving(false);
+        }
+    }
 
 
   return (
@@ -52,28 +113,28 @@ export default function ProfilePage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                     <Label htmlFor="name">Name</Label>
-                    <Input id="name" defaultValue="John Doe" />
+                    <Input id="name" value={name} readOnly className="bg-muted" aria-readonly />
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="email">Email Address</Label>
-                    <Input id="email" type="email" defaultValue="john.doe@example.com" />
+                    <Input id="email" type="email" value={email} readOnly className="bg-muted" aria-readonly />
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="contact_number">Contact Number</Label>
-                    <Input id="contact_number" type="tel" placeholder="Enter contact number" />
+                    <Input id="contact_number" type="tel" value={contactNumber} readOnly className="bg-muted" aria-readonly />
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="whatsapp_number">Whatsapp Number</Label>
-                    <Input id="whatsapp_number" type="tel" placeholder="Enter Whatsapp number" />
+                    <Input id="whatsapp_number" type="tel" value={whatsappNumber} onChange={(e) => setWhatsappNumber(e.target.value)} placeholder="Enter Whatsapp number" />
                 </div>
                  <div className="space-y-2">
                     <Label htmlFor="dob">Date of Birth</Label>
-                    <Input id="dob" type="date" />
+                    <Input id="dob" type="date" value={dob} readOnly className="bg-muted" aria-readonly />
                 </div>
             </div>
             <div className="space-y-2">
                 <Label htmlFor="address">Address</Label>
-                <Textarea id="address" defaultValue="123, Main Street, Colombo 07, Sri Lanka" />
+                <Textarea id="address" value={address} onChange={(e) => setAddress(e.target.value)} />
             </div>
 
             <hr className="my-6" />
@@ -186,7 +247,7 @@ export default function ProfilePage() {
                 </div>
             </div>
 
-            <Button onClick={handleSave}>Save Changes</Button>
+            <Button onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save Changes'}</Button>
         </CardContent>
       </Card>
     </main>
