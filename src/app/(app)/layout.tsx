@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   Sidebar,
   SidebarContent,
@@ -17,6 +17,7 @@ import { QrCode, History, BarChart, User, Settings as SettingsIcon, LogOutIcon, 
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { clientSignOut } from '@/lib/clientAuth';
+import RequireAuth from '@/components/RequireAuth';
 
 export default function AppLayout({
   children,
@@ -53,25 +54,7 @@ export default function AppLayout({
     }
   };
 
-  // On mount, verify server session for this layout. If the server session
-  // is invalid or absent, redirect to /signin. This prevents the browser
-  // back-button from showing protected content that appears cached.
-  useEffect(() => {
-    let cancelled = false;
-    const verify = async () => {
-      try {
-        const res = await fetch('/api/session/verify', { credentials: 'include' });
-        if (!cancelled && (!res.ok)) {
-          router.replace('/signin');
-        }
-      } catch (err) {
-        if (!cancelled) router.replace('/signin');
-      }
-    };
-    verify();
-    return () => { cancelled = true };
-  // only run on first mount for this layout
-  }, [router]);
+  // Auth verification is done in the `RequireAuth` client wrapper.
 
   return (
     <SidebarProvider>
@@ -150,7 +133,9 @@ export default function AppLayout({
         </SidebarContent>
       </Sidebar>
       {/* Add mobile top padding so content is not covered by the fixed header */}
-      <SidebarInset className="pt-14 md:pt-0">{children}</SidebarInset>
+      <SidebarInset className="pt-14 md:pt-0">
+        <RequireAuth>{children}</RequireAuth>
+      </SidebarInset>
     </SidebarProvider>
   )
 }
