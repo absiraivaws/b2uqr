@@ -22,6 +22,9 @@ export default function SignUpPage() {
   const RESEND_SECONDS = 60; // seconds to wait before allowing resend
   const countdownRef = (globalThis as any).__signup_resend_timer__ as { id?: number } | undefined;
 
+  // this is to enable/disable phone OTP button
+  const enablePhoneOtp = false
+
   const [socialLoading, setSocialLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [verifiedUser, setVerifiedUser] = useState<{
@@ -258,17 +261,19 @@ export default function SignUpPage() {
               <label className="text-sm">Phone Number</label>
               <div className='flex gap-2'>
                 <Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+947xxxxxxxx" required />
-                <Button type="button" onClick={() => sendOtpToPhone(phone)} disabled={emailSending || sendingCode || (resendSecondsLeft !== null && resendSecondsLeft > 0)}>
-                  {emailSending || sendingCode ? (
-                    <Loader2 className="animate-spin h-4 w-4" />
-                  ) : resendSecondsLeft && resendSecondsLeft > 0 ? (
-                    `Sent (${resendSecondsLeft}s)`
-                  ) : sentOnce ? (
-                    'Resend'
-                  ) : (
-                    'Send OTP'
-                  )}
-                </Button>
+                {enablePhoneOtp && (
+                  <Button type="button" onClick={() => sendOtpToPhone(phone)} disabled={emailSending || sendingCode || (resendSecondsLeft !== null && resendSecondsLeft > 0)}>
+                    {emailSending || sendingCode ? (
+                      <Loader2 className="animate-spin h-4 w-4" />
+                    ) : resendSecondsLeft && resendSecondsLeft > 0 ? (
+                      `Sent (${resendSecondsLeft}s)`
+                    ) : sentOnce ? (
+                      'Resend'
+                    ) : (
+                      'Send OTP'
+                    )}
+                  </Button>
+                )}
               </div>
             </div>
             <div>
