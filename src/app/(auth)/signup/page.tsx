@@ -7,6 +7,8 @@ import { Separator } from "@/components/ui/separator";
 import { Loader2, UserPlus, LogIn } from "lucide-react";
 import { useEmailOtp } from '@/hooks/use-email-otp';
 import { usePhoneOtp } from '@/hooks/use-phone-otp';
+import { db } from '@/lib/firebase';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 // server-side PIN hashing is done via /api/user/set-pin
 import { useRouter } from 'next/navigation';
 
@@ -15,9 +17,6 @@ export default function SignUpPage() {
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
-  const [identifier, setIdentifier] = useState(''); // email or phone input
-  const [activeChannel, setActiveChannel] = useState<'email' | 'phone' | null>(null);
-  const [identifierSent, setIdentifierSent] = useState(false);
   const [resendSecondsLeft, setResendSecondsLeft] = useState<number | null>(null);
   const [sentOnce, setSentOnce] = useState(false);
   const RESEND_SECONDS = 60; // seconds to wait before allowing resend
@@ -62,6 +61,25 @@ export default function SignUpPage() {
       });
       const json = await res.json();
       if (!res.ok || !json?.ok) throw new Error(json?.message || 'Failed to save PIN');
+
+      // Ensure we persist any email/phone present in the form if the
+      // verifiedUser object lacks them for some reason. Merge to Firestore
+      // using a merge write so we don't overwrite unrelated fields.
+      const finalPhone = verifiedUser.phone ?? (phone && phone.toString().trim() ? phone : null);
+      const finalEmail = verifiedUser.email ?? (email && email.toString().trim() ? email : null);
+      const userDocRef = doc(db, 'users', verifiedUser.uid);
+      const payload: any = {
+        uid: verifiedUser.uid,
+        displayName: verifiedUser.displayName ?? null,
+        phone: finalPhone,
+        email: finalEmail,
+        updated_at: serverTimestamp(),
+      };
+      // If server returned created timestamp or pin metadata, include it
+      if (json.createdAt) payload.created_at = json.createdAt;
+      if (json.pinHash) payload.pinHash = json.pinHash;
+      await setDoc(userDocRef, payload, { merge: true });
+
       // redirect after save
       try { router.push('/generate-qr'); } catch (e) { /* ignore */ }
     } catch (err: any) {
@@ -100,7 +118,20 @@ export default function SignUpPage() {
     handleVerifyEmailOtp,
     setEmailOtpSent,
     setEmailOtpError,
-  } = useEmailOtp({ email, fullName, onVerified: (u) => setVerifiedUser(u) });
+  } = useEmailOtp({
+    email,
+    fullName,
+    onVerified: (u) => {
+      // merge component state so we keep phone/email even if verification
+      // channel didn't return the other value.
+      setVerifiedUser({
+        uid: u.uid,
+        phone: u.phone ?? (phone && phone.toString().trim() ? phone : null),
+        displayName: u.displayName ?? (fullName && fullName.toString().trim() ? fullName : null),
+        email: u.email ?? (email && email.toString().trim() ? email : null),
+      });
+    }
+  });
 
   const {
     sendingCode,
@@ -110,16 +141,49 @@ export default function SignUpPage() {
     setOtp,
     handleSendCode,
     handleVerifyOtp,
-  } = usePhoneOtp({ phone, fullName, onVerified: (u) => setVerifiedUser(u) });
+  } = usePhoneOtp({
+    phone,
+    fullName,
+    onVerified: (u) => {
+      // merge component state so we keep phone/email even if verification
+      // channel didn't return the other value.
+      setVerifiedUser({
+        uid: u.uid,
+        phone: u.phone ?? (phone && phone.toString().trim() ? phone : null),
+        displayName: u.displayName ?? (fullName && fullName.toString().trim() ? fullName : null),
+        email: u.email ?? (email && email.toString().trim() ? email : null),
+      });
+    }
+  });
+
+  const sendOtpToEmail = async (emailParam?: string) => {
+    // call hook send and, on success, start a longer email-specific countdown
+    try {
+      const res: any = await handleSendEmailOtp(emailParam);
+      // if hook returned an object with ok/data, prefer server-provided TTL
+      if (res && res.ok) {
+        const secs = res.data?.secsLeft ?? 300; // default 5 minutes for email OTP
+        setSentOnce(true);
+        setResendSecondsLeft(secs);
+      }
+      return res;
+    } catch (e) {
+      // preserve upstream error handling in hook
+      return undefined;
+    }
+  };
+
+  const sendOtpToPhone = async (phoneParam?: string) => {
+    return await handleSendCode(phoneParam);
+  };
 
   useEffect(() => {
-    // reset per-channel UI when identifier changes
+    // reset per-channel UI when email or phone inputs change
     setEmailOtpSent(false);
     setEmailOtpError(null);
     setOtp('');
-  setIdentifierSent(false);
-  setSentOnce(false);
-    // clear any existing countdown when user edits identifier
+    setSentOnce(false);
+    // clear any existing countdown when user edits email/phone
     setResendSecondsLeft(null);
     try {
       if (countdownRef && countdownRef.id) {
@@ -130,50 +194,7 @@ export default function SignUpPage() {
       /* ignore */
     }
     // do not clear verifiedUser here
-  }, [identifier]);
-
-  const isEmailLike = (v: string) => /^\S+@\S+\.\S+$/.test(v.trim());
-  const isPhoneLike = (v: string) => /^\+?[0-9\s\-()]{6,}$/.test(v.trim());
-
-  const handleSendIdentifier = async () => {
-    setError(null);
-    const v = identifier.trim();
-    if (!v) {
-      setError('Enter an email or phone number.');
-      return;
-    }
-    // disable the button immediately to avoid duplicate submits
-    setIdentifierSent(true);
-    try {
-      if (isEmailLike(v)) {
-        setEmail(v.toLowerCase());
-        setActiveChannel('email');
-        const res = await handleSendEmailOtp(v.toLowerCase());
-        // if server provided secsLeft (on success or 429), align client countdown
-        if (res?.ok || res?.data?.secsLeft) {
-          const secs = res.data?.secsLeft ?? RESEND_SECONDS;
-          setSentOnce(true);
-          setResendSecondsLeft(secs);
-          setIdentifierSent(true);
-        }
-        // emailOtpSent hook will also update other state
-      } else if (isPhoneLike(v)) {
-        // normalize phone minimally - keep as entered for firebase
-        setPhone(v);
-        setActiveChannel('phone');
-        await handleSendCode(v);
-        // success will be signaled via confirmationRequested (hook)
-      } else {
-        setError('Enter a valid email or phone number.');
-        setIdentifierSent(false);
-      }
-    } catch (err: any) {
-      console.error(err);
-      setError(err?.message || 'Failed to request OTP.');
-      // allow retry on error
-      setIdentifierSent(false);
-    }
-  };
+  }, [email, phone]);
 
   // When either hook indicates a send succeeded, start the resend countdown
   useEffect(() => {
@@ -181,7 +202,6 @@ export default function SignUpPage() {
     if (!sent) return;
     // mark sent and start countdown; if server already provided a TTL,
     // keep it; otherwise initialize to default.
-    setIdentifierSent(true);
     setSentOnce(true);
     if (resendSecondsLeft === null) setResendSecondsLeft(RESEND_SECONDS);
     // clear any existing timer
@@ -192,7 +212,6 @@ export default function SignUpPage() {
         if (prev <= 1) {
           // done
           try { if (countdownRef && countdownRef.id) { clearInterval(countdownRef.id); countdownRef.id = undefined; } } catch (e) {}
-          setIdentifierSent(false);
           return null;
         }
         return prev - 1;
@@ -236,10 +255,27 @@ export default function SignUpPage() {
               <Input value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Jane Doe" required />
             </div>
             <div>
-              <label className="text-sm">Email or phone</label>
+              <label className="text-sm">Phone Number</label>
+              <div className='flex gap-2'>
+                <Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+947xxxxxxxx" required />
+                <Button type="button" onClick={() => sendOtpToPhone(phone)} disabled={emailSending || sendingCode || (resendSecondsLeft !== null && resendSecondsLeft > 0)}>
+                  {emailSending || sendingCode ? (
+                    <Loader2 className="animate-spin h-4 w-4" />
+                  ) : resendSecondsLeft && resendSecondsLeft > 0 ? (
+                    `Sent (${resendSecondsLeft}s)`
+                  ) : sentOnce ? (
+                    'Resend'
+                  ) : (
+                    'Send OTP'
+                  )}
+                </Button>
+              </div>
+            </div>
+            <div>
+              <label className="text-sm">Email Address</label>
               <div className="flex gap-2">
-                <Input value={identifier} onChange={e => setIdentifier(e.target.value)} placeholder="you@example.com or +94 712 345 678" />
-                <Button onClick={handleSendIdentifier} disabled={emailSending || sendingCode || identifierSent}>
+                <Input value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" />
+                <Button type="button" onClick={() => sendOtpToEmail(email)} disabled={emailSending || sendingCode || (resendSecondsLeft !== null && resendSecondsLeft > 0)}>
                   {emailSending || sendingCode ? (
                     <Loader2 className="animate-spin h-4 w-4" />
                   ) : resendSecondsLeft && resendSecondsLeft > 0 ? (
@@ -255,7 +291,7 @@ export default function SignUpPage() {
             </div>
 
             {/* Email OTP UI */}
-            {activeChannel === 'email' && !verifiedUser && (
+            {emailOtpSent && !verifiedUser && (
               <div>
                 <label className="text-sm">Enter email OTP</label>
                 <div className="flex gap-2 mt-1">
@@ -265,12 +301,12 @@ export default function SignUpPage() {
                   </Button>
                 </div>
                 {emailOtpError && <div className="text-xs text-destructive mt-1">{emailOtpError}</div>}
-                <div className="text-xs text-muted-foreground mt-1">OTP sent to {email || identifier}. Check your inbox.</div>
+                <div className="text-xs text-muted-foreground mt-1">OTP sent to {email}. Check your inbox.</div>
               </div>
             )}
 
             {/* Phone OTP UI */}
-            {activeChannel === 'phone' && confirmationRequested && !verifiedUser && (
+            {confirmationRequested && !verifiedUser && (
               <div>
                 <label className="text-sm">Enter OTP</label>
                 <div className="flex gap-2">
