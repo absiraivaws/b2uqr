@@ -92,7 +92,7 @@ export default function SignInPage() {
   };
 
   return (
-    <main className="p-4 sm:p-6 lg:p-8 max-w-3xl mx-auto">
+    <main className="p-4 sm:p-6 lg:p-8 max-w-2xl mx-auto md:min-h-screen md:flex md:flex-col md:justify-center">
       <Card>
         <CardHeader>
           <CardTitle>Sign in</CardTitle>
@@ -107,38 +107,42 @@ export default function SignInPage() {
           )}
 
           {/* Google */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-medium">Continue with Google</h3>
+          {false && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium">Continue with Google</h3>
+              </div>
+              <Button variant="outline" className="w-full flex items-center justify-center gap-2" onClick={handleGoogleSignIn} disabled={loadingGoogle}>
+                {loadingGoogle ? <Loader2 className="animate-spin h-4 w-4" /> : <LogIn className="h-4 w-4" />}
+                <span>{loadingGoogle ? 'Signing in...' : 'Sign in with Google'}</span>
+              </Button>
             </div>
-            <Button variant="outline" className="w-full flex items-center justify-center gap-2" onClick={handleGoogleSignIn} disabled={loadingGoogle}>
-              {loadingGoogle ? <Loader2 className="animate-spin h-4 w-4" /> : <LogIn className="h-4 w-4" />}
-              <span>{loadingGoogle ? 'Signing in...' : 'Sign in with Google'}</span>
-            </Button>
-          </div>
+          )}
 
           <Separator />
 
           {/* Username (email or phone) + PIN */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-medium">Sign in with username (email or phone) + PIN</h3>
+              <h3 className="text-sm font-medium">Enter the email</h3>
             </div>
             <div className="flex gap-2">
-              <Input placeholder="Email or phone" value={identifier} onChange={e => setIdentifier(e.target.value)} />
+              <Input placeholder="you@example.com" value={identifier} onChange={e => setIdentifier(e.target.value)} />
             </div>
             <div className="mt-2">
               <label className="text-sm">Enter PIN</label>
               <div className="flex gap-2 mt-1">
                 <Input placeholder="4-6 digit PIN" value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0,6))} />
-                <Button onClick={handlePinSignIn} disabled={signingPin}>
-                  {signingPin ? <Loader2 className="animate-spin h-4 w-4" /> : 'Sign in with PIN'}
-                </Button>
               </div>
             </div>
           </div>
 
           <Separator />
+
+          <Button onClick={handlePinSignIn} disabled={signingPin} className='w-full'>
+            {signingPin ? <Loader2 className="animate-spin h-4 w-4" /> : 'Sign in'}
+          </Button>
+
         </CardContent>
       </Card>
 

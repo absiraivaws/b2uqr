@@ -228,7 +228,7 @@ export default function SignUpPage() {
   }, [emailOtpSent, confirmationRequested]);
 
   return (
-    <main className="p-4 sm:p-6 lg:p-8 max-w-3xl mx-auto">
+    <main className="p-4 sm:p-6 lg:p-8 max-w-3xl mx-auto md:min-h-screen md:flex md:flex-col md:justify-center">
       <div id="recaptcha-container" />
       <Card>
         <CardHeader>
@@ -240,15 +240,17 @@ export default function SignUpPage() {
             <div className="text-sm text-destructive">{error}</div>
           )}
 
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-medium">Continue with Google</h3>
+          {false && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium">Continue with Google</h3>
+              </div>
+              <Button variant="outline" className="w-full flex items-center justify-center gap-2" onClick={handleGoogleSignUp} disabled={socialLoading}>
+                {socialLoading ? <Loader2 className="animate-spin h-4 w-4" /> : <LogIn className="h-4 w-4" />}
+                <span>{socialLoading ? 'Processing...' : 'Sign up with Google'}</span>
+              </Button>
             </div>
-            <Button variant="outline" className="w-full flex items-center justify-center gap-2" onClick={handleGoogleSignUp} disabled={socialLoading}>
-              {socialLoading ? <Loader2 className="animate-spin h-4 w-4" /> : <LogIn className="h-4 w-4" />}
-              <span>{socialLoading ? 'Processing...' : 'Sign up with Google'}</span>
-            </Button>
-          </div>
+          )}
 
           <Separator />
 
@@ -280,7 +282,12 @@ export default function SignUpPage() {
               <label className="text-sm">Email Address</label>
               <div className="flex gap-2">
                 <Input value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" />
-                <Button type="button" onClick={() => sendOtpToEmail(email)} disabled={emailSending || sendingCode || (resendSecondsLeft !== null && resendSecondsLeft > 0)}>
+                <Button
+                  type="button"
+                  className='hidden md:inline-flex'
+                  onClick={() => sendOtpToEmail(email)}
+                  disabled={emailSending || sendingCode || (resendSecondsLeft !== null && resendSecondsLeft > 0)}
+                >
                   {emailSending || sendingCode ? (
                     <Loader2 className="animate-spin h-4 w-4" />
                   ) : resendSecondsLeft && resendSecondsLeft > 0 ? (
@@ -288,11 +295,27 @@ export default function SignUpPage() {
                   ) : sentOnce ? (
                     'Resend'
                   ) : (
-                    'Send OTP'
+                    'Request OTP'
                   )}
                 </Button>
               </div>
               {error && <div className="text-xs text-destructive mt-1">{error}</div>}
+              <Button
+                type="button"
+                className='md:hidden w-full mt-4'
+                onClick={() => sendOtpToEmail(email)}
+                disabled={emailSending || sendingCode || (resendSecondsLeft !== null && resendSecondsLeft > 0)}
+              >
+                {emailSending || sendingCode ? (
+                  <Loader2 className="animate-spin h-4 w-4" />
+                ) : resendSecondsLeft && resendSecondsLeft > 0 ? (
+                  `Sent (${resendSecondsLeft}s)`
+                ) : sentOnce ? (
+                  'Resend'
+                ) : (
+                  'Request OTP'
+                )}
+              </Button>
             </div>
 
             {/* Email OTP UI */}
