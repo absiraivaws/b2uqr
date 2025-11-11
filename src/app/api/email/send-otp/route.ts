@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebaseAdmin';
 import nodemailer from 'nodemailer';
+import { generateOTPEmail } from '@/lib/emailTemplates';
 
 // Simple server-side API to generate and store a 6-digit OTP for an email.
 // NOTE: This implementation logs the OTP to the server console. Replace the
@@ -64,12 +65,13 @@ export async function POST(req: Request) {
           auth: { user: SMTP_USER, pass: SMTP_PASS },
         });
 
+        const { subject, text, html } = generateOTPEmail({ code, expiresInMinutes: 5, appName: 'LankaQR' });
         const info = await transporter.sendMail({
           from: FROM_EMAIL,
           to: email,
-          subject: 'Your verification code',
-          text: `Your verification code is ${code}. It expires in 5 minutes.`,
-          html: `<p>Your verification code is <strong>${code}</strong>. It expires in 5 minutes.</p>`,
+          subject,
+          text,
+          html,
         });
         console.log('OTP email sent:', info && (info.messageId || info.response));
         sendOk = true;
@@ -82,7 +84,7 @@ export async function POST(req: Request) {
     }
 
     // Fallback: always log OTP to server console so it can be inspected in dev
-    console.log(`Email OTP for ${email}: ${code} (expires in 5 minutes)`);
+  console.log(`Email OTP for ${email}: ${code} (expires in 5 minutes)`);
 
     const secsLeft = Math.max(0, Math.ceil((expiresAtMs - Date.now()) / 1000));
     // If SMTP config existed but send failed, surface an error to the client.
