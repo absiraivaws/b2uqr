@@ -139,9 +139,14 @@ export default function SignInPage() {
 
           <Separator />
 
-          <Button onClick={handlePinSignIn} disabled={signingPin} className='w-full'>
-            {signingPin ? <Loader2 className="animate-spin h-4 w-4" /> : 'Sign in'}
-          </Button>
+          <div>
+            <Button onClick={handlePinSignIn} disabled={signingPin} className='w-full'>
+              {signingPin ? <Loader2 className="animate-spin h-4 w-4" /> : 'Sign in'}
+            </Button>
+            <div className="mt-1 flex justify-end">
+              <Button variant="link" className="px-0 text-sm" onClick={() => router.push('/reset-pin')}>Forgot your PIN?</Button>
+            </div>
+          </div>
 
         </CardContent>
       </Card>

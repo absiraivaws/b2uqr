@@ -9,10 +9,19 @@ import { generateOTPEmail } from '@/lib/emailTemplates';
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const email = (body?.email || '').toString().trim().toLowerCase();
+  const body = await req.json();
+  const email = (body?.email || '').toString().trim().toLowerCase();
+  const purpose = (body?.purpose || '').toString(); // e.g. 'signup' | 'reset-pin'
     if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
       return NextResponse.json({ ok: false, message: 'Invalid email' }, { status: 400 });
+    }
+
+    // If purpose is reset-pin, ensure a user exists with this email in users collection
+    if (purpose === 'reset-pin') {
+      const userSnap = await adminDb.collection('users').where('email', '==', email).limit(1).get();
+      if (userSnap.empty) {
+        return NextResponse.json({ ok: false, message: 'User not found. Please sign up.' }, { status: 404 });
+      }
     }
 
     // generate 6-digit code
