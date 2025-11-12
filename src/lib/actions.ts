@@ -170,7 +170,10 @@ export async function simulateWebhook(uuid: string, status: "SUCCESS" | "FAILED"
 
   // Use a relative path for the fetch call inside a server component/action
   const webhookUrl = '/api/bank/webhook';
-  const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:9002';
+  // Prefer an explicit base URL for non-Vercel hosts (e.g., Cloud Run)
+  const baseUrl =
+    process.env.APP_BASE_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : `http://localhost:${process.env.PORT || 9002}`);
   
   await fetch(new URL(webhookUrl, baseUrl), {
     method: 'POST',

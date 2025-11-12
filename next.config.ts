@@ -1,5 +1,6 @@
 import type {NextConfig} from 'next';
 import withPWA from 'next-pwa';
+import path from 'path';
 
 const nextConfig: NextConfig = {
   /* config options here */
@@ -38,6 +39,16 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // Explicitly map '@' to 'src' to ensure Webpack resolves TS path aliases during Docker builds
+  webpack: (config) => {
+    config.resolve = config.resolve || {};
+    config.resolve.alias = {
+      ...(config.resolve?.alias || {}),
+      ['@']: path.resolve(__dirname, 'src'),
+    };
+    return config;
+  },
+  output: 'standalone',
 };
 
 // wrap with PWA
