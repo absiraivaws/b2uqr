@@ -36,7 +36,7 @@ export default function AppLayout({
 
   const accountItems = [
       { href: '/profile', label: 'Profile', icon: User },
-      { href: '/settings', label: 'Settings', icon: SettingsIcon },
+      //{ href: '/settings', label: 'Settings', icon: SettingsIcon },
       { href: '/signout', label: 'Sign Out', icon: LogOutIcon },
   ]
 
