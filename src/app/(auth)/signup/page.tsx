@@ -1,26 +1,28 @@
  'use client'
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, UserPlus, LogIn } from "lucide-react";
-import { useEmailOtp } from '@/hooks/use-email-otp';
-import { usePhoneOtp } from '@/hooks/use-phone-otp';
+import { Loader2, LogIn } from "lucide-react";
 import { db } from '@/lib/firebase';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-// server-side PIN hashing is done via /api/user/set-pin
+import { doc, setDoc, serverTimestamp, GeoPoint } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
+import SignupKycSection, { KycValues } from '@/components/signup/SignupKycSection';
+import SignupOtpSection from '@/components/signup/SignupOtpSection';
+import SignupPinSection from '@/components/signup/SignupPinSection';
 
 export default function SignUpPage() {
   const router = useRouter();
-  const [fullName, setFullName] = useState('');
+  const [kyc, setKyc] = useState<KycValues>({
+    displayName: '',
+    nic: '',
+    businessReg: '',
+    address: '',
+    lat: '',
+    lng: '',
+  });
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
-  const [resendSecondsLeft, setResendSecondsLeft] = useState<number | null>(null);
-  const [sentOnce, setSentOnce] = useState(false);
-  const RESEND_SECONDS = 60; // seconds to wait before allowing resend
-  const countdownRef = (globalThis as any).__signup_resend_timer__ as { id?: number } | undefined;
 
   // this is to enable/disable phone OTP button
   const enablePhoneOtp = false
@@ -43,6 +45,11 @@ export default function SignUpPage() {
     setError(null);
     if (!verifiedUser) {
       setError('No verified user available.');
+      return;
+    }
+    // basic required validations for additional KYC fields
+    if (!kyc.displayName.trim() || !kyc.nic.trim() || !kyc.businessReg.trim() || !kyc.address.trim() || kyc.lat === '' || kyc.lng === '') {
+      setError('Please complete your full name, NIC, business registration number, address, and location.');
       return;
     }
     if (!/^\d{4,6}$/.test(pin)) {
@@ -73,11 +80,23 @@ export default function SignUpPage() {
       const userDocRef = doc(db, 'users', verifiedUser.uid);
       const payload: any = {
         uid: verifiedUser.uid,
-        displayName: verifiedUser.displayName ?? null,
+        displayName: kyc.displayName || null,
         phone: finalPhone,
         email: finalEmail,
+        nic: kyc.nic || null,
+        businessRegistrationNumber: kyc.businessReg || null,
+        address: kyc.address || null,
         updated_at: serverTimestamp(),
       };
+      if (kyc.lat !== '' && kyc.lng !== '') {
+        try {
+          const nlat = parseFloat(kyc.lat);
+          const nlng = parseFloat(kyc.lng);
+          if (!isNaN(nlat) && !isNaN(nlng)) {
+            payload.location = new GeoPoint(nlat, nlng);
+          }
+        } catch (e) { /* ignore location parse */ }
+      }
       // If server returned created timestamp or pin metadata, include it
       if (json.createdAt) payload.created_at = json.createdAt;
       if (json.pinHash) payload.pinHash = json.pinHash;
@@ -108,124 +127,7 @@ export default function SignUpPage() {
     }
   };
 
-  // Email and phone logic handled by hooks
-  const {
-    emailSending,
-    emailOtpSent,
-    emailOtpError,
-    emailOtp,
-    setEmailOtp,
-    emailVerifying,
-    emailVerified,
-    handleSendEmailOtp,
-    handleVerifyEmailOtp,
-    setEmailOtpSent,
-    setEmailOtpError,
-  } = useEmailOtp({
-    email,
-    fullName,
-    onVerified: (u) => {
-      // merge component state so we keep phone/email even if verification
-      // channel didn't return the other value.
-      setVerifiedUser({
-        uid: u.uid,
-        phone: u.phone ?? (phone && phone.toString().trim() ? phone : null),
-        displayName: u.displayName ?? (fullName && fullName.toString().trim() ? fullName : null),
-        email: u.email ?? (email && email.toString().trim() ? email : null),
-      });
-    }
-  });
-
-  const {
-    sendingCode,
-    verifyingOtp,
-    confirmationRequested,
-    otp,
-    setOtp,
-    handleSendCode,
-    handleVerifyOtp,
-  } = usePhoneOtp({
-    phone,
-    fullName,
-    onVerified: (u) => {
-      // merge component state so we keep phone/email even if verification
-      // channel didn't return the other value.
-      setVerifiedUser({
-        uid: u.uid,
-        phone: u.phone ?? (phone && phone.toString().trim() ? phone : null),
-        displayName: u.displayName ?? (fullName && fullName.toString().trim() ? fullName : null),
-        email: u.email ?? (email && email.toString().trim() ? email : null),
-      });
-    }
-  });
-
-  const sendOtpToEmail = async (emailParam?: string) => {
-    // call hook send and, on success, start a longer email-specific countdown
-    try {
-      const res: any = await handleSendEmailOtp(emailParam);
-      // if hook returned an object with ok/data, prefer server-provided TTL
-      if (res && res.ok) {
-        const secs = res.data?.secsLeft ?? 300; // default 5 minutes for email OTP
-        setSentOnce(true);
-        setResendSecondsLeft(secs);
-      }
-      return res;
-    } catch (e) {
-      // preserve upstream error handling in hook
-      return undefined;
-    }
-  };
-
-  const sendOtpToPhone = async (phoneParam?: string) => {
-    return await handleSendCode(phoneParam);
-  };
-
-  useEffect(() => {
-    // reset per-channel UI when email or phone inputs change
-    setEmailOtpSent(false);
-    setEmailOtpError(null);
-    setOtp('');
-    setSentOnce(false);
-    // clear any existing countdown when user edits email/phone
-    setResendSecondsLeft(null);
-    try {
-      if (countdownRef && countdownRef.id) {
-        clearInterval(countdownRef.id);
-        countdownRef.id = undefined;
-      }
-    } catch (e) {
-      /* ignore */
-    }
-    // do not clear verifiedUser here
-  }, [email, phone]);
-
-  // When either hook indicates a send succeeded, start the resend countdown
-  useEffect(() => {
-    const sent = emailOtpSent || confirmationRequested;
-    if (!sent) return;
-    // mark sent and start countdown; if server already provided a TTL,
-    // keep it; otherwise initialize to default.
-    setSentOnce(true);
-    if (resendSecondsLeft === null) setResendSecondsLeft(RESEND_SECONDS);
-    // clear any existing timer
-    try { if (countdownRef && countdownRef.id) { clearInterval(countdownRef.id); countdownRef.id = undefined; } } catch (e) {}
-    const id = setInterval(() => {
-      setResendSecondsLeft(prev => {
-        if (prev === null) return null;
-        if (prev <= 1) {
-          // done
-          try { if (countdownRef && countdownRef.id) { clearInterval(countdownRef.id); countdownRef.id = undefined; } } catch (e) {}
-          return null;
-        }
-        return prev - 1;
-      });
-    }, 1000) as unknown as number;
-    // store globally to survive HMR during dev
-    try { (globalThis as any).__signup_resend_timer__ = { id }; } catch (e) {}
-    return () => {
-      try { clearInterval(id); } catch (e) {}
-    };
-  }, [emailOtpSent, confirmationRequested]);
+  // OTP hooks and resend logic are handled inside SignupOtpSection
 
   return (
     <main className="p-4 sm:p-6 lg:p-8 max-w-3xl mx-auto md:min-h-screen md:flex md:flex-col md:justify-center">
@@ -255,118 +157,34 @@ export default function SignUpPage() {
           <Separator />
 
           <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
-            <div>
-              <label className="text-sm">Full name</label>
-              <Input value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Jane Doe" required />
-            </div>
-            <div>
-              <label className="text-sm">Phone Number</label>
-              <div className='flex gap-2'>
-                <Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+947xxxxxxxx" required />
-                {enablePhoneOtp && (
-                  <Button type="button" onClick={() => sendOtpToPhone(phone)} disabled={emailSending || sendingCode || (resendSecondsLeft !== null && resendSecondsLeft > 0)}>
-                    {emailSending || sendingCode ? (
-                      <Loader2 className="animate-spin h-4 w-4" />
-                    ) : resendSecondsLeft && resendSecondsLeft > 0 ? (
-                      `Sent (${resendSecondsLeft}s)`
-                    ) : sentOnce ? (
-                      'Resend'
-                    ) : (
-                      'Send OTP'
-                    )}
-                  </Button>
-                )}
-              </div>
-            </div>
-            <div>
-              <label className="text-sm">Email Address</label>
-              <div className="flex gap-2">
-                <Input value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" />
-                <Button
-                  type="button"
-                  className='hidden md:inline-flex'
-                  onClick={() => sendOtpToEmail(email)}
-                  disabled={emailSending || sendingCode || (resendSecondsLeft !== null && resendSecondsLeft > 0)}
-                >
-                  {emailSending || sendingCode ? (
-                    <Loader2 className="animate-spin h-4 w-4" />
-                  ) : resendSecondsLeft && resendSecondsLeft > 0 ? (
-                    `Sent (${resendSecondsLeft}s)`
-                  ) : sentOnce ? (
-                    'Resend'
-                  ) : (
-                    'Request OTP'
-                  )}
-                </Button>
-              </div>
-              {error && <div className="text-xs text-destructive mt-1">{error}</div>}
-              <Button
-                type="button"
-                className='md:hidden w-full mt-4'
-                onClick={() => sendOtpToEmail(email)}
-                disabled={emailSending || sendingCode || (resendSecondsLeft !== null && resendSecondsLeft > 0)}
-              >
-                {emailSending || sendingCode ? (
-                  <Loader2 className="animate-spin h-4 w-4" />
-                ) : resendSecondsLeft && resendSecondsLeft > 0 ? (
-                  `Sent (${resendSecondsLeft}s)`
-                ) : sentOnce ? (
-                  'Resend'
-                ) : (
-                  'Request OTP'
-                )}
-              </Button>
-            </div>
-
-            {/* Email OTP UI */}
-            {emailOtpSent && !verifiedUser && (
-              <div>
-                <label className="text-sm">Enter email OTP</label>
-                <div className="flex gap-2 mt-1">
-                  <Input value={emailOtp} onChange={e => setEmailOtp(e.target.value)} placeholder="123456" />
-                  <Button onClick={handleVerifyEmailOtp} disabled={emailVerifying}>
-                    {emailVerifying ? <Loader2 className="animate-spin h-4 w-4" /> : 'Verify'}
-                  </Button>
-                </div>
-                {emailOtpError && <div className="text-xs text-destructive mt-1">{emailOtpError}</div>}
-                <div className="text-xs text-muted-foreground mt-1">OTP sent to {email}. Check your inbox.</div>
-              </div>
-            )}
-
-            {/* Phone OTP UI */}
-            {confirmationRequested && !verifiedUser && (
-              <div>
-                <label className="text-sm">Enter OTP</label>
-                <div className="flex gap-2">
-                  <Input value={otp} onChange={e => setOtp(e.target.value)} placeholder="123456" />
-                  <Button onClick={handleVerifyOtp} disabled={verifyingOtp}>
-                    {verifyingOtp ? <Loader2 className="animate-spin h-4 w-4" /> : 'Verify'}
-                  </Button>
-                </div>
-              </div>
-            )}
+            <SignupKycSection values={kyc} onChange={setKyc} />
+            <SignupOtpSection
+              email={email}
+              setEmail={setEmail}
+              phone={phone}
+              setPhone={setPhone}
+              fullName={kyc.displayName}
+              enablePhoneOtp={enablePhoneOtp}
+              errorBelowEmail={error}
+              onVerified={(u) => setVerifiedUser({
+                uid: u.uid,
+                phone: u.phone ?? (phone && phone.toString().trim() ? phone : null),
+                displayName: u.displayName ?? (kyc.displayName && kyc.displayName.toString().trim() ? kyc.displayName : null),
+                email: u.email ?? (email && email.toString().trim() ? email : null),
+              })}
+            />
 
             {verifiedUser && (
               <>
                 <div className="text-sm">Verified: <strong>{verifiedUser.email ?? verifiedUser.phone}</strong></div>
-                <div>
-                  <label className="text-sm">Create 4-6 digit PIN</label>
-                  <div className="flex gap-2">
-                    <Input value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, ''))} placeholder="1234" maxLength={6} />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-sm">Confirm PIN</label>
-                  <div className="flex gap-2">
-                    <Input value={confirmPin} onChange={e => setConfirmPin(e.target.value.replace(/\D/g, ''))} placeholder="1234" maxLength={6} />
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button type="button" className="flex-1" onClick={handleSavePinAndCreateUser} disabled={savingUser}>
-                    {savingUser ? <Loader2 className="animate-spin h-4 w-4" /> : <UserPlus className="h-4 w-4 mr-2" />}
-                    {savingUser ? 'Saving...' : 'Save PIN & Continue'}
-                  </Button>
-                </div>
+                <SignupPinSection
+                  pin={pin}
+                  setPin={setPin}
+                  confirmPin={confirmPin}
+                  setConfirmPin={setConfirmPin}
+                  saving={savingUser}
+                  onSave={handleSavePinAndCreateUser}
+                />
               </>
             )}
 
