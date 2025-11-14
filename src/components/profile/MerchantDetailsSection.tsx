@@ -9,6 +9,7 @@ import { useSettingsStore, allApiFields } from "@/hooks/use-settings";
 import { useToast } from "@/hooks/use-toast";
 import { auth, db } from '@/lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { bankCodeItems } from '@/lib/bankCodes';
 
 export type MerchantDetailsHandle = { save: () => Promise<void> };
 
@@ -32,13 +33,13 @@ const MerchantDetailsSection = forwardRef<MerchantDetailsHandle, {}>((_, ref) =>
         const snap = await getDoc(refDoc);
         if (snap.exists()) {
           const data: any = snap.data();
-          if (data.merchant_details_locked) setLocked(true);
-          if (data['Merchant ID'] && !getField('merchant_id')?.value) setFieldValue('merchant_id', data['Merchant ID']);
-          if (data['Bank Code'] && !getField('bank_code')?.value) setFieldValue('bank_code', data['Bank Code']);
-          if (data['Terminal ID'] && !getField('terminal_id')?.value) setFieldValue('terminal_id', data['Terminal ID']);
-          if (data['Merchant Name'] && !getField('merchant_name')?.value) setFieldValue('merchant_name', data['Merchant Name']);
-          if (data['Merchant City'] && !getField('merchant_city')?.value) setFieldValue('merchant_city', data['Merchant City']);
-          if (data['Manual Invoice Prefix/Placeholder'] && !getField('merchant_reference_label')?.value) setFieldValue('merchant_reference_label', data['Manual Invoice Prefix/Placeholder']);
+          if (data.detailsLocked) setLocked(true);
+          if (data.merchantId && !getField('merchant_id')?.value) setFieldValue('merchant_id', data.merchantId);
+          if (data.bankCode && !getField('bank_code')?.value) setFieldValue('bank_code', data.bankCode);
+          if (data.terminalId && !getField('terminal_id')?.value) setFieldValue('terminal_id', data.terminalId);
+          if (data.merchantName && !getField('merchant_name')?.value) setFieldValue('merchant_name', data.merchantName);
+          if (data.merchantCity && !getField('merchant_city')?.value) setFieldValue('merchant_city', data.merchantCity);
+          if (data.manualInvoice && !getField('merchant_reference_label')?.value) setFieldValue('merchant_reference_label', data.manualInvoice);
         }
       } catch (e) {
         console.error('Failed to load merchant details', e);
@@ -62,16 +63,16 @@ const MerchantDetailsSection = forwardRef<MerchantDetailsHandle, {}>((_, ref) =>
       try {
         const refDoc = doc(db, 'users', user.uid);
         const payload: any = {
-          'Merchant ID': getField('merchant_id')?.value || null,
-          'Bank Code': getField('bank_code')?.value || null,
-          'Terminal ID': getField('terminal_id')?.value || null,
-          'Merchant Name': getField('merchant_name')?.value || null,
-          'Merchant City': getField('merchant_city')?.value || null,
-          'Merchant Category Code': getField('mcc')?.value || null,
-          'Reference Number Type': referenceType || null,
-          'Manual Invoice Prefix/Placeholder': getField('merchant_reference_label')?.value || null,
-          'Include Customer Reference in QR Code': isCustomerReferenceEnabled,
-          merchant_details_locked: true,
+          merchantId: getField('merchant_id')?.value || null,
+          bankCode: getField('bank_code')?.value || null,
+          terminalId: getField('terminal_id')?.value || null,
+          merchantName: getField('merchant_name')?.value || null,
+          merchantCity: getField('merchant_city')?.value || null,
+          merchantCategoryCode: getField('mcc')?.value || null,
+          referenceNumberType: referenceType || null,
+          manualInvoice: getField('merchant_reference_label')?.value || null,
+          includeCustomerReferenceInQrCode: isCustomerReferenceEnabled,
+          detailsLocked: true,
         };
         await setDoc(refDoc, payload, { merge: true });
         setLocked(true);
@@ -101,17 +102,22 @@ const MerchantDetailsSection = forwardRef<MerchantDetailsHandle, {}>((_, ref) =>
         <p className="text-xs text-muted-foreground">Must be {getFieldDef('merchant_id')?.maxLength} digits.</p>
       </div>
       <div className="space-y-2">
-        <Label htmlFor="bank_code">Bank Code</Label>
-        <Input
-          id="bank_code"
+        <Label htmlFor="bank_code">Bank</Label>
+        <Select
           value={getField('bank_code')?.value ?? ''}
-          onChange={(e) => !locked && setFieldValue('bank_code', e.target.value)}
-          placeholder={getFieldDef('bank_code')?.placeholder}
-          maxLength={getFieldDef('bank_code')?.maxLength}
-          readOnly={locked}
-          className={locked ? 'bg-muted' : ''}
-        />
-        <p className="text-xs text-muted-foreground">Must be {getFieldDef('bank_code')?.maxLength} digits.</p>
+          onValueChange={(value) => !locked && setFieldValue('bank_code', value)}
+          disabled={locked}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select Bank" />
+          </SelectTrigger>
+          <SelectContent>
+            {bankCodeItems.map((item) => (
+              <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">Select your bank from the dropdown menu.</p>
       </div>
       <div className="space-y-2">
         <Label htmlFor="terminal_id">Terminal ID</Label>
