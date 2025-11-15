@@ -1,0 +1,21 @@
+# Node / Next.js
+node_modules
+npm-debug.log*
+.DS_Store
+.next/cache
+# Git
+.git
+.gitignore
+# Env files (do not bake secrets into image)
+.env
+.env.local
+.env.production
+.env.*
+# Editor
+.vscode
+# Tests & coverage (if added later)
+coverage
+# Docker
+Dockerfile*
+# OS artifacts
+*.swp
