@@ -1,0 +1,30 @@
+"use client";
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+
+export default function RequireAuth({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function verify() {
+      try {
+        // lightweight server check; force network (no cache)
+        const res = await fetch('/api/session/verify', { cache: 'no-store', credentials: 'include' });
+        if (cancelled) return;
+        if (!res.ok) {
+          // replace so the back-button won't return to protected snapshot
+          router.replace(`/signin?from=${encodeURIComponent(window.location.pathname)}`);
+        }
+      } catch (err) {
+        if (!cancelled) router.replace(`/signin?from=${encodeURIComponent(window.location.pathname)}`);
+      }
+    }
+
+    verify();
+    return () => { cancelled = true };
+  }, [router]);
+
+  return <>{children}</>;
+}

@@ -1,54 +1,43 @@
-
 'use client'
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Search, Loader2 } from "lucide-react";
-import { getAllTransactions } from '@/lib/actions';
+import useTransactions from '@/hooks/use-transactions';
 import type { Transaction } from '@/lib/types';
 import { format } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 
 export default function TransactionsPage() {
-    const [transactions, setTransactions] = useState<Transaction[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    // Use hook to subscribe only to transactions belonging to the current user
+    const { transactions, loading: isLoading, error } = useTransactions();
 
     const [searchTerm, setSearchTerm] = useState('');
     const [date, setDate] = useState<string>('');
     const [terminalId, setTerminalId] = useState('all');
 
-    useEffect(() => {
-        async function fetchTransactions() {
-            try {
-                setIsLoading(true);
-                const fetchedTransactions = await getAllTransactions();
-                setTransactions(fetchedTransactions);
-                setError(null);
-            } catch (err) {
-                setError('Failed to fetch transactions.');
-                console.error(err);
-            } finally {
-                setIsLoading(false);
-            }
-        }
-        fetchTransactions();
-    }, []);
+    // subscriptions handled by `useTransactions`
 
     const filteredTransactions = useMemo(() => {
         return transactions.filter(tx => {
             const searchMatch = searchTerm === '' || 
-                tx.amount.includes(searchTerm) || 
-                tx.reference_number.includes(searchTerm) ||
-                tx.transaction_id.includes(searchTerm) ||
+                (typeof tx.amount === 'string' ? tx.amount : String(tx.amount)).includes(searchTerm) || 
+                (tx.reference_number && tx.reference_number.includes(searchTerm)) ||
+                (tx.transaction_id && tx.transaction_id.includes(searchTerm)) ||
                 (tx.bankResponse?.terminal_id && tx.bankResponse.terminal_id.includes(searchTerm));
 
-            const dateMatch = date === '' || format(new Date(tx.created_at), 'yyyy-MM-dd') === date;
+            // Support both ISO string and Firestore Timestamp (toDate)
+            const createdAtDate = (typeof tx.created_at === 'string')
+                ? new Date(tx.created_at)
+                : (tx.created_at && typeof (tx.created_at as any).toDate === 'function')
+                    ? (tx.created_at as any).toDate()
+                    : new Date(tx.created_at as any);
+
+            const dateMatch = date === '' || format(createdAtDate, 'yyyy-MM-dd') === date;
             
             const terminalMatch = terminalId === 'all' || (tx.bankResponse?.terminal_id === terminalId);
 
@@ -127,13 +116,24 @@ export default function TransactionsPage() {
                         ) : error ? (
                              <TableRow>
                                 <TableCell colSpan={5} className="text-center text-red-500 py-8">
-                                    {error}
+                                    {typeof error === 'string' ? error : error?.message ?? 'Failed to fetch transactions.'}
                                 </TableCell>
                             </TableRow>
                         ) : filteredTransactions.length > 0 ? (
                             filteredTransactions.map((tx) => (
                                 <TableRow key={tx.transaction_uuid}>
-                                    <TableCell>{format(new Date(tx.created_at), 'Pp')}</TableCell>
+                                    <TableCell>{
+                                        // Defensive formatting for created_at
+                                        ((): string => {
+                                            try {
+                                                if (typeof tx.created_at === 'string') return format(new Date(tx.created_at), 'Pp');
+                                                if (tx.created_at && typeof (tx.created_at as any).toDate === 'function') return format((tx.created_at as any).toDate(), 'Pp');
+                                                return format(new Date(tx.created_at as any), 'Pp');
+                                            } catch (e) {
+                                                return '';
+                                            }
+                                        })()
+                                    }</TableCell>
                                     <TableCell>{tx.bankResponse?.terminal_id ?? tx.terminal_id ?? 'N/A'}</TableCell>
                                     <TableCell>{parseFloat(tx.amount).toFixed(2)} {tx.currency}</TableCell>
                                     <TableCell>{tx.reference_number}</TableCell>
