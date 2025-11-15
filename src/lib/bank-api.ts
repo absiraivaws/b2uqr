@@ -85,9 +85,11 @@ export async function callBankCreateQR(params: CreateQrRequest): Promise<CreateQ
   const merchantName = buildTag('59', params.merchant_name);
   const merchantCity = buildTag('60', params.merchant_city);
 
-  // Tag 62: Additional Data (with nested Reference Number) as per user's last instruction
-  // The value is now a fixed string `0503***`
-  const additionalData = '62070503***';
+  // Tag 62: Additional Data (with nested Reference Number for merchant and customer)
+  const merchantReferenceLabel = buildTag('05', params.reference_number);
+  const customerReferenceLabel = buildTag('06', params.reference_number);
+  const additionalDataValue = `${merchantReferenceLabel}${customerReferenceLabel}`;
+  const additionalData = buildTag('62', additionalDataValue);
   
   const payloadWithoutCrc = [
     payloadIndicator,

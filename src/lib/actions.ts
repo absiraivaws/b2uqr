@@ -18,26 +18,11 @@ import crypto from "crypto";
 
 const TransactionSchema = z.object({
   amount: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid amount format"),
-  reference_number: z.string(),
-  // From settings
-  merchant_id: z.string().min(1, "Merchant ID is required."),
-  bank_code: z.string().min(1, "Bank Code is required."),
-  terminal_id: z.string().min(1, "Terminal ID is required."),
-  merchant_name: z.string().min(1, "Merchant Name is required."),
-  merchant_city: z.string().min(1, "Merchant City is required."),
-  mcc: z.string().min(1, "MCC is required."),
-  currency: z.string().optional(), // Not on form, but in settings
-  currency_code: z.string().optional(), // Not on form, but in settings
-  country_code: z.string().optional(), // Not on form, but in settings
-  customer_email: z.string().optional(),
-  customer_name: z.string().optional(),
+  reference_number: z.string().min(1, "Reference number is required"),
 });
 
-
-export async function createTransaction(formData: FormData): Promise<Transaction> {
-  const dataToParse = Object.fromEntries(formData.entries());
-  console.log("Data being parsed:", dataToParse);
-  const parsed = TransactionSchema.safeParse(dataToParse);
+export async function createTransaction(transactionData: {amount: string, reference_number: string}): Promise<Transaction> {
+  const parsed = TransactionSchema.safeParse(transactionData);
 
   if (!parsed.success) {
     // Log the detailed error for debugging
@@ -52,6 +37,19 @@ export async function createTransaction(formData: FormData): Promise<Transaction
   // 1. Generate transaction_uuid
    const transaction_uuid = `uuid_${crypto.randomBytes(12).toString('hex')}`;
 
+  // In a real app, these would come from a secure source on the server, not the client.
+  // For this demo, we'll use defaults similar to the settings store.
+  const serverSideSettings = {
+      merchant_id: '0000000007960028005',
+      bank_code: '16135',
+      terminal_id: '0001',
+      merchant_name: 'LVMSiraiva',
+      merchant_city: 'MANNAR',
+      mcc: '5999',
+      currency_code: '144',
+      country_code: 'LK',
+  };
+
   // 2. Pre-save transaction object
   let pendingTx: Omit<Transaction, 'created_at' | 'updated_at'> = {
     transaction_id: `tx_${crypto.randomBytes(8).toString('hex')}`,
@@ -61,8 +59,8 @@ export async function createTransaction(formData: FormData): Promise<Transaction
     expires_at: "", // Will be filled after bank call
     amount: data.amount,
     reference_number: data.reference_number,
-    merchant_id: data.merchant_id,
-    terminal_id: data.terminal_id, // Pass terminal_id
+    merchant_id: serverSideSettings.merchant_id,
+    terminal_id: serverSideSettings.terminal_id,
     currency: 'LKR'
   };
 
@@ -70,14 +68,14 @@ export async function createTransaction(formData: FormData): Promise<Transaction
   const bankResponse = await callBankCreateQR({
     amount: data.amount,
     reference_number: data.reference_number,
-    merchant_id: data.merchant_id,
-    bank_code: data.bank_code,
-    terminal_id: data.terminal_id,
-    merchant_name: data.merchant_name,
-    merchant_city: data.merchant_city,
-    mcc: data.mcc,
-    currency_code: data.currency_code ?? '144', // Default to LKR
-    country_code: data.country_code ?? 'LK', // Default to LK
+    merchant_id: serverSideSettings.merchant_id,
+    bank_code: serverSideSettings.bank_code,
+    terminal_id: serverSideSettings.terminal_id,
+    merchant_name: serverSideSettings.merchant_name,
+    merchant_city: serverSideSettings.merchant_city,
+    mcc: serverSideSettings.mcc,
+    currency_code: serverSideSettings.currency_code,
+    country_code: serverSideSettings.country_code,
   });
 
   // 4. Update transaction with QR data from bank
