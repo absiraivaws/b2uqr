@@ -107,5 +107,5 @@ jobs:
 
       - name: Summary
         run: |
-          echo "Published tags:" ${{ steps.meta.outputs.tags }}
-          echo "Labels applied:" ${{ steps.meta.outputs.labels }}
+          echo "Published tags: '${{ steps.meta.outputs.tags }}'"
+          echo "Labels applied: '${{ steps.meta.outputs.labels }}'"
