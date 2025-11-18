@@ -75,6 +75,38 @@ export function generateOTPEmail(params: {
   return { subject, text, html };
 }
 
+export function generateSetPasswordEmail(params: { name: string; email: string; link: string; appName?: string }) {
+  const { name, email, link, appName = 'LankaQR' } = params;
+  const subject = `${appName} - Set your admin password`;
+  const text = `Hello ${name},\n\nPlease set your admin password by visiting the link: ${link}\n\nIf you didn't expect this, ignore.`;
+
+  const html = `
+  <!doctype html>
+  <html lang="en">
+    <head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>${escapeHtml(subject)}</title>
+    </head>
+    <body style="margin:0;padding:24px;background:#f3f4f6;font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;">
+      <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:12px;padding:24px;">
+        <h2 style="margin:0 0 8px 0;color:#111827">${escapeHtml(appName)}</h2>
+        <p style="color:#374151">Hello ${escapeHtml(name || email)},</p>
+        <p style="color:#374151">An administrator account was created for you. Click the button below to set your password. This link can be used once and will expire shortly.</p>
+        <div style="text-align:center;margin:20px 0;">
+          <a href="${escapeHtml(link)}" style="display:inline-block;padding:12px 18px;background:#0b61ff;color:#fff;border-radius:8px;text-decoration:none;">Set password</a>
+        </div>
+        <p style="color:#6b7280;font-size:13px">If you didn't expect this, ignore this email or contact the site administrator.</p>
+        <hr style="border:none;border-top:1px solid #eef2f7;margin:20px 0;" />
+        <p style="color:#9ca3af;font-size:12px">© ${new Date().getFullYear()} ${escapeHtml(appName)}. All rights reserved.</p>
+      </div>
+    </body>
+  </html>
+  `;
+
+  return { subject, text, html };
+}
+
 function escapeHtml(input: string) {
   return input
     .replaceAll('&', '&amp;')

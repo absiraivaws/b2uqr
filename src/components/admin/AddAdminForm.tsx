@@ -54,6 +54,16 @@ export default function AddAdminForm() {
       });
       toast({ title: 'Admin added', description: `${form.name} has been added to admins.` });
       setForm({ name: '', email: '', nic: '', phone: '', position: '' });
+      // Create invite and send set-password email
+      try {
+        await fetch('/api/admin/invite', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: form.email.trim().toLowerCase(), name: form.name.trim() }),
+        });
+      } catch (err) {
+        console.warn('Failed to create invite', err);
+      }
     } catch (err) {
       console.error('Failed to add admin', err);
       toast({ title: 'Failed', description: 'Could not add admin — try again.' });
