@@ -73,13 +73,13 @@ export default function AppLayout({
 
       <Sidebar>
         <SidebarHeader>
-          <div className="flex items-center gap-2">
-            <div className="hidden md:block">
-              <SidebarTrigger />
-            </div>
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 group-data-[collapsible=icon]:-ml-1 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:opacity-0 transition-all duration-200">
-                <QrCode className="h-6 w-6 text-primary" />
-                <h1 className="text-lg font-bold">QR Bridge</h1>
+              <QrCode className="h-6 w-6 text-primary" />
+              <h1 className="text-lg font-bold">QR Bridge</h1>
+            </div>
+            <div className="md:hidden">
+              <SidebarTrigger />
             </div>
           </div>
         </SidebarHeader>
