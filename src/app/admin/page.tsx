@@ -1,7 +1,5 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import AddAdminForm from '@/components/admin/AddAdminForm';
-import SignOutButton from '@/components/admin/SignOutButton';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getAdminByCookieHeader } from '@/lib/adminSession';
@@ -20,13 +18,12 @@ export default async function AdminPage() {
       <Card>
         <CardHeader className="flex items-center justify-between">
           <div>
-            <CardTitle>Admin</CardTitle>
+            <CardTitle>Admin Settings</CardTitle>
             <CardDescription>Only admins are allowed here.</CardDescription>
           </div>
-          <SignOutButton />
         </CardHeader>
         <CardContent className="space-y-6">
-          <AddAdminForm />
+          Admin main page
         </CardContent>
       </Card>
     </main>

@@ -30,7 +30,7 @@ export default function AdminSignInPage() {
         return;
       }
       // Signed in — cookie set by server. Redirect to admin area.
-      router.push('/admin/admin');
+      router.push('/admin');
     } catch (err) {
       console.error(err);
       toast({ title: 'Error', description: 'Server error' });
