@@ -18,7 +18,7 @@ export default async function AdminPage() {
       <Card>
         <CardHeader className="flex items-center justify-between">
           <div>
-            <CardTitle>Admin Settings</CardTitle>
+            <CardTitle>Admin</CardTitle>
             <CardDescription>Only admins are allowed here.</CardDescription>
           </div>
         </CardHeader>

@@ -52,7 +52,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <SidebarTrigger />
         </div>
         {/* center: logo + title (visible on mobile header) */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 cursor-pointer" onClick={() => router.push('/admin')}>
           <QrCode className="h-6 w-6 text-primary" />
           <h1 className="text-lg font-bold">Admin</h1>
         </div>
@@ -61,7 +61,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <Sidebar>
         <SidebarHeader>
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 group-data-[collapsible=icon]:-ml-1 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:opacity-0 transition-all duration-200">
+            <div
+              className="flex items-center gap-2 group-data-[collapsible=icon]:-ml-1 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:opacity-0 transition-all duration-200 cursor-pointer"
+              onClick={() => router.push('/admin')}
+            >
               <QrCode className="h-6 w-6 text-primary" />
               <h1 className="text-lg font-bold">Admin</h1>
             </div>

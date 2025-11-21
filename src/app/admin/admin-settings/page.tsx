@@ -4,6 +4,8 @@ import AddAdminForm from '@/components/admin/AddAdminForm';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getAdminByCookieHeader } from '@/lib/adminSession';
+import AddStaffForm from '@/components/admin/AddStaffForm';
+import { Separator } from '@/components/ui/separator';
 
 export default async function AdminSettingsPage() {
   // Server-side: verify admin_session cookie and redirect to signin if invalid
@@ -19,12 +21,14 @@ export default async function AdminSettingsPage() {
       <Card>
         <CardHeader className="flex items-center justify-between">
           <div>
-            <CardTitle>Admin</CardTitle>
+            <CardTitle>Admin Settings</CardTitle>
             <CardDescription>Only admins are allowed here.</CardDescription>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
           <AddAdminForm />
+          <Separator />
+          <AddStaffForm />
         </CardContent>
       </Card>
     </main>
