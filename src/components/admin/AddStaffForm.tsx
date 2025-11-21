@@ -56,6 +56,16 @@ export default function AddStaffForm() {
       });
       toast({ title: 'Staff added', description: `${form.name} has been added to staff.` });
       setForm({ name: '', email: '', nic: '', phone: '', address: '', position: '' });
+      // Create invite and send set-password email (best-effort)
+      try {
+        await fetch('/api/staff/invite', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: form.email.trim().toLowerCase(), name: form.name.trim() }),
+        });
+      } catch (err) {
+        console.warn('Failed to create staff invite', err);
+      }
     } catch (err) {
       console.error('Failed to add staff', err);
       toast({ title: 'Failed', description: 'Could not add staff — try again.' });
