@@ -13,7 +13,7 @@ import {
   SidebarGroup,
   SidebarGroupLabel,
 } from '@/components/ui/sidebar'
-import { Settings as SettingsIcon, LogOutIcon, Loader2, QrCode } from 'lucide-react'
+import { Settings as SettingsIcon, LogOutIcon, Loader2, QrCode, User } from 'lucide-react'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 
@@ -27,6 +27,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   ]
 
   const accountItems = [
+    { href: '/admin/profile', label: 'Profile', icon: User },
     { href: '/admin/signout', label: 'Sign Out', icon: LogOutIcon },
   ]
 
