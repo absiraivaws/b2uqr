@@ -20,7 +20,10 @@ export async function POST(req: Request) {
     const invite = inviteDoc.data();
     const now = Date.now();
     if ((invite?.used) === true) return NextResponse.json({ ok: false, message: 'Token already used' }, { status: 400 });
-    if ((invite?.expires_at_ms || 0) < now) return NextResponse.json({ ok: false, message: 'Token expired' }, { status: 400 });
+    if ((invite?.expires_at_ms || 0) < now) {
+      try { await inviteDoc.ref.delete(); } catch (e) { console.warn('Failed to delete expired invite', e); }
+      return NextResponse.json({ ok: false, message: 'Token expired' }, { status: 400 });
+    }
 
     const email = (invite.email || '').toString().trim().toLowerCase();
     if (!email) return NextResponse.json({ ok: false, message: 'Invite missing email' }, { status: 500 });

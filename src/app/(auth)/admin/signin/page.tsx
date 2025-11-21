@@ -85,7 +85,7 @@ export default function AdminSignInPage() {
       </Card>
 
       <p className="text-center text-sm text-muted-foreground mt-4">
-        Need help? <Button variant="link" className="p-0" onClick={() => router.push('/admin/set-password')}>Reset password</Button>
+        Need help? <Button variant="link" className="p-0" onClick={() => router.push('/admin/reset-password')}>Reset password</Button>
       </p>
     </main>
   );
