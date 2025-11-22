@@ -4,7 +4,7 @@ import { Settings as SettingsIcon, LogOutIcon, User } from 'lucide-react'
 
 export default function StaffLayout({ children }: { children: React.ReactNode }) {
   const menuItems = [
-    { href: '/staff/settings', label: 'Settings', icon: SettingsIcon },
+    { href: '/staff/user-management', label: 'User Management', icon: SettingsIcon },
   ];
 
   const accountItems = [
