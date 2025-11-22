@@ -54,12 +54,22 @@ export default function AdminTransactionsClient() {
 		}
 	}
 
+	const totalDisplayedAmount = filteredTransactions.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+
 	return (
 		<main className="p-4 sm:p-6 lg:p-8">
 			<Card>
-				<CardHeader>
-					<CardTitle>All Transactions</CardTitle>
-					<CardDescription>Search and view all users' past transactions.</CardDescription>
+				<CardHeader className="flex items-center">
+					<div className='flex justify-between w-full'>
+						<div>
+							<CardTitle>All Transactions</CardTitle>
+							<CardDescription>Search and view all users' past transactions.</CardDescription>
+						</div>
+						<div className="text-right">
+							<div className="text-sm text-muted-foreground">Total</div>
+							<div className="text-2xl font-semibold">LKR {totalDisplayedAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+						</div>
+					</div>
 				</CardHeader>
 				<CardContent className="space-y-4">
 					<div className="flex flex-wrap items-center gap-4">
