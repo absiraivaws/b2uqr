@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -17,10 +17,17 @@ type StaffForm = {
   position: string;
 };
 
-export default function AddStaffForm() {
+type Props = {
+  onSuccess?: () => void;
+};
+
+export default function AddStaffForm({ onSuccess }: Props) {
   const { toast } = useToast();
   const [form, setForm] = useState<StaffForm>({ name: '', email: '', nic: '', phone: '', address: '', position: '' });
   const [loading, setLoading] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const successRef = useRef<HTMLDivElement | null>(null);
+  const closeTimer = useRef<number | null>(null);
 
   const onChange = (k: keyof StaffForm, v: string) => setForm(prev => ({ ...prev, [k]: v }));
 
@@ -56,6 +63,20 @@ export default function AddStaffForm() {
       });
       toast({ title: 'Staff added', description: `${form.name} has been added to staff.` });
       setForm({ name: '', email: '', nic: '', phone: '', address: '', position: '' });
+
+      // show success animation, focus it, then close parent dialog via onSuccess
+      setIsSuccess(true);
+      window.setTimeout(() => successRef.current?.focus(), 50);
+      if (closeTimer.current) window.clearTimeout(closeTimer.current);
+      closeTimer.current = window.setTimeout(() => {
+        try {
+          if (typeof onSuccess === 'function') onSuccess();
+        } catch (e) {
+          // ignore
+        }
+        setIsSuccess(false);
+      }, 900) as unknown as number;
+
       // Create invite and send set-password email (best-effort)
       try {
         await fetch('/api/staff/invite', {
@@ -74,36 +95,55 @@ export default function AddStaffForm() {
     }
   };
 
+  useEffect(() => {
+    return () => { if (closeTimer.current) window.clearTimeout(closeTimer.current); };
+  }, []);
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-3">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {isSuccess && (
+        <div
+          ref={successRef}
+          tabIndex={-1}
+          role="status"
+          aria-live="polite"
+          className="flex items-center gap-3 p-4 rounded-md bg-green-50 text-green-700"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+          <div className="font-medium">Added</div>
+          <div className="text-sm text-green-700/80">Staff has been added successfully.</div>
+        </div>
+      )}
+      <div className="flex flex-col gap-6 px-8">
+        <div className='space-y-2'>
           <Label htmlFor="staff_name">Name</Label>
           <Input id="staff_name" value={form.name} onChange={(e) => onChange('name', e.target.value)} />
         </div>
-        <div>
+        <div className='space-y-2'>
           <Label htmlFor="staff_email">Email</Label>
           <Input id="staff_email" value={form.email} onChange={(e) => onChange('email', e.target.value)} />
         </div>
-        <div>
+        <div className='space-y-2'>
           <Label htmlFor="staff_nic">NIC</Label>
           <Input id="staff_nic" value={form.nic} onChange={(e) => onChange('nic', e.target.value)} />
         </div>
-        <div>
+        <div className='space-y-2'>
           <Label htmlFor="staff_phone">Phone</Label>
           <Input id="staff_phone" value={form.phone} onChange={(e) => onChange('phone', e.target.value)} />
         </div>
-        <div className="md:col-span-2">
+        <div className='space-y-2'>
           <Label htmlFor="staff_address">Address</Label>
           <Input id="staff_address" value={form.address} onChange={(e) => onChange('address', e.target.value)} />
         </div>
-        <div className="md:col-span-3">
+        <div className='space-y-2'>
           <Label htmlFor="staff_position">Position</Label>
           <Input id="staff_position" value={form.position} onChange={(e) => onChange('position', e.target.value)} />
         </div>
       </div>
 
-      <div className="pt-2">
+      <div className="pt-4 flex justify-end">
         <Button type="submit" disabled={loading}>{loading ? 'Adding...' : 'Add staff'}</Button>
       </div>
     </form>
