@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/sidebar';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Loader2 } from 'lucide-react';
+import { Loader2, QrCode } from 'lucide-react';
 
 type MenuItem = { href: string; label: string; icon: React.ComponentType<any> };
 
@@ -57,14 +57,16 @@ export default function RoleSidebar({
           <SidebarTrigger />
         </div>
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => router.push(`/${role}`)}>
+          
           <span className="text-primary font-bold">{title}</span>
         </div>
       </header>
 
       <Sidebar>
         <SidebarHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between px-3">
             <div className="flex items-center gap-2 transition-all duration-200 cursor-pointer" onClick={() => router.push(`/${role}`)}>
+              <QrCode className="h-6 w-6" />
               <span className="text-lg font-bold">{title}</span>
             </div>
             <div className="md:hidden">
@@ -73,7 +75,7 @@ export default function RoleSidebar({
           </div>
         </SidebarHeader>
 
-        <SidebarContent>
+        <SidebarContent className='px-3'>
           <SidebarMenu>
             {menuItems.map((item) => (
               <SidebarMenuItem key={item.href}>
