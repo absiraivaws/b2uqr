@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation';
 import { getAdminByCookieHeader } from '@/lib/adminSession';
 import AddStaffForm from '@/components/admin/AddStaffForm';
 import { Separator } from '@/components/ui/separator';
+import DeleteUsers from '@/components/admin/DeleteUsers';
 
 export default async function AdminSettingsPage() {
   // Server-side: verify admin_session cookie and redirect to signin if invalid
@@ -29,6 +30,8 @@ export default async function AdminSettingsPage() {
           <AddAdminForm />
           <Separator />
           <AddStaffForm />
+          <Separator />
+          <DeleteUsers />
         </CardContent>
       </Card>
     </main>
