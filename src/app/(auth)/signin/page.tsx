@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,18 @@ export default function SignInPage() {
   const [pin, setPin] = useState('');
   const [signingPin, setSigningPin] = useState(false);
   const router = useRouter();
+
+  // Load last signed-in email from localStorage on component mount
+  useEffect(() => {
+    try {
+      const lastEmail = localStorage.getItem('last_signin_email');
+      if (lastEmail) {
+        setIdentifier(lastEmail);
+      }
+    } catch (err) {
+      console.warn('Failed to load last email from localStorage:', err);
+    }
+  }, []);
 
   // TODO: Replace stub handlers with firebase auth logic
   const handleGoogleSignIn = async () => {
@@ -81,7 +93,10 @@ export default function SignInPage() {
     try {
   // Call server to validate PIN and receive a custom token, then sign in
   const user = await signInWithPin(id, pin);
-      try { localStorage.setItem('user_uid', user.uid); } catch (_) {}
+      try { 
+        localStorage.setItem('user_uid', user.uid);
+        localStorage.setItem('last_signin_email', id);
+      } catch (_) {}
       router.push('/generate-qr');
     } catch (err: any) {
       console.error(err);
