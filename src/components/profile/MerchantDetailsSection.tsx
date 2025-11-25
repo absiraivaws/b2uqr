@@ -25,6 +25,8 @@ const MerchantDetailsSection = forwardRef<MerchantDetailsHandle, {}>((_, ref) =>
   const [merchantName, setMerchantName] = useState('');
   const [merchantCity, setMerchantCity] = useState('');
   const [mcc, setMcc] = useState('');
+  const [currencyCode, setCurrencyCode] = useState('');
+  const [countryCode, setCountryCode] = useState('');
   const [referenceType, setReferenceType] = useState<'serial' | 'invoice' | ''>('');
   const [manualInvoice, setManualInvoice] = useState('');
   const [isCustomerReferenceEnabled, setIsCustomerReferenceEnabled] = useState<boolean>(false);
@@ -49,6 +51,8 @@ const MerchantDetailsSection = forwardRef<MerchantDetailsHandle, {}>((_, ref) =>
           if (data.merchantName) setMerchantName(data.merchantName);
           if (data.merchantCity) setMerchantCity(data.merchantCity);
           if (data.merchantCategoryCode) setMcc(data.merchantCategoryCode);
+          if (data.currencyCode) setCurrencyCode(data.currencyCode);
+          if (data.countryCode) setCountryCode(data.countryCode);
           if (data.referenceNumberType) setReferenceType(data.referenceNumberType);
           if (data.manualInvoice) setManualInvoice(data.manualInvoice);
           if (typeof data.includeCustomerReferenceInQrCode === 'boolean') setIsCustomerReferenceEnabled(data.includeCustomerReferenceInQrCode);
@@ -81,6 +85,8 @@ const MerchantDetailsSection = forwardRef<MerchantDetailsHandle, {}>((_, ref) =>
           merchantName: merchantName || null,
           merchantCity: merchantCity || null,
           merchantCategoryCode: mcc || null,
+          currencyCode: currencyCode || null,
+          countryCode: countryCode || null,
           referenceNumberType: referenceType || null,
           manualInvoice: manualInvoice || null,
           includeCustomerReferenceInQrCode: isCustomerReferenceEnabled,
@@ -96,7 +102,7 @@ const MerchantDetailsSection = forwardRef<MerchantDetailsHandle, {}>((_, ref) =>
         setSaving(false);
       }
     }
-  }), [locked, merchantId, bankCode, terminalId, merchantName, merchantCity, mcc, referenceType, manualInvoice, isCustomerReferenceEnabled]);
+  }), [locked, merchantId, bankCode, terminalId, merchantName, merchantCity, mcc, currencyCode, countryCode, referenceType, manualInvoice, isCustomerReferenceEnabled]);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -174,7 +180,42 @@ const MerchantDetailsSection = forwardRef<MerchantDetailsHandle, {}>((_, ref) =>
       </div>
       <div className="space-y-2">
         <Label htmlFor="mcc">Merchant Category Code</Label>
-        <Input id="mcc" value={mcc} readOnly className="bg-muted" />
+        <Input
+          id="mcc"
+          value={mcc}
+          onChange={(e) => !locked && setMcc(e.target.value)}
+          placeholder={getFieldDef('mcc')?.placeholder}
+          maxLength={getFieldDef('mcc')?.maxLength}
+          readOnly={locked}
+          className={locked ? 'bg-muted' : ''}
+        />
+        <p className="text-xs text-muted-foreground">Max {getFieldDef('mcc')?.maxLength} digits.</p>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="currency_code">Currency Code (ISO 4217)</Label>
+        <Input
+          id="currency_code"
+          value={currencyCode}
+          onChange={(e) => !locked && setCurrencyCode(e.target.value)}
+          placeholder={getFieldDef('currency_code')?.placeholder}
+          maxLength={getFieldDef('currency_code')?.maxLength}
+          readOnly={locked}
+          className={locked ? 'bg-muted' : ''}
+        />
+        <p className="text-xs text-muted-foreground">ISO 4217 numeric currency code (e.g., 144 for LKR).</p>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="country_code">Country Code</Label>
+        <Input
+          id="country_code"
+          value={countryCode}
+          onChange={(e) => !locked && setCountryCode(e.target.value)}
+          placeholder={getFieldDef('country_code')?.placeholder}
+          maxLength={getFieldDef('country_code')?.maxLength}
+          readOnly={locked}
+          className={locked ? 'bg-muted' : ''}
+        />
+        <p className="text-xs text-muted-foreground">ISO 3166-1 alpha-2 country code (e.g., LK for Sri Lanka).</p>
       </div>
       <div className="space-y-2">
         <Label htmlFor="reference_type">Reference Number Type</Label>
