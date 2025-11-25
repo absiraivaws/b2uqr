@@ -1,18 +1,35 @@
 "use client"
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import PersonalDetailsSection, { PersonalDetailsHandle } from '@/components/profile/PersonalDetailsSection';
 import MerchantDetailsSection, { MerchantDetailsHandle } from '@/components/profile/MerchantDetailsSection';
+import { QrUploadSection } from '@/components/profile/QrUploadSection';
 
 
 export default function ProfilePage() {
 	const [saving, setSaving] = useState(false);
+	const [isLocked, setIsLocked] = useState(false);
 	const { toast } = useToast();
 	const merchantRef = useRef<MerchantDetailsHandle>(null);
 	const personalRef = useRef<PersonalDetailsHandle>(null);
+
+	// Check if merchant details are locked
+	useEffect(() => {
+		const checkLockStatus = () => {
+			if (merchantRef.current) {
+				setIsLocked(merchantRef.current.isLocked());
+			}
+		};
+		
+		// Check initially and after any potential changes
+		const timer = setInterval(checkLockStatus, 500);
+		checkLockStatus();
+		
+		return () => clearInterval(timer);
+	}, []);
 
 	// MerchantDetailsSection now owns its load/save/lock logic.
 
@@ -43,10 +60,15 @@ export default function ProfilePage() {
 
 					<hr className="my-6" />
 
-					<h3 className="text-lg font-medium">Merchant Details</h3>
+					<div className='flex flex-row justify-between'>
+						<h3 className="text-lg font-medium">Merchant Details</h3>
+						{!isLocked && <QrUploadSection merchantRef={merchantRef} />}
+					</div>
+
 					<MerchantDetailsSection ref={merchantRef} />
 
 					<Button onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save Changes'}</Button>
+					
 				</CardContent>
 			</Card>
 		</main>

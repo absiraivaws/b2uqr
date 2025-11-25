@@ -11,7 +11,20 @@ import { auth, db } from '@/lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { bankCodeItems } from '@/lib/bankCodes';
 
-export type MerchantDetailsHandle = { save: () => Promise<void> };
+export type MerchantDetailsHandle = { 
+  save: () => Promise<void>;
+  populateFromQR: (qrData: {
+    merchant_id: string;
+    bank_code: string;
+    terminal_id: string;
+    merchant_name: string;
+    merchant_city: string;
+    mcc: string;
+    currency_code: string;
+    country_code: string;
+  }) => void;
+  isLocked: () => boolean;
+};
 
 const MerchantDetailsSection = forwardRef<MerchantDetailsHandle, {}>((_, ref) => {
   const { toast } = useToast();
@@ -101,8 +114,24 @@ const MerchantDetailsSection = forwardRef<MerchantDetailsHandle, {}>((_, ref) =>
       } finally {
         setSaving(false);
       }
-    }
-  }), [locked, merchantId, bankCode, terminalId, merchantName, merchantCity, mcc, currencyCode, countryCode, referenceType, manualInvoice, isCustomerReferenceEnabled]);
+    },
+    populateFromQR: (qrData) => {
+      if (locked) {
+        toast({ title: 'Details locked', description: 'Merchant details are locked and cannot be modified.' });
+        return;
+      }
+      setMerchantId(qrData.merchant_id);
+      setBankCode(qrData.bank_code);
+      setTerminalId(qrData.terminal_id);
+      setMerchantName(qrData.merchant_name);
+      setMerchantCity(qrData.merchant_city);
+      setMcc(qrData.mcc);
+      setCurrencyCode(qrData.currency_code);
+      setCountryCode(qrData.country_code);
+      toast({ title: 'Fields populated', description: 'Merchant details filled from QR code.' });
+    },
+    isLocked: () => locked,
+  }), [locked, merchantId, bankCode, terminalId, merchantName, merchantCity, mcc, currencyCode, countryCode, referenceType, manualInvoice, isCustomerReferenceEnabled, toast]);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
