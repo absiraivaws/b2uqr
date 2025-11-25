@@ -28,7 +28,7 @@ export default function UserDetailsManager() {
   const [checkedFields, setCheckedFields] = useState<Record<string, boolean>>({});
   const [searchBy, setSearchBy] = useState<'email' | 'phone' | 'nic'>('email');
 
-  const requiredFields = ['email', 'phone', 'nic', 'merchantId', 'businessRegistrationNumber'];
+  const requiredFields = ['displayName', 'email', 'phone', 'nic', 'merchantId', 'businessRegistrationNumber', 'merchantCity', 'bankCode', 'address'];
 
   useEffect(() => {
     // reset checkboxes whenever a new user is loaded or the searchBy changes
@@ -132,8 +132,10 @@ export default function UserDetailsManager() {
               <div className="py-4 grid grid-cols-1 sm:grid-cols-2 gap-5 text-md">
                 <div className="space-y-1 px-8 flex items-center">
                   <div className="mr-4 flex-none">
-                    {/* placeholder to align with other checkbox rows (no checkbox for name) */}
-                    <div className="w-4 h-4" />
+                    <Checkbox
+                      checked={Boolean(checkedFields['displayName'])}
+                      onCheckedChange={(c) => setCheckedFields(prev => ({ ...prev, displayName: Boolean(c) }))}
+                    />
                   </div>
                   <div>
                     <div className="text-muted-foreground">Name</div>
@@ -190,7 +192,10 @@ export default function UserDetailsManager() {
                 </div>
                 <div className="space-y-1 px-8 flex items-center">
                   <div className="mr-4 flex-none">
-                    <div className="w-4 h-4" />
+                    <Checkbox
+                      checked={Boolean(checkedFields['merchantCity'])}
+                      onCheckedChange={(c) => setCheckedFields(prev => ({ ...prev, merchantCity: Boolean(c) }))}
+                    />
                   </div>
                   <div>
                     <div className="text-muted-foreground">Merchant City</div>
@@ -211,7 +216,10 @@ export default function UserDetailsManager() {
                 </div>
                 <div className="space-y-1 px-8 flex items-center">
                   <div className="mr-4 flex-none">
-                    <div className="w-4 h-4" />
+                    <Checkbox
+                      checked={Boolean(checkedFields['bankCode'])}
+                      onCheckedChange={(c) => setCheckedFields(prev => ({ ...prev, bankCode: Boolean(c) }))}
+                    />
                   </div>
                   <div>
                     <div className="text-muted-foreground">Bank Code</div>
@@ -221,7 +229,10 @@ export default function UserDetailsManager() {
                 <div className="sm:col-span-2 space-y-1 px-8">
                   <div className="flex items-start">
                     <div className="mr-4 flex-none pt-1">
-                      <div className="w-4 h-4" />
+                      <Checkbox
+                        checked={Boolean(checkedFields['address'])}
+                        onCheckedChange={(c) => setCheckedFields(prev => ({ ...prev, address: Boolean(c) }))}
+                      />
                     </div>
                     <div>
                       <div className="text-muted-foreground">Address</div>
