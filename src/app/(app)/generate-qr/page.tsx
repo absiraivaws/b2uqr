@@ -17,7 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, QrCode, AlertTriangle, CheckCircle, Clock, ShieldCheck, Send } from "lucide-react";
+import { Loader2, QrCode, AlertTriangle, CheckCircle, Clock, ShieldCheck, Send, Share2 } from "lucide-react";
 
 function TransactionForm({
   onSubmit,
@@ -109,10 +109,14 @@ function TransactionStatus({
   transaction,
   onVerify,
   isVerifying,
+  onShare,
+  isSharing,
 }: {
   transaction: Transaction;
   onVerify: () => void;
   isVerifying: boolean;
+  onShare: () => void;
+  isSharing: boolean;
 }) {
   
   const StatusIcon = ({ status }: { status: Transaction["status"] }) => {
@@ -151,12 +155,16 @@ function TransactionStatus({
         </div>
 
         {transaction.status === "PENDING" && (
-           <div className="mt-4 flex flex-col items-center">
+           <div className="mt-4 flex flex-col sm:flex-row gap-3 items-center justify-center">
               <Button onClick={onVerify} disabled={isVerifying}>
                 {isVerifying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
                 Verify Transaction
               </Button>
-              <p className="text-xs text-muted-foreground mt-2">Click to manually check the transaction status.</p>
+              <Button onClick={onShare} disabled={isSharing} variant="outline">
+                {isSharing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Share2 className="mr-2 h-4 w-4" />}
+                Share via WhatsApp
+              </Button>
+              <p className="text-xs text-muted-foreground mt-2 sm:hidden">Click to manually check or share the transaction.</p>
            </div>
         )}
       </CardContent>
@@ -168,6 +176,7 @@ export default function GenerateQRPage() {
   const [currentTransaction, setCurrentTransaction] = useState<Transaction | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
   const [referenceNumber, setReferenceNumber] = useState("");
   const [lastTxNumber, setLastTxNumber] = useState(0);
   const [amount, setAmount] = useState("");
@@ -306,6 +315,120 @@ export default function GenerateQRPage() {
       setIsVerifying(false);
     }
   };
+
+  const handleShareQR = async () => {
+    if (!currentTransaction) return;
+
+    setIsSharing(true);
+    try {
+      const merchantName = supportedFields.find(f => f.id === 'merchant_name')?.value || 'Merchant';
+      const merchantCity = supportedFields.find(f => f.id === 'merchant_city')?.value || '';
+      
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(currentTransaction.qr_payload)}&logo=https://storage.googleapis.com/proudcity/mebanenc/uploads/2021/03/Peoples-Pay-Logo.png`;
+      
+      // Fetch the QR code image
+      const response = await fetch(qrUrl);
+      const blob = await response.blob();
+      
+      // Create canvas to combine QR code with caption
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Canvas not supported');
+      
+      // Load QR image
+      const img = document.createElement('img');
+      img.crossOrigin = 'anonymous';
+      const imgLoadPromise = new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+      });
+      img.src = URL.createObjectURL(blob);
+      await imgLoadPromise;
+      
+      // Set canvas dimensions (QR + caption area)
+      const qrSize = 500;
+      const padding = 30;
+      const captionHeight = 280;
+      canvas.width = qrSize + (padding * 2);
+      canvas.height = qrSize + captionHeight + (padding * 2);
+      
+      // Fill background
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // Draw QR code
+      ctx.drawImage(img, padding, padding, qrSize, qrSize);
+      
+      // Draw caption
+      ctx.fillStyle = '#000000';
+      ctx.textAlign = 'center';
+      const centerX = canvas.width / 2;
+      let yPos = qrSize + padding + 40;
+      
+      // Title
+      ctx.font = 'bold 24px Arial';
+      ctx.fillText('Payment QR Code', centerX, yPos);
+      yPos += 40;
+      
+      // Amount
+      ctx.font = 'bold 28px Arial';
+      ctx.fillStyle = '#16a34a';
+      ctx.fillText(`LKR ${parseFloat(currentTransaction.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, centerX, yPos);
+      yPos += 35;
+      
+      // Details
+      ctx.font = '18px Arial';
+      ctx.fillStyle = '#000000';
+      ctx.fillText(`Reference: ${currentTransaction.reference_number}`, centerX, yPos);
+      yPos += 30;
+      ctx.fillText(`Merchant: ${merchantName}${merchantCity ? `, ${merchantCity}` : ''}`, centerX, yPos);
+      yPos += 30;
+      ctx.fillText(`Terminal: ${terminalId}`, centerX, yPos);
+      yPos += 35;
+      
+      // Footer
+      ctx.font = 'italic 16px Arial';
+      ctx.fillStyle = '#666666';
+      ctx.fillText('Scan this QR code to complete the payment', centerX, yPos);
+      
+      // Convert canvas to blob
+      const compositeBlob = await new Promise<Blob>((resolve) => {
+        canvas.toBlob((blob) => resolve(blob!), 'image/png', 1.0);
+      });
+      
+      // Create file from composite image
+      const file = new File([compositeBlob], `Payment-QR-${currentTransaction.reference_number}.png`, { type: 'image/png' });
+      
+      // Check if Web Share API is available and supports files
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: 'Payment QR Code',
+        });
+        toast({ title: "Shared Successfully", description: "QR code shared successfully." });
+      } else {
+        // Fallback: Open WhatsApp Web with text and QR URL
+        const whatsappMessage = `*Payment QR Code*\n\n` +
+          `Amount: LKR ${parseFloat(currentTransaction.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n` +
+          `Reference: ${currentTransaction.reference_number}\n` +
+          `Merchant: ${merchantName}${merchantCity ? `, ${merchantCity}` : ''}\n` +
+          `Terminal: ${terminalId}\n\n` +
+          `View QR: ${qrUrl}`;
+        const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(whatsappMessage)}`;
+        window.open(whatsappUrl, '_blank');
+        toast({ title: "Opening WhatsApp", description: "Share the QR code in your chat." });
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to share QR code";
+      toast({
+        variant: "destructive",
+        title: "Error Sharing",
+        description: errorMessage,
+      });
+    } finally {
+      setIsSharing(false);
+    }
+  };
   
 
   return (
@@ -340,6 +463,8 @@ export default function GenerateQRPage() {
                     transaction={currentTransaction} 
                     onVerify={handleVerifyTransaction}
                     isVerifying={isVerifying}
+                    onShare={handleShareQR}
+                    isSharing={isSharing}
                 />
             ) : (
                 <Card className="flex flex-col items-center justify-center h-full min-h-[500px] border-dashed">
