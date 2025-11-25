@@ -27,8 +27,9 @@ export default function UserDetailsManager() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [checkedFields, setCheckedFields] = useState<Record<string, boolean>>({});
   const [searchBy, setSearchBy] = useState<'email' | 'phone' | 'nic'>('email');
+  const [editedTerminalId, setEditedTerminalId] = useState('');
 
-  const requiredFields = ['displayName', 'email', 'phone', 'nic', 'merchantId', 'businessRegistrationNumber', 'merchantCity', 'bankCode', 'address'];
+  const requiredFields = ['displayName', 'email', 'phone', 'nic', 'merchantId', 'businessRegistrationNumber', 'merchantCity', 'bankCode', 'terminalId', 'merchantCategoryCode', 'currencyCode', 'countryCode', 'address'];
 
   useEffect(() => {
     // reset checkboxes whenever a new user is loaded or the searchBy changes
@@ -61,6 +62,7 @@ export default function UserDetailsManager() {
       }
       const docSnap = snap.docs[0];
       setUserDoc({ id: docSnap.id, data: docSnap.data() });
+      setEditedTerminalId(docSnap.data()?.terminalId || '');
       setDialogOpen(true);
     } catch (e) {
       console.error('Search failed', e);
@@ -82,6 +84,22 @@ export default function UserDetailsManager() {
     } catch (e) {
       console.error('Failed to update user', e);
       toast({ title: 'Update failed', description: 'Could not update user — try again.' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveTerminalId = async () => {
+    if (!userDoc) return;
+    setLoading(true);
+    try {
+      const ref = doc(db, 'users', userDoc.id);
+      await setDoc(ref, { terminalId: editedTerminalId }, { merge: true });
+      setUserDoc({ id: userDoc.id, data: { ...userDoc.data, terminalId: editedTerminalId } });
+      toast({ title: 'Saved', description: 'Terminal ID updated successfully.' });
+    } catch (e) {
+      console.error('Failed to update terminal ID', e);
+      toast({ title: 'Save failed', description: 'Could not update terminal ID — try again.' });
     } finally {
       setLoading(false);
     }
@@ -226,18 +244,76 @@ export default function UserDetailsManager() {
                     <div className="font-medium">{userDoc.data?.bankCode ?? '-'}</div>
                   </div>
                 </div>
-                <div className="sm:col-span-2 space-y-1 px-8">
-                  <div className="flex items-start">
-                    <div className="mr-4 flex-none pt-1">
-                      <Checkbox
-                        checked={Boolean(checkedFields['address'])}
-                        onCheckedChange={(c) => setCheckedFields(prev => ({ ...prev, address: Boolean(c) }))}
-                      />
-                    </div>
-                    <div>
-                      <div className="text-muted-foreground">Address</div>
-                      <div className="font-medium">{userDoc.data?.address ?? '-'}</div>
-                    </div>
+                <div className="space-y-1 px-8 flex items-center">
+                  <div className="mr-4 flex-none">
+                    <Checkbox
+                      checked={Boolean(checkedFields['terminalId'])}
+                      onCheckedChange={(c) => setCheckedFields(prev => ({ ...prev, terminalId: Boolean(c) }))}
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-muted-foreground mb-1">Terminal ID</div>
+                    <Select
+                      value={editedTerminalId}
+                      onValueChange={setEditedTerminalId}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select Terminal ID" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 10 }, (_, i) => String(i + 1).padStart(4, '0')).map(option => (
+                          <SelectItem key={option} value={option}>{option}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-1 px-8 flex items-center">
+                  <div className="mr-4 flex-none">
+                    <Checkbox
+                      checked={Boolean(checkedFields['merchantCategoryCode'])}
+                      onCheckedChange={(c) => setCheckedFields(prev => ({ ...prev, merchantCategoryCode: Boolean(c) }))}
+                    />
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">MCC</div>
+                    <div className="font-medium">{userDoc.data?.merchantCategoryCode ?? '-'}</div>
+                  </div>
+                </div>
+                <div className="space-y-1 px-8 flex items-center">
+                  <div className="mr-4 flex-none">
+                    <Checkbox
+                      checked={Boolean(checkedFields['currencyCode'])}
+                      onCheckedChange={(c) => setCheckedFields(prev => ({ ...prev, currencyCode: Boolean(c) }))}
+                    />
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Currency Code</div>
+                    <div className="font-medium">{userDoc.data?.currencyCode ?? '-'}</div>
+                  </div>
+                </div>
+                <div className="space-y-1 px-8 flex items-center">
+                  <div className="mr-4 flex-none">
+                    <Checkbox
+                      checked={Boolean(checkedFields['countryCode'])}
+                      onCheckedChange={(c) => setCheckedFields(prev => ({ ...prev, countryCode: Boolean(c) }))}
+                    />
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Country Code</div>
+                    <div className="font-medium">{userDoc.data?.countryCode ?? '-'}</div>
+                  </div>
+                </div>
+                <div className="space-y-1 px-8 flex items-center">
+                  <div className="mr-4 flex-none">
+                    <Checkbox
+                      checked={Boolean(checkedFields['address'])}
+                      onCheckedChange={(c) => setCheckedFields(prev => ({ ...prev, address: Boolean(c) }))}
+                    />
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Address</div>
+                    <div className="font-medium">{userDoc.data?.address ?? '-'}</div>
                   </div>
                 </div>
               </div>
@@ -255,6 +331,12 @@ export default function UserDetailsManager() {
 
               <DialogFooter>
                 <div className="flex items-center space-x-2 w-full sm:justify-end">
+                  <Button
+                    onClick={saveTerminalId}
+                    disabled={loading || editedTerminalId === userDoc.data?.terminalId}
+                  >
+                    Save Terminal ID
+                  </Button>
                   <Button variant="destructive" onClick={async () => {
                     await toggleDetailsLocked();
                   }} disabled={loading || !allChecked}>
