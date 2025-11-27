@@ -53,6 +53,23 @@ export async function getLastDbTransaction(): Promise<Transaction | undefined> {
   return snap.docs[0].data() as Transaction;
 }
 
+export async function getLastTransactionForToday(terminalId: string): Promise<Transaction | undefined> {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayISO = today.toISOString();
+  
+  const q = query(
+    collection(db, COLLECTION),
+    where("terminal_id", "==", terminalId),
+    where("created_at", ">=", todayISO),
+    orderBy("created_at", "desc"),
+    limit(1)
+  );
+  const snap = await getDocs(q);
+  if (snap.empty) return undefined;
+  return snap.docs[0].data() as Transaction;
+}
+
 export async function updateDbTransactionStatus(
   uuid: string,
   status: 'PENDING' | 'SUCCESS' | 'FAILED',

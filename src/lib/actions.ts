@@ -10,6 +10,7 @@ import {
   findPendingTransactions,
   getLastDbTransaction,
   getAllDbTransactions,
+  getLastTransactionForToday,
 } from "./db";
 import { cookies } from 'next/headers';
 import { adminAuth } from './firebaseAdmin';
@@ -117,6 +118,11 @@ export async function getAllTransactions(): Promise<Transaction[]> {
 
 export async function getLastTransaction(): Promise<Transaction | null> {
   const tx = await getLastDbTransaction();
+  return tx || null;
+}
+
+export async function getLastTransactionToday(terminalId: string): Promise<Transaction | null> {
+  const tx = await getLastTransactionForToday(terminalId);
   return tx || null;
 }
 

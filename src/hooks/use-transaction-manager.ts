@@ -7,6 +7,7 @@ import {
   createTransaction,
   getTransactionStatus,
   verifyTransaction,
+  getLastTransactionToday,
 } from "@/lib/actions";
 import type { Transaction } from "@/lib/types";
 import { generateQRImage } from "@/lib/qr-image-generator";
@@ -20,11 +21,61 @@ export function useTransactionManager() {
   const [referenceNumber, setReferenceNumber] = useState("");
   const [lastTxNumber, setLastTxNumber] = useState(0);
   const [amount, setAmount] = useState("");
+  const [isLoadingCounter, setIsLoadingCounter] = useState(true);
 
   const { toast } = useToast();
   const { referenceType, supportedFields } = useSettingsStore();
   const terminalId = supportedFields.find(f => f.id === 'terminal_id')?.value ?? '0001';
   const manualReferencePlaceholder = supportedFields.find(f => f.id === 'merchant_reference_label')?.value ?? 'INV-';
+
+  // Function to extract counter from reference number
+  const extractCounterFromReference = useCallback((refNum: string): number => {
+    // Reference format: <terminalId>YYYYMMDD<6-digit-counter>
+    // Extract last 6 digits
+    const last6 = refNum.slice(-6);
+    return parseInt(last6, 10) || 0;
+  }, []);
+
+  // Load the last transaction counter for today
+  useEffect(() => {
+    async function loadTodayCounter() {
+      if (referenceType !== 'serial') {
+        setIsLoadingCounter(false);
+        return;
+      }
+      
+      setIsLoadingCounter(true);
+      try {
+        const lastTx = await getLastTransactionToday(terminalId);
+        if (lastTx && lastTx.reference_number) {
+          const date = new Date();
+          const yyyy = date.getFullYear();
+          const mm = String(date.getMonth() + 1).padStart(2, '0');
+          const dd = String(date.getDate()).padStart(2, '0');
+          const todayPrefix = `${terminalId}${yyyy}${mm}${dd}`;
+          
+          // Check if the last transaction is from today
+          if (lastTx.reference_number.startsWith(todayPrefix)) {
+            const counter = extractCounterFromReference(lastTx.reference_number);
+            setLastTxNumber(counter);
+          } else {
+            // Last transaction was from a previous day, reset to 0
+            setLastTxNumber(0);
+          }
+        } else {
+          // No transactions for today, start from 0
+          setLastTxNumber(0);
+        }
+      } catch (error) {
+        console.error('Error loading today counter:', error);
+        setLastTxNumber(0);
+      } finally {
+        setIsLoadingCounter(false);
+      }
+    }
+    
+    loadTodayCounter();
+  }, [terminalId, referenceType, extractCounterFromReference]);
 
   const generateReferenceNumber = useCallback(() => {
     if (referenceType !== 'serial') return;
@@ -34,17 +85,23 @@ export function useTransactionManager() {
     const dd = String(date.getDate()).padStart(2, '0');
     const nextTxNumber = lastTxNumber + 1;
     const randomPart = String(nextTxNumber).padStart(6, '0');
-    setReferenceNumber(`${yyyy}${mm}${dd}${randomPart}`);
+    setReferenceNumber(`${terminalId}${yyyy}${mm}${dd}${randomPart}`);
     setLastTxNumber(nextTxNumber);
-  }, [lastTxNumber, referenceType]);
+  }, [lastTxNumber, referenceType, terminalId]);
 
   useEffect(() => {
-    if (referenceType === 'serial') {
-      generateReferenceNumber();
-    } else {
+    if (referenceType === 'serial' && !isLoadingCounter) {
+      const date = new Date();
+      const yyyy = date.getFullYear();
+      const mm = String(date.getMonth() + 1).padStart(2, '0');
+      const dd = String(date.getDate()).padStart(2, '0');
+      const nextTxNumber = lastTxNumber + 1;
+      const randomPart = String(nextTxNumber).padStart(6, '0');
+      setReferenceNumber(`${terminalId}${yyyy}${mm}${dd}${randomPart}`);
+    } else if (referenceType !== 'serial') {
       setReferenceNumber('');
     }
-  }, [referenceType]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [referenceType, isLoadingCounter, lastTxNumber, terminalId]);
 
   const handleCreateTransaction = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
