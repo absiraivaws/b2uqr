@@ -13,7 +13,7 @@ import {
   getLastTransactionForToday,
 } from "./db";
 import { cookies } from 'next/headers';
-import { adminAuth } from './firebaseAdmin';
+import { adminAuth, adminDb } from './firebaseAdmin';
 import { callBankCreateQR, callBankReconciliationAPI } from "./bank-api";
 import { verifyWebhookSignature } from "./security";
 import { alertFailures, type AlertFailuresOutput } from "@/ai/flows/alert-failures";
@@ -40,17 +40,61 @@ export async function createTransaction(transactionData: {amount: string, refere
   // 1. Generate transaction_uuid
    const transaction_uuid = `uuid_${crypto.randomBytes(12).toString('hex')}`;
 
-  // In a real app, these would come from a secure source on the server, not the client.
-  // For this demo, we'll use defaults similar to the settings store.
+  // For security and correctness, merchant configuration is read from Firestore
+  // users/{uid} document. We require the user to be signed in (session cookie).
+  let uid: string | null = null;
+  try {
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get('session')?.value;
+    if (sessionCookie) {
+      const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
+      if (decoded && decoded.uid) {
+        uid = decoded.uid;
+      }
+    }
+  } catch (err) {
+    console.warn('Could not verify session cookie when creating transaction:', err);
+  }
+
+  if (!uid) {
+    throw new Error('User must be signed in to create a transaction.');
+  }
+
+  const userDoc = await adminDb.collection('users').doc(uid).get();
+  if (!userDoc.exists) {
+    throw new Error('User document not found. Merchant configuration must be set in Firestore.');
+  }
+
+  const userData = userDoc.data() || {};
+
   const serverSideSettings = {
-      merchant_id: '0000000007960028005',
-      bank_code: '16135',
-      terminal_id: '0001',
-      merchant_name: 'LVMSiraiva',
-      merchant_city: 'MANNAR',
-      mcc: '5999',
-      currency_code: '144',
-      country_code: 'LK',
+    merchant_id: (userData.merchantId ?? userData.merchant_id) as string | undefined,
+    bank_code: (userData.bankCode ?? userData.bank_code) as string | undefined,
+    terminal_id: (userData.terminalId ?? userData.terminal_id) as string | undefined,
+    merchant_name: (userData.merchantName ?? userData.merchant_name) as string | undefined,
+    merchant_city: (userData.merchantCity ?? userData.merchant_city) as string | undefined,
+    mcc: (userData.merchantCategoryCode ?? userData.merchantCategoryCode ?? userData.mcc) as string | undefined,
+    currency_code: (userData.currencyCode ?? userData.currency_code) as string | undefined,
+    country_code: (userData.countryCode ?? userData.country_code) as string | undefined,
+  };
+
+  // Validate required merchant fields are present
+  const required = ['merchant_id','bank_code','terminal_id','merchant_name','merchant_city','mcc','currency_code','country_code'];
+  const missing = required.filter(k => !serverSideSettings[k as keyof typeof serverSideSettings]);
+  if (missing.length) {
+    throw new Error(`Missing merchant configuration in Firestore user doc: ${missing.join(', ')}`);
+  }
+
+  // Create a typed sanitized settings object (we validated presence above)
+  const sanitizedSettings = {
+    merchant_id: serverSideSettings.merchant_id as string,
+    bank_code: serverSideSettings.bank_code as string,
+    terminal_id: serverSideSettings.terminal_id as string,
+    merchant_name: serverSideSettings.merchant_name as string,
+    merchant_city: serverSideSettings.merchant_city as string,
+    mcc: serverSideSettings.mcc as string,
+    currency_code: serverSideSettings.currency_code as string,
+    country_code: serverSideSettings.country_code as string,
   };
 
   // 2. Pre-save transaction object
@@ -62,8 +106,8 @@ export async function createTransaction(transactionData: {amount: string, refere
     expires_at: "", // Will be filled after bank call
     amount: data.amount,
     reference_number: data.reference_number,
-    merchant_id: serverSideSettings.merchant_id,
-    terminal_id: serverSideSettings.terminal_id,
+    merchant_id: sanitizedSettings.merchant_id,
+    terminal_id: sanitizedSettings.terminal_id,
     currency: 'LKR'
   };
 
@@ -71,35 +115,22 @@ export async function createTransaction(transactionData: {amount: string, refere
   const bankResponse = await callBankCreateQR({
     amount: data.amount,
     reference_number: data.reference_number,
-    merchant_id: serverSideSettings.merchant_id,
-    bank_code: serverSideSettings.bank_code,
-    terminal_id: serverSideSettings.terminal_id,
-    merchant_name: serverSideSettings.merchant_name,
-    merchant_city: serverSideSettings.merchant_city,
-    mcc: serverSideSettings.mcc,
-    currency_code: serverSideSettings.currency_code,
-    country_code: serverSideSettings.country_code,
+    merchant_id: sanitizedSettings.merchant_id,
+    bank_code: sanitizedSettings.bank_code,
+    terminal_id: sanitizedSettings.terminal_id,
+    merchant_name: sanitizedSettings.merchant_name,
+    merchant_city: sanitizedSettings.merchant_city,
+    mcc: sanitizedSettings.mcc,
+    currency_code: sanitizedSettings.currency_code,
+    country_code: sanitizedSettings.country_code,
   });
 
   // 4. Update transaction with QR data from bank
   pendingTx.qr_payload = bankResponse.qr_payload;
   pendingTx.expires_at = bankResponse.expires_at;
 
-  // Try to attach the current user's UID from the session cookie (server-side)
-  try {
-  const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get('session')?.value;
-    if (sessionCookie) {
-      const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
-      if (decoded && decoded.uid) {
-        // attach uid to transaction so we can query transactions by user later
-        (pendingTx as any).uid = decoded.uid;
-      }
-    }
-  } catch (err) {
-    // If verification fails, proceed without uid; the transaction can still be created.
-    console.warn('Could not verify session cookie when creating transaction:', err);
-  }
+  // attach uid to transaction so we can query transactions by user later
+  (pendingTx as any).uid = uid;
 
   const finalTx = await createDbTransaction(pendingTx);
 

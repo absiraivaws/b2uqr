@@ -127,11 +127,37 @@ export function useTransactionManager() {
       setCurrentTransaction(newTransaction);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
-      toast({
-        variant: "destructive",
-        title: "Error Creating Transaction",
-        description: errorMessage,
-      });
+      // Detect missing merchant configuration error from server and provide guidance
+      const missingPrefix = 'Missing merchant configuration in Firestore user doc:';
+      if (typeof errorMessage === 'string' && errorMessage.startsWith(missingPrefix)) {
+        const missingList = errorMessage.slice(missingPrefix.length).trim();
+        const missingFields = missingList ? missingList.split(',').map(s => s.trim()).filter(Boolean) : [];
+        const fieldsStr = missingFields.length ? missingFields.join(', ') : 'required fields';
+
+        toast({
+          variant: "destructive",
+          title: "Missing Merchant Configuration",
+          description: `The following fields are missing in your Firestore user document: ${fieldsStr}.\nOpen Firebase Console → Firestore → collection 'users' → your user document and add these fields (examples: merchantId, bankCode, terminalId, merchantName, merchantCity, merchantCategoryCode, currencyCode, countryCode).`,
+        });
+
+        // Log an example to the console for easier copying
+        console.error('Missing merchant configuration. Example Firestore user doc fields to add:', {
+          merchantId: 'xxxxxxxxxxxxxxxxxxx',
+          bankCode: '16xxx',
+          terminalId: 'xxxx',
+          merchantName: 'Your Merchant Name',
+          merchantCity: 'Your City',
+          merchantCategoryCode: 'xxxx',
+          currencyCode: '144',
+          countryCode: 'LK',
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Error Creating Transaction",
+          description: errorMessage,
+        });
+      }
       if (referenceType === 'serial') {
         generateReferenceNumber();
       }
