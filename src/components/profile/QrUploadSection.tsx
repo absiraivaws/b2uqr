@@ -10,9 +10,10 @@ import { useToast } from '@/hooks/use-toast';
 
 interface QrUploadSectionProps {
   merchantRef?: React.RefObject<MerchantDetailsHandle>;
+  onScanned?: (data: LankaQRData) => void;
 }
 
-export function QrUploadSection({ merchantRef }: QrUploadSectionProps) {
+export function QrUploadSection({ merchantRef, onScanned }: QrUploadSectionProps) {
   const { toast } = useToast();
   const [qrData, setQrData] = useState<LankaQRData | null>(null);
   const [isScanning, setIsScanning] = useState(false);
@@ -86,6 +87,7 @@ export function QrUploadSection({ merchantRef }: QrUploadSectionProps) {
       const parsed = parseLankaQR(qrCodeString);
       if (parsed) {
         setQrData(parsed);
+        if (typeof onScanned === 'function') onScanned(parsed);
         toast({ 
           title: 'Success', 
           description: 'QR code scanned successfully!'
@@ -138,6 +140,7 @@ export function QrUploadSection({ merchantRef }: QrUploadSectionProps) {
           const parsed = parseLankaQR(decodedText);
           if (parsed) {
             setQrData(parsed);
+            if (typeof onScanned === 'function') onScanned(parsed);
             toast({ 
               title: 'Success', 
               description: 'QR code scanned successfully from camera!'

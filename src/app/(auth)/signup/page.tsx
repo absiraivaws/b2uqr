@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import SignupKycSection, { KycValues } from '@/components/signup/SignupKycSection';
 import SignupOtpSection from '@/components/signup/SignupOtpSection';
 import SignupPinSection from '@/components/signup/SignupPinSection';
+import VerifyCustomerSection from '@/components/signup/VerifyCustomerSection';
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -38,6 +39,7 @@ export default function SignUpPage() {
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [savingUser, setSavingUser] = useState(false);
+  const [verifyUid, setVerifyUid] = useState<string | null>(null);
 
   // Phone OTP logic (recaptcha, send/verify) moved to `use-phone-otp` hook.
 
@@ -102,8 +104,8 @@ export default function SignUpPage() {
       if (json.pinHash) payload.pinHash = json.pinHash;
       await setDoc(userDocRef, payload, { merge: true });
 
-      // redirect after save
-      try { router.push('/generate-qr'); } catch (e) { /* ignore */ }
+      // show verification steps after save instead of immediate redirect
+      try { setVerifyUid(verifiedUser.uid); } catch (e) { /* ignore */ }
     } catch (err: any) {
       console.error(err);
       setError(err?.message || 'Failed to save user.');
@@ -156,41 +158,45 @@ export default function SignUpPage() {
 
           <Separator />
 
-          <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
-            <SignupKycSection values={kyc} onChange={setKyc} />
-            <SignupOtpSection
-              email={email}
-              setEmail={setEmail}
-              phone={phone}
-              setPhone={setPhone}
-              fullName={kyc.displayName}
-              enablePhoneOtp={enablePhoneOtp}
-              errorBelowEmail={error}
-              onVerified={(u) => setVerifiedUser({
-                uid: u.uid,
-                phone: u.phone ?? (phone && phone.toString().trim() ? phone : null),
-                displayName: u.displayName ?? (kyc.displayName && kyc.displayName.toString().trim() ? kyc.displayName : null),
-                email: u.email ?? (email && email.toString().trim() ? email : null),
-              })}
-            />
+          {verifyUid ? (
+            <VerifyCustomerSection uid={verifyUid} onComplete={() => { try { router.push('/generate-qr'); } catch (e) {} }} />
+          ) : (
+            <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+              <SignupKycSection values={kyc} onChange={setKyc} />
+              <SignupOtpSection
+                email={email}
+                setEmail={setEmail}
+                phone={phone}
+                setPhone={setPhone}
+                fullName={kyc.displayName}
+                enablePhoneOtp={enablePhoneOtp}
+                errorBelowEmail={error}
+                onVerified={(u) => setVerifiedUser({
+                  uid: u.uid,
+                  phone: u.phone ?? (phone && phone.toString().trim() ? phone : null),
+                  displayName: u.displayName ?? (kyc.displayName && kyc.displayName.toString().trim() ? kyc.displayName : null),
+                  email: u.email ?? (email && email.toString().trim() ? email : null),
+                })}
+              />
 
-            {verifiedUser && (
-              <>
-                <div className="text-sm">Verified: <strong>{verifiedUser.email ?? verifiedUser.phone}</strong></div>
-                <SignupPinSection
-                  pin={pin}
-                  setPin={setPin}
-                  confirmPin={confirmPin}
-                  setConfirmPin={setConfirmPin}
-                  saving={savingUser}
-                  onSave={handleSavePinAndCreateUser}
-                />
-              </>
-            )}
+              {verifiedUser && (
+                <>
+                  <div className="text-sm">Verified: <strong>{verifiedUser.email ?? verifiedUser.phone}</strong></div>
+                  <SignupPinSection
+                    pin={pin}
+                    setPin={setPin}
+                    confirmPin={confirmPin}
+                    setConfirmPin={setConfirmPin}
+                    saving={savingUser}
+                    onSave={handleSavePinAndCreateUser}
+                  />
+                </>
+              )}
 
-            <Separator />
+              <Separator />
 
-          </form>
+            </form>
+          )}
         </CardContent>
       </Card>
 
