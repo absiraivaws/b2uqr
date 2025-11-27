@@ -8,6 +8,7 @@ import {
   getTransactionStatus,
   verifyTransaction,
   getLastTransactionToday,
+  getUserSettings,
 } from "@/lib/actions";
 import type { Transaction } from "@/lib/types";
 import { generateQRImage } from "@/lib/qr-image-generator";
@@ -25,8 +26,35 @@ export function useTransactionManager() {
 
   const { toast } = useToast();
   const { referenceType, supportedFields } = useSettingsStore();
-  const terminalId = supportedFields.find(f => f.id === 'terminal_id')?.value ?? '0001';
+  const fallbackTerminalId = supportedFields.find(f => f.id === 'terminal_id')?.value ?? '0001';
   const manualReferencePlaceholder = supportedFields.find(f => f.id === 'merchant_reference_label')?.value ?? 'INV-';
+
+  // Terminal ID will be loaded from Firestore user doc when available.
+  const [terminalId, setTerminalId] = useState<string>(fallbackTerminalId);
+  const [userSettingsLoaded, setUserSettingsLoaded] = useState(false);
+
+  // Load terminalId and other merchant settings from Firestore user document (server-side action)
+  useEffect(() => {
+    let mounted = true;
+    async function loadUserSettings() {
+      try {
+        const userSettings = await getUserSettings();
+        if (!mounted) return;
+        if (userSettings) {
+          // support both `terminalId` and `terminal_id` field names
+          const tid = (userSettings.terminalId ?? userSettings.terminal_id ?? userSettings.terminal_id)?.toString();
+          if (tid) setTerminalId(tid);
+        }
+      } catch (err) {
+        console.error('Failed to load user settings:', err);
+      } finally {
+        if (mounted) setUserSettingsLoaded(true);
+      }
+    }
+
+    loadUserSettings();
+    return () => { mounted = false; };
+  }, []);
 
   // Function to extract counter from reference number
   const extractCounterFromReference = useCallback((refNum: string): number => {
@@ -43,7 +71,9 @@ export function useTransactionManager() {
         setIsLoadingCounter(false);
         return;
       }
-      
+      // Wait until we've attempted to load user settings so terminalId is finalized
+      if (!userSettingsLoaded) return;
+
       setIsLoadingCounter(true);
       try {
         const lastTx = await getLastTransactionToday(terminalId);
@@ -75,7 +105,7 @@ export function useTransactionManager() {
     }
     
     loadTodayCounter();
-  }, [terminalId, referenceType, extractCounterFromReference]);
+  }, [terminalId, referenceType, extractCounterFromReference, userSettingsLoaded]);
 
   const generateReferenceNumber = useCallback(() => {
     if (referenceType !== 'serial') return;

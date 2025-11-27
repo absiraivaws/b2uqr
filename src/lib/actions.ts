@@ -13,7 +13,7 @@ import {
   getLastTransactionForToday,
 } from "./db";
 import { cookies } from 'next/headers';
-import { adminAuth, adminDb } from './firebaseAdmin';
+import admin, { adminAuth, adminDb } from './firebaseAdmin';
 import { callBankCreateQR, callBankReconciliationAPI } from "./bank-api";
 import { verifyWebhookSignature } from "./security";
 import { alertFailures, type AlertFailuresOutput } from "@/ai/flows/alert-failures";
@@ -155,6 +155,56 @@ export async function getLastTransaction(): Promise<Transaction | null> {
 export async function getLastTransactionToday(terminalId: string): Promise<Transaction | null> {
   const tx = await getLastTransactionForToday(terminalId);
   return tx || null;
+}
+
+// Return the Firestore user document for the currently authenticated user (server-side).
+// This reads from `users/{uid}` and returns the document data or null.
+export async function getUserSettings(): Promise<Record<string, any> | null> {
+  // Convert Firestore values to plain serializable JS values
+  function sanitize(value: any): any {
+    if (value === null || value === undefined) return null;
+    // Firestore Timestamp
+    if (typeof value?.toDate === 'function') {
+      try {
+        return value.toDate().toISOString();
+      } catch (e) {
+        // fallthrough
+      }
+    }
+    // admin.firestore.Timestamp check
+    if (admin && admin.firestore && value instanceof admin.firestore.Timestamp) {
+      return value.toDate().toISOString();
+    }
+    // GeoPoint
+    if (admin && admin.firestore && value instanceof admin.firestore.GeoPoint) {
+      return { latitude: value.latitude, longitude: value.longitude };
+    }
+    if (Array.isArray(value)) return value.map(sanitize);
+    if (typeof value === 'object') {
+      const out: Record<string, any> = {};
+      for (const [k, v] of Object.entries(value)) {
+        out[k] = sanitize(v);
+      }
+      return out;
+    }
+    return value;
+  }
+
+  try {
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get('session')?.value;
+    if (!sessionCookie) return null;
+    const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
+    if (!decoded || !decoded.uid) return null;
+
+    const userDoc = await adminDb.collection('users').doc(decoded.uid).get();
+    if (!userDoc.exists) return null;
+    const raw = userDoc.data() as Record<string, any>;
+    return sanitize(raw);
+  } catch (err) {
+    console.error('Error fetching user settings:', err);
+    return null;
+  }
 }
 
 
