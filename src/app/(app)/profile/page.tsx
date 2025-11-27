@@ -12,6 +12,7 @@ import { QrUploadSection } from '@/components/profile/QrUploadSection';
 export default function ProfilePage() {
 	const [saving, setSaving] = useState(false);
 	const [isLocked, setIsLocked] = useState(false);
+	const [merchantLoaded, setMerchantLoaded] = useState(false);
 	const { toast } = useToast();
 	const merchantRef = useRef<MerchantDetailsHandle>(null);
 	const personalRef = useRef<PersonalDetailsHandle>(null);
@@ -62,10 +63,10 @@ export default function ProfilePage() {
 
 					<div className='flex flex-row justify-between'>
 						<h3 className="text-lg font-medium">Merchant Details</h3>
-						{!isLocked && <QrUploadSection merchantRef={merchantRef} />}
+						{merchantLoaded && !isLocked && <QrUploadSection merchantRef={merchantRef} />}
 					</div>
 
-					<MerchantDetailsSection ref={merchantRef} />
+						<MerchantDetailsSection ref={merchantRef} onLoaded={setMerchantLoaded} />
 
 					<Button onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save Changes'}</Button>
 					

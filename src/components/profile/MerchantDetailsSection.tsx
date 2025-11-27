@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { allApiFields } from "@/hooks/use-settings";
 import { useToast } from "@/hooks/use-toast";
 import { auth, db } from '@/lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { bankCodeItems } from '@/lib/bankCodes';
 
@@ -26,7 +27,11 @@ export type MerchantDetailsHandle = {
   isLocked: () => boolean;
 };
 
-const MerchantDetailsSection = forwardRef<MerchantDetailsHandle, {}>((_, ref) => {
+type Props = {
+  onLoaded?: (loaded: boolean) => void;
+};
+
+const MerchantDetailsSection = forwardRef<MerchantDetailsHandle, Props>(({ onLoaded }, ref) => {
   const { toast } = useToast();
   const [locked, setLocked] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -49,9 +54,10 @@ const MerchantDetailsSection = forwardRef<MerchantDetailsHandle, {}>((_, ref) =>
   const terminalIdOptions = useMemo(() => Array.from({ length: 10 }, (_, i) => String(i + 1).padStart(4, '0')), []);
 
   useEffect(() => {
-    const user = auth.currentUser;
-    if (!user) return;
-    (async () => {
+    let unsub = () => {};
+
+    const loadForUser = async (user: any) => {
+      if (onLoaded) onLoaded(false);
       try {
         const refDoc = doc(db, 'users', user.uid);
         const snap = await getDoc(refDoc);
@@ -72,8 +78,19 @@ const MerchantDetailsSection = forwardRef<MerchantDetailsHandle, {}>((_, ref) =>
         }
       } catch (e) {
         console.error('Failed to load merchant details', e);
+      } finally {
+        if (onLoaded) onLoaded(true);
       }
-    })();
+    };
+
+    unsub = onAuthStateChanged(auth, (user) => {
+      if (user) loadForUser(user);
+      else if (onLoaded) onLoaded(true);
+    });
+
+    return () => {
+      try { unsub(); } catch {}
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
