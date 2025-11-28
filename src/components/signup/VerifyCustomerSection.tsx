@@ -1,4 +1,4 @@
- 'use client'
+'use client'
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,7 @@ import { QrUploadSection } from '@/components/profile/QrUploadSection';
 import { db, storage } from '@/lib/firebase';
 import { bankCodeItems } from '@/lib/bankCodes';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 
 interface VerifyCustomerSectionProps {
@@ -39,6 +39,8 @@ export default function VerifyCustomerSection({ uid, onComplete }: VerifyCustome
   const streamRef = useRef<MediaStream | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
+  const [redirectEmail, setRedirectEmail] = useState<string | null>(null);
+  const [redirectCountdown, setRedirectCountdown] = useState<number>(10);
 
   useEffect(() => {
     return () => {
@@ -47,6 +49,47 @@ export default function VerifyCustomerSection({ uid, onComplete }: VerifyCustome
       }
     };
   }, []);
+
+  useEffect(() => {
+    let interval: number | undefined;
+    let timeoutId: number | undefined;
+    const fetchAndRedirect = async () => {
+      try {
+        // try to fetch user email to autofill signin
+        const userDoc = await getDoc(doc(db, 'users', uid));
+        const data = userDoc.exists() ? userDoc.data() as any : null;
+        if (data && data.email) setRedirectEmail(String(data.email));
+      } catch (e) {
+        console.error('fetch user email error', e);
+      }
+
+      // start countdown
+      setRedirectCountdown(10);
+      interval = window.setInterval(() => {
+        setRedirectCountdown((c) => {
+          if (c <= 1) {
+            // will be handled by timeout
+            return 0;
+          }
+          return c - 1;
+        });
+      }, 1000);
+
+      timeoutId = window.setTimeout(() => {
+        const target = redirectEmail ? `/signin?email=${encodeURIComponent(redirectEmail)}` : '/signin';
+        try { router.push(target); } catch (e) { /* ignore */ }
+      }, 10000);
+    };
+
+    if (step === 4) {
+      fetchAndRedirect();
+    }
+
+    return () => {
+      if (interval) window.clearInterval(interval);
+      if (timeoutId) window.clearTimeout(timeoutId);
+    };
+  }, [step, uid, router, redirectEmail]);
 
   const startCamera = async () => {
     try {
@@ -240,6 +283,8 @@ export default function VerifyCustomerSection({ uid, onComplete }: VerifyCustome
         if (payload[k] === null || payload[k] === undefined) delete payload[k];
       });
       if (Object.keys(payload).length > 0) {
+        // also lock details when saving parsed QR
+        payload.detailsLocked = true;
         await updateDoc(userDocRef, payload);
       }
       toast({ title: 'QR saved', description: 'LankaQR data saved to profile' });
@@ -271,6 +316,17 @@ export default function VerifyCustomerSection({ uid, onComplete }: VerifyCustome
     const c = String(code);
     const found = bankCodeItems.find(b => b.value === c);
     return found ? found.label : c;
+  };
+
+  const maskEmail = (email?: string | null) => {
+    if (!email) return '';
+    const s = String(email);
+    const parts = s.split('@');
+    if (parts.length !== 2) return s;
+    const [local, domain] = parts;
+    if (local.length <= 2) return `${local[0] ?? ''}***@${domain}`;
+    const first = local.slice(0, 2);
+    return `${first}***@${domain}`;
   };
 
   return (
@@ -567,27 +623,14 @@ export default function VerifyCustomerSection({ uid, onComplete }: VerifyCustome
               </svg>
             </div>
           </div>
-          <div className="flex gap-2 absolute right-0 bottom-0">
-            <Button
-              disabled={locking}
-              onClick={async () => {
-                setLocking(true);
-                try {
-                  const userDocRef = doc(db, 'users', uid);
-                  await updateDoc(userDocRef, { detailsLocked: true });
-                  toast({ title: 'Saved', description: 'Details locked' });
-                  try { router.push('/signin'); } catch (e) { /* ignore */ }
-                } catch (e) {
-                  console.error('lock details error', e);
-                  toast({ title: 'Error', description: 'Failed to lock details', variant: 'destructive' });
-                } finally {
-                  setLocking(false);
-                }
-              }}
-            >
-              {locking ? 'Processing...' : 'Continue'}
-            </Button>
-          </div>
+          <p className="text-sm text-gray-600 mb-2">
+            Redirecting to sign-in in <span className="font-medium">{redirectCountdown}</span>s
+          </p>
+          {redirectEmail && (
+            <p className="text-sm text-gray-700 mb-4">
+              Autofill email: <span className="font-mono text-sm text-gray-800">{maskEmail(redirectEmail)}</span>
+            </p>
+          )}
         </div>
       )}
     </div>
