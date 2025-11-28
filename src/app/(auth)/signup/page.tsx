@@ -10,7 +10,6 @@ import { useRouter } from 'next/navigation';
 import SignupKycSection, { KycValues } from '@/components/signup/SignupKycSection';
 import SignupOtpSection from '@/components/signup/SignupOtpSection';
 import SignupPinSection from '@/components/signup/SignupPinSection';
-import VerifyCustomerSection from '@/components/signup/VerifyCustomerSection';
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -39,7 +38,6 @@ export default function SignUpPage() {
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [savingUser, setSavingUser] = useState(false);
-  const [verifyUid, setVerifyUid] = useState<string | null>(null);
 
   // Phone OTP logic (recaptcha, send/verify) moved to `use-phone-otp` hook.
 
@@ -104,8 +102,8 @@ export default function SignUpPage() {
       if (json.pinHash) payload.pinHash = json.pinHash;
       await setDoc(userDocRef, payload, { merge: true });
 
-      // show verification steps after save instead of immediate redirect
-      try { setVerifyUid(verifiedUser.uid); } catch (e) { /* ignore */ }
+      // redirect to verification page after save
+      try { router.push(`/verify-customer?uid=${verifiedUser.uid}`); } catch (e) { /* ignore */ }
     } catch (err: any) {
       console.error(err);
       setError(err?.message || 'Failed to save user.');
@@ -158,9 +156,6 @@ export default function SignUpPage() {
 
           <Separator />
 
-          {verifyUid ? (
-            <VerifyCustomerSection uid={verifyUid} onComplete={() => { try { router.push('/generate-qr'); } catch (e) {} }} />
-          ) : (
             <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
               <SignupKycSection values={kyc} onChange={setKyc} />
               <SignupOtpSection
@@ -196,7 +191,6 @@ export default function SignUpPage() {
               <Separator />
 
             </form>
-          )}
         </CardContent>
       </Card>
 
