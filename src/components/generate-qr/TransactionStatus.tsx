@@ -1,7 +1,9 @@
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, AlertTriangle, CheckCircle, Clock, ShieldCheck, Share2, Download } from "lucide-react";
+import QRCode from "qrcode";
 import type { Transaction } from "@/lib/types";
 
 interface TransactionStatusProps {
@@ -32,19 +34,32 @@ export function TransactionStatus({
   onDownload,
   isDownloading,
 }: TransactionStatusProps) {
+  const [qrDataUrl, setQrDataUrl] = useState<string>("");
+
+  useEffect(() => {
+    if (transaction.status === "PENDING") {
+      // Generate QR code with high error correction
+      QRCode.toDataURL(transaction.qr_payload, { errorCorrectionLevel: "H", width: 250 })
+        .then(setQrDataUrl)
+        .catch(console.error);
+    }
+  }, [transaction.qr_payload, transaction.status]);
+
   return (
     <Card className="overflow-hidden">
       <CardContent className="pt-6">
         <div className="flex flex-col items-center justify-center p-6 bg-muted/50 rounded-lg">
-          {transaction.status === "PENDING" ? (
-            <Image
-              src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(transaction.qr_payload)}&logo=https://storage.googleapis.com/proudcity/mebanenc/uploads/2021/03/Peoples-Pay-Logo.png`}
-              alt="QR Code"
-              width={250}
-              height={250}
-              className="rounded-lg shadow-md"
-              data-ai-hint="qr code"
-            />
+          {transaction.status === "PENDING" && qrDataUrl ? (
+            <div className="relative w-[250px] h-[250px]">
+              <Image src={qrDataUrl} alt="QR Code" width={250} height={250} className="rounded-lg shadow-md" />
+              <Image
+                src="/lankaQR.png"
+                alt="Logo"
+                width={50}
+                height={50}
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+              />
+            </div>
           ) : (
             <div className="w-[250px] h-[250px] flex flex-col items-center justify-center text-center bg-background rounded-lg shadow-md">
               <StatusIcon status={transaction.status} />
