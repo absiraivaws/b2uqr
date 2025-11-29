@@ -37,7 +37,7 @@ export default function VerifyCustomerClientWrapper() {
         <CardDescription>Complete the verification steps to finish registration.</CardDescription>
       </CardHeader>
       <CardContent>
-        <VerifyCustomerSection uid={uid} onComplete={() => { try { router.push('/generate-qr'); } catch (e) {} }} />
+        <VerifyCustomerSection uid={uid} />
       </CardContent>
     </Card>
   );

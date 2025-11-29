@@ -1,25 +1,25 @@
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { QrUploadSection } from '@/components/profile/QrUploadSection';
+import ProfileStep from '@/components/signup/steps/ProfileStep';
+import NicFrontStep from '@/components/signup/steps/NicFrontStep';
+import NicBackStep from '@/components/signup/steps/NicBackStep';
+import QrStep from '@/components/signup/steps/QrStep';
+import CompleteStep from '@/components/signup/steps/CompleteStep';
 import { db, storage } from '@/lib/firebase';
-import { bankCodeItems } from '@/lib/bankCodes';
-import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import { processImage, uploadBlob as uploadBlobHelper } from '@/lib/verificationHelpers';
 import { useRouter } from 'next/navigation';
 
 interface VerifyCustomerSectionProps {
   uid: string;
-  onComplete?: () => void;
 }
 
-export default function VerifyCustomerSection({ uid, onComplete }: VerifyCustomerSectionProps) {
+export default function VerifyCustomerSection({ uid }: VerifyCustomerSectionProps) {
   const { toast } = useToast();
   const router = useRouter();
   const [step, setStep] = useState(0);
-  const [locking, setLocking] = useState(false);
 
   // Previews and blobs
   const [profilePreview, setProfilePreview] = useState<string | null>(null);
@@ -135,72 +135,7 @@ export default function VerifyCustomerSection({ uid, onComplete }: VerifyCustome
     setVideoReady(false);
   };
 
-  const captureFromVideo = async (): Promise<Blob | null> => {
-    if (!videoRef.current) return null;
-    const video = videoRef.current;
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth || 1280;
-    canvas.height = video.videoHeight || 720;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    stopCamera();
-    return await new Promise<Blob | null>(resolve => canvas.toBlob(b => resolve(b), 'image/jpeg', 0.9));
-  };
-
-  // Client-side image processing: optional center-crop to square and compression
-  const processImage = async (fileOrBlob: Blob, opts?: { cropToSquare?: boolean; maxSize?: number; quality?: number }): Promise<Blob | null> => {
-    const { cropToSquare = false, maxSize = 1024, quality = 0.8 } = opts || {};
-    return await new Promise<Blob | null>((resolve) => {
-      const img = new Image();
-      img.onload = () => {
-        try {
-          let sw = img.naturalWidth;
-          let sh = img.naturalHeight;
-
-          // If cropToSquare, compute square crop centered
-          let sx = 0, sy = 0, sSize = Math.min(sw, sh);
-          if (cropToSquare) {
-            sx = Math.floor((sw - sSize) / 2);
-            sy = Math.floor((sh - sSize) / 2);
-          } else {
-            sSize = Math.min(sw, sh);
-          }
-
-          // Determine output size while respecting maxSize
-          const outSize = cropToSquare ? Math.min(sSize, maxSize) : Math.min(Math.max(sw, sh), maxSize);
-          const canvas = document.createElement('canvas');
-          if (cropToSquare) {
-            canvas.width = outSize;
-            canvas.height = outSize;
-          } else {
-            const ratio = Math.min(1, maxSize / Math.max(sw, sh));
-            canvas.width = Math.round(sw * ratio);
-            canvas.height = Math.round(sh * ratio);
-          }
-          const ctx = canvas.getContext('2d');
-          if (!ctx) return resolve(null);
-
-          if (cropToSquare) {
-            ctx.drawImage(img, sx, sy, sSize, sSize, 0, 0, outSize, outSize);
-          } else {
-            ctx.drawImage(img, 0, 0, sw, sh, 0, 0, canvas.width, canvas.height);
-          }
-
-          canvas.toBlob((b) => {
-            if (b) resolve(b);
-            else resolve(null);
-          }, 'image/jpeg', quality);
-        } catch (e) {
-          console.error('processImage error', e);
-          resolve(null);
-        }
-      };
-      img.onerror = (e) => { console.error('image load error', e); resolve(null); };
-      const url = URL.createObjectURL(fileOrBlob);
-      img.src = url;
-    });
-  };
+  // `processImage` provided by helpers
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>, setPreview: (s: string|null)=>void, setBlob: (b: Blob|null)=>void) => {
     const file = e.target.files?.[0];
@@ -216,10 +151,7 @@ export default function VerifyCustomerSection({ uid, onComplete }: VerifyCustome
   };
 
   const uploadBlob = async (blob: Blob, path: string) => {
-    const sRef = storageRef(storage, path);
-    await uploadBytes(sRef, blob);
-    const url = await getDownloadURL(sRef);
-    return url;
+    return await uploadBlobHelper(storage, path, blob);
   };
 
   const completeStepUpload = async () => {
@@ -301,337 +233,76 @@ export default function VerifyCustomerSection({ uid, onComplete }: VerifyCustome
     setQrParsed(null);
   };
 
-  const maskMerchantId = (id?: string | null) => {
-    if (!id) return '';
-    const s = String(id);
-    if (s.length <= 8) return s;
-    const first = s.slice(0, 4);
-    const last = s.slice(-4);
-    const middle = '*'.repeat(Math.max(0, s.length - 8));
-    return `${first}${middle}${last}`;
-  };
-
-  const getBankName = (code?: string | number | null) => {
-    if (!code && code !== 0) return '';
-    const c = String(code);
-    const found = bankCodeItems.find(b => b.value === c);
-    return found ? found.label : c;
-  };
-
-  const maskEmail = (email?: string | null) => {
-    if (!email) return '';
-    const s = String(email);
-    const parts = s.split('@');
-    if (parts.length !== 2) return s;
-    const [local, domain] = parts;
-    if (local.length <= 2) return `${local[0] ?? ''}***@${domain}`;
-    const first = local.slice(0, 2);
-    return `${first}***@${domain}`;
-  };
+  // maskMerchantId, getBankName, maskEmail provided by helpers
 
   return (
     <div className="space-y-4 max-w-4xl w-full mx-auto px-4">
 
       {step === 0 && (
-        <div className="relative pb-16 flex flex-col items-center text-center">
-          <p className="text-lg mb-4 text-center">Add profile picture (upload or take a picture)</p>
-          <div className="flex justify-center mb-3">
-            <div className="relative w-96 h-96">
-              <img
-                src={profilePreview ?? 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="224" height="224" viewBox="0 0 24 24" fill="none" stroke="%23888" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3"/><path d="M20.5 21a8.38 8.38 0 0 0-17 0"/></svg>'}
-                alt="profile"
-                className={`absolute inset-0 w-full h-full rounded-full object-cover border-2 transition-all duration-500 ease-in-out ${cameraActive ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}
-              />
-              <div className={`absolute inset-0 rounded-full overflow-hidden border-2 transition-all duration-500 ease-in-out ${videoReady ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-                <video ref={videoRef} className="w-full h-full object-cover" playsInline muted autoPlay />
-              </div>
-              {cameraActive && !videoReady && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-12 h-12 border-4 border-gray-200 border-t-gray-600 rounded-full animate-spin" />
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="flex gap-2 items-center justify-center">
-            {!cameraActive && !profilePreview && !profileBlob && (
-              <>
-                <input
-                  ref={profileFileRef}
-                  type="file"
-                  accept="image/*"
-                  className="text-sm file:py-2 file:px-4 file:bg-indigo-600 file:text-white file:rounded file:border-0 file:mr-2 file:cursor-pointer"
-                  onChange={(e) => handleFileInput(e, setProfilePreview, setProfileBlob)}
-                />
-                <Button size='sm' onClick={startCamera}>Open Camera</Button>
-              </>
-            )}
-            {cameraActive && (
-              <>
-                <Button onClick={async () => {
-                  const b = await captureFromVideo();
-                  if (b) {
-                    const processed = await processImage(b, { cropToSquare: true, maxSize: 1024, quality: 0.85 });
-                    const final = processed ?? b;
-                    const url = URL.createObjectURL(final);
-                    setProfilePreview(url);
-                    setProfileBlob(final);
-                  }
-                }}>Capture</Button>
-                <Button variant="outline" onClick={stopCamera}>Close Camera</Button>
-              </>
-            )}
-          </div>
-          <div className="flex gap-2 absolute right-0 bottom-0">
-            {profilePreview && profileBlob && (
-              <Button
-                variant='destructive'
-                size='sm'
-                onClick={() => { 
-                  if (profilePreview) URL.revokeObjectURL(profilePreview);
-                  setProfilePreview(null); 
-                  setProfileBlob(null); 
-                  if (profileFileRef.current) profileFileRef.current.value = '';
-                }}
-              >
-                Clear
-              </Button>
-            )}
-
-            <Button
-              onClick={completeStepUpload}
-              disabled={!profileBlob || uploading}
-              size='sm'
-            >
-              {uploading ? 'Uploading...' : 'Save and Continue'}
-            </Button>
-          </div>
-        </div>
+        <ProfileStep
+          profilePreview={profilePreview}
+          profileBlob={profileBlob}
+          profileFileRef={profileFileRef}
+          cameraActive={cameraActive}
+          videoReady={videoReady}
+          videoRefSetter={(el) => { videoRef.current = el; }}
+          startCamera={startCamera}
+          stopCamera={stopCamera}
+          handleFileInput={(e) => handleFileInput(e, setProfilePreview, setProfileBlob)}
+          setProfilePreview={setProfilePreview}
+          setProfileBlob={setProfileBlob}
+          uploading={uploading}
+          completeStepUpload={completeStepUpload}
+        />
       )}
 
       {step === 1 && (
-        <div className="relative pb-16 flex flex-col items-center text-center">
-          <p className="text-lg mb-4 text-center">Capture NIC (Front). Camera only.</p>
-          <div className="flex justify-center mb-3">
-            <div className="relative w-96 h-72">
-              <img
-                src={nicFrontPreview ?? 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="384" height="288" viewBox="0 0 24 24" fill="none" stroke="%23888" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><circle cx="8" cy="9" r="2"/><path d="M21 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/></svg>'}
-                alt="nic front"
-                className={`absolute inset-0 w-full h-full object-cover rounded transition-all duration-500 ease-in-out ${cameraActive ? 'opacity-0 scale-95' : (nicFrontPreview ? 'opacity-100 scale-100' : 'opacity-100')}`}
-              />
-              <div className={`absolute inset-0 rounded overflow-hidden transition-all duration-500 ease-in-out ${videoReady ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-                <video ref={videoRef} className="w-full h-full object-cover" playsInline muted autoPlay />
-              </div>
-              {cameraActive && !videoReady && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-10 h-10 border-4 border-gray-200 border-t-gray-600 rounded-full animate-spin" />
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="flex gap-2 items-center justify-center">
-            {!cameraActive && !nicFrontPreview && !nicFrontBlob && (
-              <Button size='sm' onClick={startCamera}>Open Camera</Button>
-            )}
-            {cameraActive && (
-              <>
-                <Button
-                  size='sm'
-                  onClick={async () => {
-                    const b = await captureFromVideo();
-                    if (b) {
-                      const processed = await processImage(b, { cropToSquare: false, maxSize: 1280, quality: 0.85 });
-                      const final = processed ?? b;
-                      const url = URL.createObjectURL(final);
-                      setNicFrontPreview(url);
-                      setNicFrontBlob(final);
-                    }
-                }}>Capture</Button>
-                <Button size='sm' variant="outline" onClick={stopCamera}>Close Camera</Button>
-              </>
-            )}
-          </div>
-          <div className="flex gap-2 absolute right-0 bottom-0">
-            {nicFrontPreview && nicFrontBlob && (
-              <Button
-                variant='destructive'
-                size='sm'
-                onClick={() => {
-                  if (nicFrontPreview) URL.revokeObjectURL(nicFrontPreview);
-                  setNicFrontPreview(null); setNicFrontBlob(null);
-                }}
-              >
-                Clear
-              </Button>
-            )}
-
-            <Button
-              size='sm'
-              onClick={completeStepUpload}
-              disabled={!nicFrontBlob || uploading}
-            >
-              {uploading ? 'Uploading...' : 'Save and Continue'}
-            </Button>
-          </div>
-        </div>
+        <NicFrontStep
+          nicFrontPreview={nicFrontPreview}
+          nicFrontBlob={nicFrontBlob}
+          cameraActive={cameraActive}
+          videoReady={videoReady}
+          videoRefSetter={(el) => { videoRef.current = el; }}
+          startCamera={startCamera}
+          stopCamera={stopCamera}
+          setNicFrontPreview={setNicFrontPreview}
+          setNicFrontBlob={setNicFrontBlob}
+          uploading={uploading}
+          completeStepUpload={completeStepUpload}
+        />
       )}
 
       {step === 2 && (
-        <div className="relative pb-16 flex flex-col items-center text-center">
-          <p className="text-lg mb-4 text-center">Capture NIC (Back). Camera only.</p>
-          <div className="flex justify-center mb-3">
-            <div className="relative w-96 h-72">
-              <img
-                src={nicBackPreview ?? 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="384" height="288" viewBox="0 0 24 24" fill="none" stroke="%23888" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><path d="M3 7h18"/></svg>'}
-                alt="nic back"
-                className={`absolute inset-0 w-full h-full object-cover rounded transition-all duration-500 ease-in-out ${cameraActive ? 'opacity-0 scale-95' : (nicBackPreview ? 'opacity-100 scale-100' : 'opacity-100')}`}
-              />
-              <div className={`absolute inset-0 rounded overflow-hidden transition-all duration-500 ease-in-out ${videoReady ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-                <video ref={videoRef} className="w-full h-full object-cover" playsInline muted autoPlay />
-              </div>
-              {cameraActive && !videoReady && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-10 h-10 border-4 border-gray-200 border-t-gray-600 rounded-full animate-spin" />
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="flex gap-2 items-center justify-center">
-            {!cameraActive && !nicBackPreview && !nicBackBlob && (
-              <Button size='sm' onClick={startCamera}>Open Camera</Button>
-            )}
-            {cameraActive && (
-              <>
-                <Button
-                  size='sm'
-                  onClick={async () => {
-                    const b = await captureFromVideo();
-                    if (b) {
-                      const processed = await processImage(b, { cropToSquare: false, maxSize: 1280, quality: 0.85 });
-                      const final = processed ?? b;
-                      const url = URL.createObjectURL(final);
-                      setNicBackPreview(url);
-                      setNicBackBlob(final);
-                    }
-                }}>Capture</Button>
-                <Button size='sm' variant="outline" onClick={stopCamera}>Close Camera</Button>
-              </>
-            )}
-          </div>
-          <div className="flex gap-2 absolute right-0 bottom-0">
-            {nicBackPreview && nicBackBlob && (
-              <Button
-                variant='destructive'
-                size='sm'
-                onClick={() => {
-                  if (nicBackPreview) URL.revokeObjectURL(nicBackPreview);
-                  setNicBackPreview(null); setNicBackBlob(null);
-                }}
-              >
-                Clear
-              </Button>
-            )}
-
-            <Button
-              size='sm'
-              onClick={completeStepUpload}
-              disabled={!nicBackBlob || uploading}
-            >
-              {uploading ? 'Uploading...' : 'Save and Continue'}
-            </Button>
-          </div>
-        </div>
+        <NicBackStep
+          nicBackPreview={nicBackPreview}
+          nicBackBlob={nicBackBlob}
+          cameraActive={cameraActive}
+          videoReady={videoReady}
+          videoRefSetter={(el) => { videoRef.current = el; }}
+          startCamera={startCamera}
+          stopCamera={stopCamera}
+          setNicBackPreview={setNicBackPreview}
+          setNicBackBlob={setNicBackBlob}
+          uploading={uploading}
+          completeStepUpload={completeStepUpload}
+        />
       )}
 
       {step === 3 && (
-        <div className='relative pb-16 flex flex-col items-center text-center'>
-          <p className="text-lg mb-4 text-center">Scan LankaQR to associate merchant details.</p>
-          <div className='flex justify-center mb-3'>
-            <div className="relative w-96 h-96">
-              {qrParsed ? (
-                <div className="absolute inset-0 p-4 bg-white rounded border flex flex-col justify-start items-stretch text-left text-sm space-y-3 overflow-auto">
-                  <div className="w-full text-center">
-                    <div className="text-3xl font-bold my-8">{qrParsed.merchantName ?? qrParsed.merchant_name ?? 'Merchant'}</div>
-                  </div>
-                  <div className="w-full">
-                    <div className="grid grid-cols-[auto_auto_1fr] gap-x-4 gap-y-2 items-center text-sm text-gray-600">
-                      <div className="text-left pr-2">Merchant ID</div>
-                      <div className="text-center">:</div>
-                      <div className="font-mono text-lg text-gray-800">{maskMerchantId(qrParsed.merchantId ?? qrParsed.merchant_id ?? '')}</div>
-
-                      <div className="text-left pr-2">City</div>
-                      <div className="text-center">:</div>
-                      <div className="font-mono text-lg text-gray-800">{qrParsed.merchantCity ?? qrParsed.merchant_city ?? ''}</div>
-
-                      <div className="text-left pr-2">Bank</div>
-                      <div className="text-center">:</div>
-                      <div className="font-mono text-lg text-gray-800">{getBankName(qrParsed.bankCode ?? qrParsed.bank_code ?? '')}</div>
-
-                      <div className="text-left pr-2">Currency</div>
-                      <div className="text-center">:</div>
-                      <div className="font-mono text-lg text-gray-800">{qrParsed.currencyCode ?? qrParsed.currency_code ?? ''}</div>
-
-                      <div className="text-left pr-2">Terminal</div>
-                      <div className="text-center">:</div>
-                      <div className="font-mono text-lg text-gray-800">{qrParsed.terminalId ?? qrParsed.terminal_id ?? ''}</div>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <img
-                  src={'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="224" height="224" viewBox="0 0 24 24" fill="%23fff"><rect width="24" height="24" fill="%23fff"/><rect x="1" y="1" width="6" height="6" fill="%23000"/><rect x="17" y="1" width="6" height="6" fill="%23000"/><rect x="1" y="17" width="6" height="6" fill="%23000"/><rect x="9" y="3" width="2" height="2" fill="%23000"/><rect x="12" y="3" width="2" height="2" fill="%23000"/><rect x="9" y="6" width="2" height="2" fill="%23000"/><rect x="6" y="9" width="2" height="2" fill="%23000"/><rect x="3" y="12" width="2" height="2" fill="%23000"/><rect x="9" y="12" width="2" height="2" fill="%23000"/><rect x="12" y="9" width="2" height="2" fill="%23000"/><rect x="15" y="12" width="2" height="2" fill="%23000"/><rect x="12" y="15" width="2" height="2" fill="%23000"/><rect x="18" y="9" width="2" height="2" fill="%23000"/></svg>'}
-                  alt="qr placeholder"
-                  className="absolute inset-0 w-full h-full object-cover rounded transition-all duration-500 ease-in-out opacity-100"
-                />
-              )}
-            </div>
-          </div>
-          {!qrParsed && (
-            <div className='flex justify-center'>
-              <QrUploadSection onScanned={handleScanCompleted} />
-            </div>
-          )}
-          <div className="flex gap-2 absolute right-0 bottom-0">
-            {qrParsed && (
-              <Button
-                variant='destructive'
-                size='sm'
-                onClick={clearParsedQr}
-              >
-                Clear
-              </Button>
-            )}
-
-            <Button
-              size='sm'
-              onClick={saveParsedQr}
-              disabled={!qrParsed || uploading}
-            >
-              {uploading ? 'Saving...' : 'Save and Continue'}
-            </Button>
-          </div>
-        </div>
+        <QrStep
+          qrParsed={qrParsed}
+          handleScanCompleted={handleScanCompleted}
+          clearParsedQr={clearParsedQr}
+          saveParsedQr={saveParsedQr}
+          uploading={uploading}
+        />
       )}
 
       {step === 4 && (
-        <div className="relative pb-16 flex flex-col items-center text-center">
-          <p className="text-lg mb-4 text-center">All steps completed.</p>
-          <div className="flex justify-center mb-3">
-            <div className="w-36 h-36">
-              <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" className="w-full h-full rounded-full">
-                <rect width="64" height="64" rx="32" fill="#10B981" />
-                <path d="M45 23.5c0 .8-.3 1.6-.9 2.2L30.6 39.3c-.6.6-1.6.6-2.2 0L20.9 31.8c-.6-.6-.6-1.6 0-2.2.6-.6 1.6-.6 2.2 0l6.1 6.1L42.5 23.5c.6-.6 1.6-.6 2.2 0 .6.6.6 1.6 0 2.2z" fill="#fff" />
-              </svg>
-            </div>
-          </div>
-          <p className="text-sm text-gray-600 mb-2">
-            Redirecting to sign-in in <span className="font-medium">{redirectCountdown}</span>s
-          </p>
-          {redirectEmail && (
-            <p className="text-sm text-gray-700 mb-4">
-              Autofill email: <span className="font-mono text-sm text-gray-800">{maskEmail(redirectEmail)}</span>
-            </p>
-          )}
-        </div>
+        <CompleteStep
+          redirectCountdown={redirectCountdown}
+          redirectEmail={redirectEmail}
+        />
       )}
     </div>
   );
