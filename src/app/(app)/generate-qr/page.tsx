@@ -38,6 +38,7 @@ export default function GenerateQRPage() {
             terminalId={terminalId}
             amount={amount}
             onAmountChange={setAmount}
+            status={currentTransaction?.status}
             referenceType={referenceType}
             manualReferencePlaceholder={manualReferencePlaceholder}
           />

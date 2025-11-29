@@ -12,6 +12,7 @@ interface TransactionFormProps {
   terminalId: string;
   amount: string;
   onAmountChange: (amount: string) => void;
+  status?: string | null;
   referenceType: 'serial' | 'invoice';
   manualReferencePlaceholder: string;
 }
@@ -24,6 +25,7 @@ export function TransactionForm({
   terminalId,
   amount,
   onAmountChange,
+  status,
   referenceType,
   manualReferencePlaceholder
 }: TransactionFormProps) {
@@ -73,11 +75,11 @@ export function TransactionForm({
               step="0.01"
               value={amount}
               onChange={(e) => onAmountChange(e.target.value)}
-              disabled={isSubmitting}
+              disabled={isSubmitting || status === 'PENDING'}
             />
           </div>
 
-          <Button type="submit" disabled={isSubmitting || !amount || !referenceNumber} className="w-full">
+          <Button type="submit" disabled={isSubmitting || !amount || !referenceNumber || status === 'PENDING'} className="w-full">
             {isSubmitting ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
