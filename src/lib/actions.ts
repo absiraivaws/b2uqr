@@ -108,7 +108,9 @@ export async function createTransaction(transactionData: {amount: string, refere
     reference_number: data.reference_number,
     merchant_id: sanitizedSettings.merchant_id,
     terminal_id: sanitizedSettings.terminal_id,
-    currency: 'LKR'
+    currency: 'LKR',
+    merchant_name: sanitizedSettings.merchant_name,
+    merchant_city: sanitizedSettings.merchant_city
   };
 
   // 3. Call Bank API to create QR

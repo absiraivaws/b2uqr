@@ -3,6 +3,8 @@ export interface Transaction {
   transaction_id: string;
   transaction_uuid: string;
   merchant_id: string;
+  merchant_name: string;
+  merchant_city: string;
   uid?: string;
   terminal_id?: string;
   amount: string;
