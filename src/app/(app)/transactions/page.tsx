@@ -7,9 +7,7 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@
 import { Badge } from "@/components/ui/badge";
 import { Search, Loader2 } from "lucide-react";
 import useTransactions from '@/hooks/use-transactions';
-import type { Transaction } from '@/lib/types';
 import { format } from 'date-fns';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 
 export default function TransactionsPage() {
@@ -19,7 +17,6 @@ export default function TransactionsPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
-    const [terminalId, setTerminalId] = useState('all');
 
     // subscriptions handled by `useTransactions`
 
@@ -28,8 +25,7 @@ export default function TransactionsPage() {
             const searchMatch = searchTerm === '' || 
                 (typeof tx.amount === 'string' ? tx.amount : String(tx.amount)).includes(searchTerm) || 
                 (tx.reference_number && tx.reference_number.includes(searchTerm)) ||
-                (tx.transaction_id && tx.transaction_id.includes(searchTerm)) ||
-                (tx.bankResponse?.terminal_id && tx.bankResponse.terminal_id.includes(searchTerm));
+                (tx.transaction_id && tx.transaction_id.includes(searchTerm));
 
             // Defensive created_at parsing
             let createdAtDate: Date;
@@ -56,11 +52,9 @@ export default function TransactionsPage() {
                 if (createdAtDate >= e) return false;
             }
 
-            const terminalMatch = terminalId === 'all' || (tx.bankResponse?.terminal_id === terminalId);
-
-            return searchMatch && terminalMatch;
+            return searchMatch;
         });
-    }, [transactions, searchTerm, startDate, endDate, terminalId]);
+    }, [transactions, searchTerm, startDate, endDate]);
 
     const getStatusVariant = (status: string) => {
         switch (status) {
@@ -103,18 +97,7 @@ export default function TransactionsPage() {
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
                 />
-                <div className="w-full sm:w-auto">
-                    <Select value={terminalId} onValueChange={setTerminalId}>
-                        <SelectTrigger className="w-full sm:w-[180px]">
-                            <SelectValue placeholder="Select Terminal" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Terminals</SelectItem>
-                            <SelectItem value="0001">0001</SelectItem>
-                            <SelectItem value="0002">0002</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
+                
             </div>
             <div className="border rounded-lg">
                 <Table>
