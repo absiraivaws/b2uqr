@@ -17,7 +17,8 @@ export default function TransactionsPage() {
     const { transactions, loading: isLoading, error } = useTransactions();
 
     const [searchTerm, setSearchTerm] = useState('');
-    const [date, setDate] = useState<string>('');
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
     const [terminalId, setTerminalId] = useState('all');
 
     // subscriptions handled by `useTransactions`
@@ -30,20 +31,36 @@ export default function TransactionsPage() {
                 (tx.transaction_id && tx.transaction_id.includes(searchTerm)) ||
                 (tx.bankResponse?.terminal_id && tx.bankResponse.terminal_id.includes(searchTerm));
 
-            // Support both ISO string and Firestore Timestamp (toDate)
-            const createdAtDate = (typeof tx.created_at === 'string')
-                ? new Date(tx.created_at)
-                : (tx.created_at && typeof (tx.created_at as any).toDate === 'function')
-                    ? (tx.created_at as any).toDate()
-                    : new Date(tx.created_at as any);
+            // Defensive created_at parsing
+            let createdAtDate: Date;
+            try {
+                if (typeof tx.created_at === 'string') {
+                    createdAtDate = new Date(tx.created_at);
+                } else if (tx.created_at && typeof (tx.created_at as any).toDate === 'function') {
+                    createdAtDate = (tx.created_at as any).toDate();
+                } else {
+                    createdAtDate = new Date(tx.created_at as any);
+                }
+            } catch (e) {
+                createdAtDate = new Date();
+            }
 
-            const dateMatch = date === '' || format(createdAtDate, 'yyyy-MM-dd') === date;
-            
+            // Date range filter
+            if (startDate) {
+                const s = new Date(startDate);
+                if (createdAtDate < s) return false;
+            }
+            if (endDate) {
+                const e = new Date(endDate);
+                e.setDate(e.getDate() + 1); // include endDate day
+                if (createdAtDate >= e) return false;
+            }
+
             const terminalMatch = terminalId === 'all' || (tx.bankResponse?.terminal_id === terminalId);
 
-            return searchMatch && dateMatch && terminalMatch;
+            return searchMatch && terminalMatch;
         });
-    }, [transactions, searchTerm, date, terminalId]);
+    }, [transactions, searchTerm, startDate, endDate, terminalId]);
 
     const getStatusVariant = (status: string) => {
         switch (status) {
@@ -75,11 +92,18 @@ export default function TransactionsPage() {
                 </div>
                 <Input 
                     type="date" 
-                    className="w-full sm:w-auto"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
+                    className="w-full sm:w-[200px]"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
                 />
-                 <div className="w-full sm:w-auto">
+                <span className="hidden sm:inline">-</span>
+                <Input 
+                    type="date" 
+                    className="w-full sm:w-[200px]"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                />
+                <div className="w-full sm:w-auto">
                     <Select value={terminalId} onValueChange={setTerminalId}>
                         <SelectTrigger className="w-full sm:w-[180px]">
                             <SelectValue placeholder="Select Terminal" />
