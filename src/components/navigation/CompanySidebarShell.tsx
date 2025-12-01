@@ -24,7 +24,6 @@ export default function CompanySidebarShell({ permissions, companyName, companyS
       label: 'Account',
       links: [
         { href: `${base}/profile`, label: 'Profile', icon: User, permission: 'profile' },
-        { href: `${base}/settings`, label: 'Settings', icon: SettingsIcon, permission: 'settings' },
         { href: `${base}/signout`, label: 'Sign Out', icon: LogOutIcon, action: 'signout' },
       ],
     },

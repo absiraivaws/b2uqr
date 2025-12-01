@@ -1,6 +1,24 @@
 import { NextResponse } from 'next/server';
 import { verifySessionCookieFromRequest } from '@/lib/sessionAdmin';
 import { getCompanyById } from '@/lib/companyData';
+import { PERMISSIONS } from '@/lib/organizations';
+
+const ROLE_PERMISSION_KEY: Record<string, keyof typeof PERMISSIONS> = {
+  individual: 'individual',
+  'company-owner': 'companyOwner',
+  'branch-manager': 'branchManager',
+  cashier: 'cashier',
+};
+
+function withRoleDefaults(role: string | null | undefined, permissions: any): string[] {
+  const current = Array.isArray(permissions) ? permissions.slice() : [];
+  const roleKey = role ? ROLE_PERMISSION_KEY[role] : undefined;
+  if (!roleKey) return current;
+  const needed = PERMISSIONS[roleKey] || [];
+  const merged = new Set(current);
+  needed.forEach((perm) => merged.add(perm));
+  return Array.from(merged);
+}
 
 export async function GET(req: Request) {
   try {
@@ -13,6 +31,7 @@ export async function GET(req: Request) {
         companySlug = company.slug;
       }
     }
+    const permissions = withRoleDefaults(decoded.role, decoded.permissions);
     return NextResponse.json({
       ok: true,
       uid: decoded.uid,
@@ -25,7 +44,7 @@ export async function GET(req: Request) {
       branchId: decoded.branchId || null,
        branchSlug: decoded.branchSlug || null,
        cashierSlug: decoded.cashierSlug || null,
-      permissions: decoded.permissions || [],
+      permissions,
     });
   } catch (err: any) {
     console.error('session verify error', err);

@@ -6,10 +6,10 @@ const GeoPoint = admin.firestore.GeoPoint;
 
 const VIRTUAL_LOGIN_DOMAIN = process.env.VIRTUAL_LOGIN_DOMAIN || 'lqr.internal';
 
-const PERMISSIONS = {
-  individual: ['generate-qr', 'transactions', 'summary', 'profile', 'settings'],
-  companyOwner: ['company:dashboard', 'company:branches', 'company:cashiers'],
-  branchManager: ['company:branches', 'company:cashiers'],
+export const PERMISSIONS = {
+  individual: ['generate-qr', 'transactions', 'summary', 'profile'],
+  companyOwner: ['company:dashboard', 'company:branches', 'company:cashiers', 'profile'],
+  branchManager: ['company:branches', 'company:cashiers', 'profile'],
   cashier: ['generate-qr', 'transactions', 'summary'],
 } as const;
 

@@ -4,6 +4,7 @@ import { getServerUser } from '@/lib/serverUser';
 import { getCompanyBySlug, getBranchBySlug } from '@/lib/companyData';
 import BranchSidebarShell from '@/components/navigation/BranchSidebarShell';
 import RequireAuth from '@/components/RequireAuth';
+import { PERMISSIONS } from '@/lib/organizations';
 
 interface BranchLayoutProps {
   children: ReactNode;
@@ -40,7 +41,9 @@ export default async function BranchSlugLayout({ children, params }: BranchLayou
     redirect('/signin');
   }
 
-  const permissions = Array.isArray(session.claims?.permissions) ? session.claims.permissions : [];
+  const permissions = Array.isArray(session.claims?.permissions)
+    ? Array.from(new Set([...session.claims.permissions, ...PERMISSIONS.branchManager]))
+    : [...PERMISSIONS.branchManager];
 
   return (
     <BranchSidebarShell

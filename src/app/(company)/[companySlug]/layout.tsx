@@ -4,6 +4,7 @@ import { getServerUser } from '@/lib/serverUser';
 import { getCompanyById, getCompanyBySlug } from '@/lib/companyData';
 import CompanySidebarShell from '@/components/navigation/CompanySidebarShell';
 import RequireAuth from '@/components/RequireAuth';
+import { PERMISSIONS } from '@/lib/organizations';
 
 interface CompanyLayoutProps {
   children: ReactNode;
@@ -41,7 +42,9 @@ export default async function CompanySlugLayout({ children, params }: CompanyLay
     redirect(`/${canonicalSlug}/branches`);
   }
 
-  const permissions = Array.isArray(session.claims?.permissions) ? session.claims.permissions : [];
+  const permissions = Array.isArray(session.claims?.permissions)
+    ? Array.from(new Set([...session.claims.permissions, ...PERMISSIONS.companyOwner]))
+    : [...PERMISSIONS.companyOwner];
 
   return (
     <CompanySidebarShell
