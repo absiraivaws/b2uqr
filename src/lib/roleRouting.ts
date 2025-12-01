@@ -8,12 +8,12 @@ export function getDefaultRouteForRole(role?: string | null, context?: RoleRoute
   switch (role) {
     case 'company-owner':
       if (context?.companySlug) return `/${context.companySlug}/branches`;
-      return '/company/branches';
+      return '/generate-qr';
     case 'branch-manager':
       if (context?.companySlug && context?.branchSlug) {
         return `/${context.companySlug}/${context.branchSlug}`;
       }
-      return '/branch';
+      return '/generate-qr';
     case 'cashier':
       if (context?.companySlug && context?.branchSlug && context?.cashierSlug) {
         return `/${context.companySlug}/${context.branchSlug}/${context.cashierSlug}/generate-qr`;
@@ -26,8 +26,6 @@ export function getDefaultRouteForRole(role?: string | null, context?: RoleRoute
 }
 
 const PERMISSION_RULES: Array<{ prefix: string; permission: string }> = [
-  { prefix: '/company', permission: 'company:branches' },
-  { prefix: '/branch', permission: 'company:cashiers' },
   { prefix: '/generate-qr', permission: 'generate-qr' },
   { prefix: '/transactions', permission: 'transactions' },
   { prefix: '/summary', permission: 'summary' },

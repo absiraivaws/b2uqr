@@ -117,7 +117,7 @@ export default function SignUpPage() {
 
         const companySlug = accountType === 'company' ? (onboardJson?.companySlug as string | undefined) : undefined;
         const nextPath = accountType === 'company'
-          ? (companySlug ? `/${companySlug}/branches` : '/company/branches')
+          ? (companySlug ? `/${companySlug}/branches` : null)
           : null;
       const nextQuery = nextPath ? `&next=${encodeURIComponent(nextPath)}` : '';
       router.push(`/verify-customer?uid=${verifiedUser.uid}${nextQuery}`);

@@ -1,7 +1,19 @@
 import { NextResponse, NextRequest } from 'next/server';
 
-// Only these top-level routes (and their subpaths) are protected
-const PROTECTED_PREFIXES = ['/generate-qr', '/transactions', '/summary', '/profile', '/settings', '/company', '/branch'];
+// Always enforce auth for these static routes
+const PROTECTED_PREFIXES = ['/generate-qr', '/transactions', '/summary', '/profile', '/settings'];
+const PUBLIC_ROOT_SEGMENTS = new Set([
+  '',
+  'signin',
+  'signup',
+  'reset-pin',
+  'docs',
+  'public',
+  'manifest.json',
+  'sw.js',
+  'workbox-4754cb34.js',
+  'icons',
+]);
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -17,7 +29,18 @@ export function middleware(req: NextRequest) {
   }
 
   // If request matches a protected route, require a session cookie
-  const isProtected = PROTECTED_PREFIXES.some(prefix => pathname === prefix || pathname.startsWith(`${prefix}/`));
+  const isStaticProtected = PROTECTED_PREFIXES.some(prefix => pathname === prefix || pathname.startsWith(`${prefix}/`));
+  let isSlugProtected = false;
+  if (!isStaticProtected) {
+    const segments = pathname.split('/').filter(Boolean);
+    if (segments.length) {
+      const first = segments[0];
+      if (!PUBLIC_ROOT_SEGMENTS.has(first) && !first.startsWith('_next') && first !== 'api') {
+        isSlugProtected = true;
+      }
+    }
+  }
+  const isProtected = isStaticProtected || isSlugProtected;
   if (!isProtected) return NextResponse.next();
 
   // Check for our server-side session cookie created at /api/session/create
@@ -45,5 +68,5 @@ export function middleware(req: NextRequest) {
 
 // Run middleware only for these routes
 export const config = {
-  matcher: ['/generate-qr/:path*', '/transactions/:path*', '/summary/:path*', '/profile/:path*', '/settings/:path*', '/company/:path*', '/branch/:path*'],
+  matcher: ['/((?!_next/|api/|favicon\.ico|robots\.txt|manifest\.json|sw\.js|workbox-.*\.js).*)'],
 };
