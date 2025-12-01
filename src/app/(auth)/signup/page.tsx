@@ -1,18 +1,22 @@
  'use client'
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Loader2, LogIn } from "lucide-react";
-import { db } from '@/lib/firebase';
-import { doc, setDoc, serverTimestamp, GeoPoint } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import SignupKycSection, { KycValues } from '@/components/signup/SignupKycSection';
 import SignupOtpSection from '@/components/signup/SignupOtpSection';
 import SignupPinSection from '@/components/signup/SignupPinSection';
+import { auth } from '@/lib/firebase';
+
+type AccountType = 'individual' | 'company';
 
 export default function SignUpPage() {
   const router = useRouter();
+  const [accountType, setAccountType] = useState<AccountType>('individual');
   const [kyc, setKyc] = useState<KycValues>({
     displayName: '',
     nic: '',
@@ -20,6 +24,7 @@ export default function SignUpPage() {
     address: '',
     lat: '',
     lng: '',
+    companyName: '',
   });
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -52,6 +57,10 @@ export default function SignUpPage() {
       setError('Please complete your full name, NIC, business registration number, address, and location.');
       return;
     }
+    if (accountType === 'company' && !kyc.companyName?.trim()) {
+      setError('Please enter your company name.');
+      return;
+    }
     if (!/^\d{4,6}$/.test(pin)) {
       setError('PIN must be 4 to 6 digits.');
       return;
@@ -72,38 +81,43 @@ export default function SignUpPage() {
       const json = await res.json();
       if (!res.ok || !json?.ok) throw new Error(json?.message || 'Failed to save PIN');
 
-      // Ensure we persist any email/phone present in the form if the
-      // verifiedUser object lacks them for some reason. Merge to Firestore
-      // using a merge write so we don't overwrite unrelated fields.
       const finalPhone = verifiedUser.phone ?? (phone && phone.toString().trim() ? phone : null);
       const finalEmail = verifiedUser.email ?? (email && email.toString().trim() ? email : null);
-      const userDocRef = doc(db, 'users', verifiedUser.uid);
-      const payload: any = {
-        uid: verifiedUser.uid,
-        displayName: kyc.displayName || null,
-        phone: finalPhone,
-        email: finalEmail,
-        nic: kyc.nic || null,
-        businessRegistrationNumber: kyc.businessReg || null,
-        address: kyc.address || null,
-        updated_at: serverTimestamp(),
-      };
-      if (kyc.lat !== '' && kyc.lng !== '') {
-        try {
-          const nlat = parseFloat(kyc.lat);
-          const nlng = parseFloat(kyc.lng);
-          if (!isNaN(nlat) && !isNaN(nlng)) {
-            payload.location = new GeoPoint(nlat, nlng);
-          }
-        } catch (e) { /* ignore location parse */ }
-      }
-      // If server returned created timestamp or pin metadata, include it
-      if (json.createdAt) payload.created_at = json.createdAt;
-      if (json.pinHash) payload.pinHash = json.pinHash;
-      await setDoc(userDocRef, payload, { merge: true });
 
-      // redirect to verification page after save
-      try { router.push(`/verify-customer?uid=${verifiedUser.uid}`); } catch (e) { /* ignore */ }
+      const onboardRes = await fetch('/api/merchant/onboard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accountType,
+          kyc,
+          contact: {
+            phone: finalPhone,
+            email: finalEmail,
+          },
+        }),
+      });
+      const onboardJson = await onboardRes.json().catch(() => ({}));
+      if (!onboardRes.ok || !onboardJson?.ok) {
+        throw new Error(onboardJson?.message || 'Failed to save merchant profile');
+      }
+
+      try {
+        const currentUser = auth.currentUser;
+        if (currentUser) {
+          const idToken = await currentUser.getIdToken(true);
+          await fetch('/api/session/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ idToken }),
+          });
+        }
+      } catch (refreshErr) {
+        console.warn('session refresh after onboarding failed', refreshErr);
+      }
+
+      const nextPath = accountType === 'company' ? '/company/branches' : null;
+      const nextQuery = nextPath ? `&next=${encodeURIComponent(nextPath)}` : '';
+      router.push(`/verify-customer?uid=${verifiedUser.uid}${nextQuery}`);
     } catch (err: any) {
       console.error(err);
       setError(err?.message || 'Failed to save user.');
@@ -157,7 +171,31 @@ export default function SignUpPage() {
           <Separator />
 
             <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
-              <SignupKycSection values={kyc} onChange={setKyc} />
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">Account type</Label>
+                <RadioGroup
+                  value={accountType}
+                  onValueChange={(value) => setAccountType(value as AccountType)}
+                  className="grid gap-3 md:grid-cols-2"
+                >
+                  <label htmlFor="account-individual" className={`border rounded-lg p-4 flex gap-3 cursor-pointer transition shadow-sm ${accountType === 'individual' ? 'border-primary ring-2 ring-primary/50' : 'border-border'}`}>
+                    <RadioGroupItem id="account-individual" value="individual" />
+                    <div>
+                      <p className="font-medium text-sm">Individual merchant</p>
+                      <p className="text-xs text-muted-foreground">Access QR, transactions, summary, profile.</p>
+                    </div>
+                  </label>
+                  <label htmlFor="account-company" className={`border rounded-lg p-4 flex gap-3 cursor-pointer transition shadow-sm ${accountType === 'company' ? 'border-primary ring-2 ring-primary/50' : 'border-border'}`}>
+                    <RadioGroupItem id="account-company" value="company" />
+                    <div>
+                      <p className="font-medium text-sm">Company</p>
+                      <p className="text-xs text-muted-foreground">Manage branches, managers, and cashiers.</p>
+                    </div>
+                  </label>
+                </RadioGroup>
+              </div>
+
+              <SignupKycSection values={kyc} onChange={setKyc} accountType={accountType} />
               <SignupOtpSection
                 email={email}
                 setEmail={setEmail}

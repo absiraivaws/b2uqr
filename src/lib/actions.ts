@@ -24,6 +24,102 @@ const TransactionSchema = z.object({
   reference_number: z.string().min(1, "Reference number is required"),
 });
 
+const MERCHANT_FIELD_GROUPS = {
+  merchantId: ['merchantId', 'merchant_id'] as const,
+  bankCode: ['bankCode', 'bank_code'] as const,
+  terminalId: ['terminalId', 'terminal_id'] as const,
+  merchantName: ['merchantName', 'merchant_name'] as const,
+  merchantCity: ['merchantCity', 'merchant_city'] as const,
+  merchantCategoryCode: ['merchantCategoryCode', 'merchant_category_code', 'mcc'] as const,
+  currencyCode: ['currencyCode', 'currency_code'] as const,
+  countryCode: ['countryCode', 'country_code'] as const,
+} as const;
+
+type MerchantFieldGroupKey = keyof typeof MERCHANT_FIELD_GROUPS;
+type ServerMerchantSettings = {
+  merchant_id?: string;
+  bank_code?: string;
+  terminal_id?: string;
+  merchant_name?: string;
+  merchant_city?: string;
+  mcc?: string;
+  currency_code?: string;
+  country_code?: string;
+};
+const REQUIRED_MERCHANT_FIELDS: Array<keyof ServerMerchantSettings> = [
+  'merchant_id',
+  'bank_code',
+  'terminal_id',
+  'merchant_name',
+  'merchant_city',
+  'mcc',
+  'currency_code',
+  'country_code',
+];
+
+function pickFirstValue(...values: any[]): string | undefined {
+  for (const value of values) {
+    if (value === null || value === undefined) continue;
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed.length) return trimmed;
+    } else if (typeof value === 'number') {
+      if (!Number.isNaN(value)) return value.toString();
+    }
+  }
+  return undefined;
+}
+
+async function loadCompanyMerchantSettings(companyId: string): Promise<Record<string, any> | null> {
+  try {
+    const snap = await adminDb.collection('companies').doc(companyId).get();
+    if (!snap.exists) return null;
+    const data = snap.data() || {};
+    return (data.merchantSettings ?? null) as Record<string, any> | null;
+  } catch (err) {
+    console.error('Failed to load company merchant settings', err);
+    return null;
+  }
+}
+
+function resolveMerchantSettings(userData: Record<string, any>, companySettings?: Record<string, any> | null): ServerMerchantSettings {
+  const getGroupValue = (groupKey: MerchantFieldGroupKey) => {
+    const keys = MERCHANT_FIELD_GROUPS[groupKey];
+    const userValues = keys.map((key) => userData?.[key]);
+    const companyValues = companySettings ? keys.map((key) => companySettings?.[key]) : [];
+    return pickFirstValue(...userValues, ...companyValues);
+  };
+
+  return {
+    merchant_id: getGroupValue('merchantId'),
+    bank_code: getGroupValue('bankCode'),
+    terminal_id: getGroupValue('terminalId'),
+    merchant_name: getGroupValue('merchantName'),
+    merchant_city: getGroupValue('merchantCity'),
+    mcc: getGroupValue('merchantCategoryCode'),
+    currency_code: getGroupValue('currencyCode'),
+    country_code: getGroupValue('countryCode'),
+  };
+}
+
+function applyCompanySettingsToUserData(raw: Record<string, any>, companySettings?: Record<string, any> | null) {
+  if (!companySettings) return;
+  for (const keys of Object.values(MERCHANT_FIELD_GROUPS)) {
+    const hasValue = keys.some((key) => {
+      const val = raw?.[key];
+      if (val === null || val === undefined) return false;
+      if (typeof val === 'string') return val.trim().length > 0;
+      return true;
+    });
+    if (hasValue) continue;
+    const fallback = pickFirstValue(...keys.map((key) => companySettings?.[key]));
+    if (fallback === undefined) continue;
+    keys.forEach((key) => {
+      raw[key] = fallback;
+    });
+  }
+}
+
 export async function createTransaction(transactionData: {amount: string, reference_number: string}): Promise<Transaction> {
   const parsed = TransactionSchema.safeParse(transactionData);
 
@@ -67,35 +163,21 @@ export async function createTransaction(transactionData: {amount: string, refere
 
   const userData = userDoc.data() || {};
 
-  const serverSideSettings = {
-    merchant_id: (userData.merchantId ?? userData.merchant_id) as string | undefined,
-    bank_code: (userData.bankCode ?? userData.bank_code) as string | undefined,
-    terminal_id: (userData.terminalId ?? userData.terminal_id) as string | undefined,
-    merchant_name: (userData.merchantName ?? userData.merchant_name) as string | undefined,
-    merchant_city: (userData.merchantCity ?? userData.merchant_city) as string | undefined,
-    mcc: (userData.merchantCategoryCode ?? userData.merchantCategoryCode ?? userData.mcc) as string | undefined,
-    currency_code: (userData.currencyCode ?? userData.currency_code) as string | undefined,
-    country_code: (userData.countryCode ?? userData.country_code) as string | undefined,
-  };
+  let companySettings: Record<string, any> | null = null;
+  if (userData.accountType === 'company' && userData.companyId) {
+    companySettings = await loadCompanyMerchantSettings(String(userData.companyId));
+  }
+
+  const serverSideSettings = resolveMerchantSettings(userData, companySettings);
 
   // Validate required merchant fields are present
-  const required = ['merchant_id','bank_code','terminal_id','merchant_name','merchant_city','mcc','currency_code','country_code'];
-  const missing = required.filter(k => !serverSideSettings[k as keyof typeof serverSideSettings]);
+  const missing = REQUIRED_MERCHANT_FIELDS.filter(field => !serverSideSettings[field]);
   if (missing.length) {
     throw new Error(`Missing merchant configuration in Firestore user doc: ${missing.join(', ')}`);
   }
 
   // Create a typed sanitized settings object (we validated presence above)
-  const sanitizedSettings = {
-    merchant_id: serverSideSettings.merchant_id as string,
-    bank_code: serverSideSettings.bank_code as string,
-    terminal_id: serverSideSettings.terminal_id as string,
-    merchant_name: serverSideSettings.merchant_name as string,
-    merchant_city: serverSideSettings.merchant_city as string,
-    mcc: serverSideSettings.mcc as string,
-    currency_code: serverSideSettings.currency_code as string,
-    country_code: serverSideSettings.country_code as string,
-  };
+  const sanitizedSettings = serverSideSettings as Required<ServerMerchantSettings>;
 
   // 2. Pre-save transaction object
   let pendingTx: Omit<Transaction, 'created_at' | 'updated_at'> = {
@@ -202,6 +284,13 @@ export async function getUserSettings(): Promise<Record<string, any> | null> {
     const userDoc = await adminDb.collection('users').doc(decoded.uid).get();
     if (!userDoc.exists) return null;
     const raw = userDoc.data() as Record<string, any>;
+    if (raw?.accountType === 'company' && raw?.companyId) {
+      const companySettings = await loadCompanyMerchantSettings(String(raw.companyId));
+      applyCompanySettingsToUserData(raw, companySettings);
+      if (companySettings) {
+        raw.companyMerchantSettings = companySettings;
+      }
+    }
     return sanitize(raw);
   } catch (err) {
     console.error('Error fetching user settings:', err);

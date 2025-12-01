@@ -6,6 +6,7 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const identifier = (body?.identifier || '').toString().trim();
+    const normalizedIdentifier = identifier.toLowerCase();
     const pin = (body?.pin || '').toString().trim();
     if (!identifier || !pin) return NextResponse.json({ ok: false, message: 'Missing identifier or pin' }, { status: 400 });
 
@@ -18,9 +19,17 @@ export async function POST(req: Request) {
       if (!byPhone.empty) userDocSnap = byPhone.docs[0];
     }
 
+    if (!userDocSnap) {
+      const usernameLookup = await adminDb.collection('users').where('username', '==', normalizedIdentifier).limit(1).get();
+      if (!usernameLookup.empty) userDocSnap = usernameLookup.docs[0];
+    }
+
     if (!userDocSnap) return NextResponse.json({ ok: false, message: 'User not found' }, { status: 404 });
 
     const data: any = userDocSnap.data();
+    if (data?.status === 'disabled') {
+      return NextResponse.json({ ok: false, message: 'Account disabled' }, { status: 403 });
+    }
     const storedHash = data?.pinHash;
     if (!storedHash) return NextResponse.json({ ok: false, message: 'PIN not set' }, { status: 400 });
 

@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Sidebar,
   SidebarContent,
@@ -27,16 +27,36 @@ export default function AppLayout({
   const pathname = usePathname()
   const router = useRouter()
   const [signingOut, setSigningOut] = useState(false)
-  
+  const [sessionInfo, setSessionInfo] = useState<{ permissions: string[] } | null>(null)
+
+  useEffect(() => {
+    let mounted = true
+    async function load() {
+      try {
+        const res = await fetch('/api/session/verify', { cache: 'no-store', credentials: 'include' })
+        if (!mounted) return
+        if (res.ok) {
+          const data = await res.json().catch(() => ({}))
+          setSessionInfo({ permissions: Array.isArray(data?.permissions) ? data.permissions : [] })
+        } else {
+          setSessionInfo(null)
+        }
+      } catch {
+        if (mounted) setSessionInfo(null)
+      }
+    }
+    load()
+    return () => { mounted = false }
+  }, [])
+
   const menuItems = [
-    { href: '/generate-qr', label: 'Generate QR', icon: QrCode },
-    { href: '/transactions', label: 'Transactions', icon: History },
-    { href: '/summary', label: 'Summary', icon: BarChart },
+    { href: '/generate-qr', label: 'Generate QR', icon: QrCode, permission: 'generate-qr' },
+    { href: '/transactions', label: 'Transactions', icon: History, permission: 'transactions' },
+    { href: '/summary', label: 'Summary', icon: BarChart, permission: 'summary' },
   ]
 
   const accountItems = [
-      { href: '/profile', label: 'Profile', icon: User },
-      //{ href: '/settings', label: 'Settings', icon: SettingsIcon },
+      { href: '/profile', label: 'Profile', icon: User, permission: 'profile' },
       { href: '/signout', label: 'Sign Out', icon: LogOutIcon },
   ]
 
@@ -85,7 +105,7 @@ export default function AppLayout({
         </SidebarHeader>
         <SidebarContent>
             <SidebarMenu>
-                {menuItems.map((item) => (
+                {menuItems.filter((item) => !item.permission || sessionInfo?.permissions?.includes(item.permission)).map((item) => (
                     <SidebarMenuItem key={item.href}>
                         <SidebarMenuButton
                         asChild
@@ -103,7 +123,7 @@ export default function AppLayout({
             <SidebarGroup>
                 <SidebarGroupLabel>Account</SidebarGroupLabel>
                 <SidebarMenu>
-                    {accountItems.map((item) => (
+                    {accountItems.filter((item) => !item.permission || sessionInfo?.permissions?.includes(item.permission)).map((item) => (
                         <SidebarMenuItem key={item.href}>
                             <SidebarMenuButton
                             asChild

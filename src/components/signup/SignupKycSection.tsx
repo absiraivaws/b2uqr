@@ -12,16 +12,19 @@ export type KycValues = {
   address: string;
   lat: string;
   lng: string;
+  companyName?: string;
 };
 
 interface SignupKycSectionProps {
   values: KycValues;
   onChange: (values: KycValues) => void;
+  accountType: 'individual' | 'company';
 }
 
-export default function SignupKycSection({ values, onChange }: SignupKycSectionProps) {
+export default function SignupKycSection({ values, onChange, accountType }: SignupKycSectionProps) {
   const [locating, setLocating] = useState(false);
   const [locError, setLocError] = useState<string | null>(null);
+  const isCompany = accountType === 'company';
 
   const update = (patch: Partial<KycValues>) => {
     onChange({ ...values, ...patch });
@@ -54,24 +57,35 @@ export default function SignupKycSection({ values, onChange }: SignupKycSectionP
 
   return (
     <>
+      {isCompany && (
+        <div>
+          <label className="text-sm">Company legal name</label>
+          <Input
+            value={values.companyName || ''}
+            onChange={e => update({ companyName: e.target.value })}
+            placeholder="Acme Holdings"
+            required
+          />
+        </div>
+      )}
       <div>
-        <label className="text-sm">Full name</label>
+        <label className="text-sm">{isCompany ? 'Owner full name' : 'Full name'}</label>
         <Input value={values.displayName} onChange={e => update({ displayName: e.target.value })} placeholder="Jane Doe" required />
       </div>
       <div>
-        <label className="text-sm">NIC Number</label>
+        <label className="text-sm">{isCompany ? 'Owner NIC' : 'NIC Number'}</label>
         <Input value={values.nic} onChange={e => update({ nic: e.target.value.trim() })} placeholder="123456789V" required />
       </div>
       <div>
-        <label className="text-sm">Business Registration Number</label>
+        <label className="text-sm">{isCompany ? 'Company registration number' : 'Business Registration Number'}</label>
         <Input value={values.businessReg} onChange={e => update({ businessReg: e.target.value.trim() })} placeholder="BRN-XXXXXXX" required />
       </div>
       <div>
-        <label className="text-sm">Address</label>
+        <label className="text-sm">{isCompany ? 'Registered address' : 'Address'}</label>
         <Textarea value={values.address} onChange={e => update({ address: e.target.value })} placeholder="Street, City, Province, Postal Code" required />
       </div>
       <div>
-        <label className="text-sm">GPS Location</label>
+        <label className="text-sm">{isCompany ? 'Registered GPS location' : 'GPS Location'}</label>
         <div className="flex flex-col gap-2">
           <div className="flex gap-2">
             <Input

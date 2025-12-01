@@ -10,6 +10,7 @@ export default function VerifyCustomerClientWrapper() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const uid = searchParams.get('uid');
+  const next = searchParams.get('next');
 
   if (!uid) {
     return (
@@ -37,7 +38,7 @@ export default function VerifyCustomerClientWrapper() {
         <CardDescription>Complete the verification steps to finish registration.</CardDescription>
       </CardHeader>
       <CardContent>
-        <VerifyCustomerSection uid={uid} />
+        <VerifyCustomerSection uid={uid} next={next} />
       </CardContent>
     </Card>
   );

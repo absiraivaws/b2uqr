@@ -1,7 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 
 // Only these top-level routes (and their subpaths) are protected
-const PROTECTED_PREFIXES = ['/generate-qr', '/transactions', '/summary', '/profile', '/settings'];
+const PROTECTED_PREFIXES = ['/generate-qr', '/transactions', '/summary', '/profile', '/settings', '/company', '/branch'];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -45,5 +45,5 @@ export function middleware(req: NextRequest) {
 
 // Run middleware only for these routes
 export const config = {
-  matcher: ['/generate-qr/:path*', '/transactions/:path*', '/summary/:path*', '/profile/:path*', '/settings/:path*'],
+  matcher: ['/generate-qr/:path*', '/transactions/:path*', '/summary/:path*', '/profile/:path*', '/settings/:path*', '/company/:path*', '/branch/:path*'],
 };

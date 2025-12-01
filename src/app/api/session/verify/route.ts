@@ -3,10 +3,19 @@ import { verifySessionCookieFromRequest } from '@/lib/sessionAdmin';
 
 export async function GET(req: Request) {
   try {
-    const decoded = await verifySessionCookieFromRequest(req);
+    const decoded: any = await verifySessionCookieFromRequest(req);
     if (!decoded) return NextResponse.json({ ok: false, message: 'No valid session' }, { status: 401 });
-    // return minimal user info
-    return NextResponse.json({ ok: true, uid: decoded.uid, email: decoded.email, name: decoded.name });
+    return NextResponse.json({
+      ok: true,
+      uid: decoded.uid,
+      email: decoded.email,
+      name: decoded.name,
+      role: decoded.role || null,
+      accountType: decoded.accountType || null,
+      companyId: decoded.companyId || null,
+      branchId: decoded.branchId || null,
+      permissions: decoded.permissions || [],
+    });
   } catch (err: any) {
     console.error('session verify error', err);
     return NextResponse.json({ ok: false, message: err?.message || 'Server error' }, { status: 500 });

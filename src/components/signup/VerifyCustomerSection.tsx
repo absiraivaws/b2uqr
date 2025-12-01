@@ -14,12 +14,20 @@ import { useRouter } from 'next/navigation';
 
 interface VerifyCustomerSectionProps {
   uid: string;
+  next?: string | null;
 }
 
-export default function VerifyCustomerSection({ uid }: VerifyCustomerSectionProps) {
+interface UserProfileMeta {
+  email?: string | null;
+  accountType?: string | null;
+  companyId?: string | null;
+}
+
+export default function VerifyCustomerSection({ uid, next }: VerifyCustomerSectionProps) {
   const { toast } = useToast();
   const router = useRouter();
   const [step, setStep] = useState(0);
+  const [userProfile, setUserProfile] = useState<UserProfileMeta | null>(null);
 
   // Previews and blobs
   const [profilePreview, setProfilePreview] = useState<string | null>(null);
@@ -51,45 +59,52 @@ export default function VerifyCustomerSection({ uid }: VerifyCustomerSectionProp
   }, []);
 
   useEffect(() => {
-    let interval: number | undefined;
-    let timeoutId: number | undefined;
-    const fetchAndRedirect = async () => {
+    let active = true;
+    (async () => {
       try {
-        // try to fetch user email to autofill signin
         const userDoc = await getDoc(doc(db, 'users', uid));
-        const data = userDoc.exists() ? userDoc.data() as any : null;
-        if (data && data.email) setRedirectEmail(String(data.email));
+        if (!active) return;
+        if (userDoc.exists()) {
+          const data = userDoc.data() as any;
+          const derivedAccountType = data?.accountType
+            || (data?.role === 'company-owner' ? 'company' : data?.role === 'individual' ? 'individual' : null);
+          setUserProfile({
+            email: data?.email ?? null,
+            accountType: derivedAccountType,
+            companyId: data?.companyId ?? null,
+          });
+          if (data?.email) setRedirectEmail(String(data.email));
+        }
       } catch (e) {
-        console.error('fetch user email error', e);
+        console.error('fetch user profile error', e);
       }
-
-      // start countdown
-      setRedirectCountdown(10);
-      interval = window.setInterval(() => {
-        setRedirectCountdown((c) => {
-          if (c <= 1) {
-            // will be handled by timeout
-            return 0;
-          }
-          return c - 1;
-        });
-      }, 1000);
-
-      timeoutId = window.setTimeout(() => {
-        const target = redirectEmail ? `/signin?email=${encodeURIComponent(redirectEmail)}` : '/signin';
-        try { router.push(target); } catch (e) { /* ignore */ }
-      }, 10000);
-    };
-
-    if (step === 4) {
-      fetchAndRedirect();
-    }
+    })();
 
     return () => {
-      if (interval) window.clearInterval(interval);
-      if (timeoutId) window.clearTimeout(timeoutId);
+      active = false;
     };
-  }, [step, uid, router, redirectEmail]);
+  }, [uid]);
+
+  useEffect(() => {
+    if (step !== 4) return;
+
+    setRedirectCountdown(10);
+    const interval = window.setInterval(() => {
+      setRedirectCountdown((c) => (c <= 1 ? 0 : c - 1));
+    }, 1000);
+
+    const timeoutId = window.setTimeout(() => {
+      const target = next && next.length
+        ? next
+        : (redirectEmail ? `/signin?email=${encodeURIComponent(redirectEmail)}` : '/signin');
+      try { router.push(target); } catch (e) { /* ignore */ }
+    }, 10000);
+
+    return () => {
+      window.clearInterval(interval);
+      window.clearTimeout(timeoutId);
+    };
+  }, [step, next, redirectEmail, router]);
 
   const startCamera = async () => {
     try {
@@ -218,6 +233,9 @@ export default function VerifyCustomerSection({ uid }: VerifyCustomerSectionProp
         // also lock details when saving parsed QR
         payload.detailsLocked = true;
         await updateDoc(userDocRef, payload);
+        if (userProfile?.accountType === 'company' && userProfile.companyId) {
+          await syncCompanyMerchantConfig(userProfile.companyId, payload);
+        }
       }
       toast({ title: 'QR saved', description: 'LankaQR data saved to profile' });
       setStep(4);
@@ -226,6 +244,18 @@ export default function VerifyCustomerSection({ uid }: VerifyCustomerSectionProp
       toast({ title: 'Save failed', description: 'Failed to save QR data', variant: 'destructive' });
     } finally {
       setUploading(false);
+    }
+  };
+
+  const syncCompanyMerchantConfig = async (companyId: string, config: Record<string, any>) => {
+    const res = await fetch('/api/company/merchant-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ companyId, config }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json?.ok) {
+      throw new Error(json?.message || 'Failed to update company merchant settings');
     }
   };
 

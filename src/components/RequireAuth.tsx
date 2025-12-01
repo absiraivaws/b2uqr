@@ -1,6 +1,7 @@
 "use client";
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { getDefaultRouteForRole, getRequiredPermissionForPath } from '@/lib/roleRouting';
 
 export default function RequireAuth({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -16,6 +17,13 @@ export default function RequireAuth({ children }: { children: React.ReactNode })
         if (!res.ok) {
           // replace so the back-button won't return to protected snapshot
           router.replace(`/signin?from=${encodeURIComponent(window.location.pathname)}`);
+          return;
+        }
+        const data = await res.json().catch(() => ({}));
+        const requiredPermission = getRequiredPermissionForPath(window.location.pathname);
+        if (requiredPermission && Array.isArray(data?.permissions) && !data.permissions.includes(requiredPermission)) {
+          const fallback = getDefaultRouteForRole(data?.role) || '/';
+          router.replace(fallback);
         }
       } catch (err) {
         if (!cancelled) router.replace(`/signin?from=${encodeURIComponent(window.location.pathname)}`);

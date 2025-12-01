@@ -7,6 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { AlertTriangle, Loader2, LogIn } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { signInWithPin } from '@/hooks/use-pin-auth';
+import { getDefaultRouteForRole } from '@/lib/roleRouting';
 
 export default function SignInPage() {
   const [loadingGoogle, setLoadingGoogle] = useState(false);
@@ -97,7 +98,14 @@ export default function SignInPage() {
         localStorage.setItem('user_uid', user.uid);
         localStorage.setItem('last_signin_email', id);
       } catch (_) {}
-      router.push('/generate-qr');
+      try {
+        const verifyRes = await fetch('/api/session/verify', { cache: 'no-store', credentials: 'include' });
+        const verifyData = await verifyRes.json().catch(() => ({}));
+        const nextRoute = verifyRes.ok ? getDefaultRouteForRole(verifyData?.role) : '/generate-qr';
+        router.push(nextRoute);
+      } catch {
+        router.push('/generate-qr');
+      }
     } catch (err: any) {
       console.error(err);
       setError(err?.message || 'PIN sign-in failed.');
@@ -139,7 +147,7 @@ export default function SignInPage() {
           {/* Username (email or phone) + PIN */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-medium">Enter the email</h3>
+              <h3 className="text-sm font-medium">Enter email, phone, or username</h3>
             </div>
             <div className="flex gap-2">
               <Input placeholder="you@example.com" value={identifier} onChange={e => setIdentifier(e.target.value)} />
