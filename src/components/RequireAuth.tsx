@@ -22,7 +22,7 @@ export default function RequireAuth({ children }: { children: React.ReactNode })
         const data = await res.json().catch(() => ({}));
         const requiredPermission = getRequiredPermissionForPath(window.location.pathname);
         if (requiredPermission && Array.isArray(data?.permissions) && !data.permissions.includes(requiredPermission)) {
-          const fallback = getDefaultRouteForRole(data?.role) || '/';
+          const fallback = getDefaultRouteForRole(data?.role, data) || '/';
           router.replace(fallback);
         }
       } catch (err) {

@@ -46,7 +46,7 @@ export async function POST(req: Request) {
       actorUid: user.uid,
     });
 
-    return NextResponse.json({ ok: true, branchId: result.branchId, username: result.username });
+    return NextResponse.json({ ok: true, branchId: result.branchId, username: result.username, branchNumber: result.branchNumber });
   } catch (err: any) {
     console.error('create branch error', err);
     return NextResponse.json({ ok: false, message: err?.message || 'Server error' }, { status: 500 });

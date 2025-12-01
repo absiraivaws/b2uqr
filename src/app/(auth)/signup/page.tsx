@@ -115,7 +115,10 @@ export default function SignUpPage() {
         console.warn('session refresh after onboarding failed', refreshErr);
       }
 
-      const nextPath = accountType === 'company' ? '/company/branches' : null;
+        const companySlug = accountType === 'company' ? (onboardJson?.companySlug as string | undefined) : undefined;
+        const nextPath = accountType === 'company'
+          ? (companySlug ? `/${companySlug}/branches` : '/company/branches')
+          : null;
       const nextQuery = nextPath ? `&next=${encodeURIComponent(nextPath)}` : '';
       router.push(`/verify-customer?uid=${verifiedUser.uid}${nextQuery}`);
     } catch (err: any) {

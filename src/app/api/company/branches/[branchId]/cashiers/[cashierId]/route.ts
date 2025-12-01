@@ -3,11 +3,12 @@ import { getCurrentUser } from '@/lib/getCurrentUser';
 import { deleteCashier } from '@/lib/organizations';
 
 interface RouteParams {
-  params: { branchId: string; cashierId: string };
+  params: Promise<{ branchId: string; cashierId: string }>;
 }
 
-export async function DELETE(req: Request, { params }: RouteParams) {
+export async function DELETE(req: Request, context: RouteParams) {
   try {
+    const { branchId, cashierId } = await context.params;
     const user = await getCurrentUser(req);
     const role = user?.claims?.role;
     if (!user?.uid || (role !== 'company-owner' && role !== 'branch-manager')) {
@@ -17,8 +18,6 @@ export async function DELETE(req: Request, { params }: RouteParams) {
     if (!companyId) {
       return NextResponse.json({ ok: false, message: 'Missing company context' }, { status: 400 });
     }
-    const branchId = params?.branchId;
-    const cashierId = params?.cashierId;
     if (!branchId || !cashierId) {
       return NextResponse.json({ ok: false, message: 'branchId and cashierId are required' }, { status: 400 });
     }

@@ -7,25 +7,28 @@ import { useMemo } from 'react';
 interface BranchSidebarShellProps {
   permissions?: string[] | null;
   branchName?: string | null;
+  companySlug: string;
+  branchSlug: string;
   children: React.ReactNode;
 }
 
-export default function BranchSidebarShell({ permissions, branchName, children }: BranchSidebarShellProps) {
+export default function BranchSidebarShell({ permissions, branchName, companySlug, branchSlug, children }: BranchSidebarShellProps) {
+  const base = `/${companySlug}/${branchSlug}`;
   const sections = useMemo<SidebarSectionConfig[]>(() => [
     {
       label: 'Branch',
       links: [
-        { href: '/branch', label: 'Manage Cashiers', icon: Users, permission: 'company:cashiers' },
+        { href: base, label: 'Manage Cashiers', icon: Users, permission: 'company:cashiers' },
       ],
     },
     {
       label: 'Account',
       links: [
-        { href: '/profile', label: 'Profile', icon: User, permission: 'profile' },
-        { href: '/signout', label: 'Sign Out', icon: LogOutIcon, action: 'signout' },
+        { href: `${base}/profile`, label: 'Profile', icon: User, permission: 'profile' },
+        { href: `${base}/signout`, label: 'Sign Out', icon: LogOutIcon, action: 'signout' },
       ],
     },
-  ], []);
+  ], [base]);
 
   return (
     <RoleSidebarLayout

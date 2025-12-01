@@ -4,11 +4,12 @@ import { adminDb } from '@/lib/firebaseAdmin';
 import { createCashier } from '@/lib/organizations';
 
 interface RouteParams {
-  params: { branchId: string };
+  params: Promise<{ branchId: string }>;
 }
 
-export async function POST(req: Request, { params }: RouteParams) {
+export async function POST(req: Request, context: RouteParams) {
   try {
+    const { branchId } = await context.params;
     const user = await getCurrentUser(req);
     const role = user?.claims?.role;
     if (!user?.uid || (role !== 'company-owner' && role !== 'branch-manager')) {
@@ -18,7 +19,6 @@ export async function POST(req: Request, { params }: RouteParams) {
     if (!companyId) {
       return NextResponse.json({ ok: false, message: 'Missing company context' }, { status: 400 });
     }
-    const branchId = params?.branchId;
     if (!branchId) {
       return NextResponse.json({ ok: false, message: 'branchId missing' }, { status: 400 });
     }

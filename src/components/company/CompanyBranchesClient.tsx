@@ -24,6 +24,7 @@ export type BranchInfo = {
   id: string;
   name: string;
   username: string;
+  branchNumber?: number | null;
   managerName: string | null;
   managerContact: { email?: string | null; phone?: string | null } | null;
   managerUid?: string | null;
@@ -74,6 +75,7 @@ export default function CompanyBranchesClient({ companyName, initialBranches }: 
         id: data.branchId,
         name: branchForm.name,
         username: data.username,
+        branchNumber: typeof data.branchNumber === 'number' ? data.branchNumber : null,
         managerName: null,
         managerContact: null,
         managerUid: null,
@@ -259,7 +261,12 @@ export default function CompanyBranchesClient({ companyName, initialBranches }: 
             <CardHeader className="flex flex-row items-start justify-between gap-4">
               <div>
                 <CardTitle className="flex items-center gap-3">
-                  {branch.name}
+                  <span className="flex items-center gap-2">
+                    {branch.name}
+                    {typeof branch.branchNumber === 'number' && branch.branchNumber > 0 && (
+                      <Badge variant="secondary" className="font-mono text-xs">#{branch.branchNumber}</Badge>
+                    )}
+                  </span>
                   <Badge variant="outline" className="capitalize">{branch.managerName ? 'Managed' : 'Unassigned'}</Badge>
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">Username: <span className="font-mono">{branch.username}</span></p>

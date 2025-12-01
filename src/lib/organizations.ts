@@ -201,6 +201,7 @@ export async function onboardCompanyMerchant(input: OnboardCompanyInput) {
       updated_at: FieldValue.serverTimestamp(),
       branchCount: 0,
       cashierCount: 0,
+      nextBranchNumber: 1,
     });
 
     const timestamps: Record<string, any> = {
@@ -234,6 +235,7 @@ export async function onboardCompanyMerchant(input: OnboardCompanyInput) {
     role: 'company-owner',
     accountType: 'company',
     companyId: companyRef.id,
+    companySlug: slug,
     permissions: PERMISSIONS.companyOwner,
   });
 
@@ -246,6 +248,7 @@ export async function createBranch(input: CreateBranchInput) {
   const branchRef = companyRef.collection('branches').doc();
   const slug = slugify(branchName) || `branch-${branchRef.id.slice(0, 5)}`;
   let username = `${companySlug}-${slug}`;
+  let assignedBranchNumber: number | null = null;
   const allBranches = await companyRef.collection('branches').where('username', '==', username).limit(1).get();
   if (!allBranches.empty) {
     username = `${username}-${branchRef.id.slice(-3)}`;
@@ -253,9 +256,16 @@ export async function createBranch(input: CreateBranchInput) {
   await adminDb.runTransaction(async (tx) => {
     const companySnap = await tx.get(companyRef);
     if (!companySnap.exists) throw new Error('Company not found');
-    if (companySnap.data()?.ownerUid !== actorUid) {
+    const companyData = companySnap.data() || {};
+    if (companyData.ownerUid !== actorUid) {
       throw new Error('Not authorized to add branches');
     }
+    let branchNumber = Number(companyData.nextBranchNumber);
+    if (!Number.isFinite(branchNumber) || branchNumber < 1) {
+      branchNumber = Number(companyData.branchCount || 0) + 1;
+    }
+
+    assignedBranchNumber = branchNumber;
 
     tx.set(branchRef, {
       id: branchRef.id,
@@ -265,6 +275,7 @@ export async function createBranch(input: CreateBranchInput) {
       name: branchName,
       slug,
       username,
+      branchNumber,
       address: address || null,
       location: toGeoPoint(lat, lng) || null,
       created_at: FieldValue.serverTimestamp(),
@@ -278,11 +289,12 @@ export async function createBranch(input: CreateBranchInput) {
 
     tx.update(companyRef, {
       branchCount: FieldValue.increment(1),
+      nextBranchNumber: branchNumber + 1,
       updated_at: FieldValue.serverTimestamp(),
     });
   });
 
-  return { branchId: branchRef.id, username };
+  return { branchId: branchRef.id, username, branchNumber: assignedBranchNumber };
 }
 
 export async function deleteBranch(input: DeleteBranchInput) {
@@ -335,6 +347,8 @@ export async function upsertBranchManager(input: UpsertBranchManagerInput) {
   const branchSnap = await branchRef.get();
   if (!branchSnap.exists) throw new Error('Branch not found');
   const branchData = branchSnap.data() as any;
+  const branchSlug = branchData.slug as string;
+  const companySlug = branchData.companySlug as string;
   const managerUid = branchData.managerAccountUid as string;
   const pinHash = await hashPin(pin);
   const email = buildVirtualEmail(branchUsername);
@@ -345,7 +359,9 @@ export async function upsertBranchManager(input: UpsertBranchManagerInput) {
       role: 'branch-manager',
       accountType: 'company',
       companyId,
+      companySlug,
       branchId,
+      branchSlug,
       username: branchUsername,
       email,
       phone: contact.phone || null,
@@ -371,6 +387,8 @@ export async function upsertBranchManager(input: UpsertBranchManagerInput) {
     accountType: 'company',
     companyId,
     branchId,
+    companySlug,
+    branchSlug,
     permissions: PERMISSIONS.branchManager,
   });
 
@@ -415,11 +433,16 @@ export async function createCashier(input: CreateCashierInput) {
   const cashierRef = branchRef.collection('cashiers').doc();
   const pinHash = await hashPin(pin);
   let cashierNumber = 1;
+  let branchSlug: string | null = null;
+  let companySlug: string | null = null;
+  let cashierSlugSegment: string | null = null;
 
   await adminDb.runTransaction(async (tx) => {
     const branchSnap = await tx.get(branchRef);
     if (!branchSnap.exists) throw new Error('Branch not found');
     const branchData = branchSnap.data() || {};
+    branchSlug = typeof branchData.slug === 'string' ? branchData.slug : null;
+    companySlug = typeof branchData.companySlug === 'string' ? branchData.companySlug : null;
     cashierNumber = Number(branchData.nextCashierNumber) || 1;
     tx.update(branchRef, {
       nextCashierNumber: cashierNumber + 1,
@@ -427,6 +450,7 @@ export async function createCashier(input: CreateCashierInput) {
     });
     const username = `${branchUsername}-${cashierNumber}`;
     const email = buildVirtualEmail(username);
+    cashierSlugSegment = `cashier${cashierNumber}`;
 
     tx.set(cashierRef, {
       id: cashierRef.id,
@@ -443,7 +467,11 @@ export async function createCashier(input: CreateCashierInput) {
       role: 'cashier',
       accountType: 'company',
       companyId,
+      companySlug: companySlug || null,
       branchId,
+      branchSlug: branchSlug || null,
+      cashierNumber,
+      cashierSlug: cashierSlugSegment,
       username,
       email,
       displayName,
@@ -463,6 +491,9 @@ export async function createCashier(input: CreateCashierInput) {
     accountType: 'company',
     companyId,
     branchId,
+    companySlug,
+    branchSlug,
+    cashierSlug: cashierSlugSegment,
     permissions: PERMISSIONS.cashier,
   });
   await adminDb.collection('companies').doc(companyId).update({

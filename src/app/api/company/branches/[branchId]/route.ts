@@ -3,11 +3,12 @@ import { getCurrentUser } from '@/lib/getCurrentUser';
 import { deleteBranch } from '@/lib/organizations';
 
 interface RouteParams {
-  params: { branchId: string };
+  params: Promise<{ branchId: string }>;
 }
 
-export async function DELETE(req: Request, { params }: RouteParams) {
+export async function DELETE(req: Request, context: RouteParams) {
   try {
+    const { branchId } = await context.params;
     const user = await getCurrentUser(req);
     if (!user?.uid || user.claims?.role !== 'company-owner') {
       return NextResponse.json({ ok: false, message: 'Not authorized' }, { status: 403 });
@@ -16,7 +17,6 @@ export async function DELETE(req: Request, { params }: RouteParams) {
     if (!companyId) {
       return NextResponse.json({ ok: false, message: 'Missing company context' }, { status: 400 });
     }
-    const branchId = params?.branchId;
     if (!branchId) {
       return NextResponse.json({ ok: false, message: 'branchId missing' }, { status: 400 });
     }
