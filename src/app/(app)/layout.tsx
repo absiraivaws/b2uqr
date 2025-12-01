@@ -1,161 +1,60 @@
 'use client'
-import { useEffect, useState } from 'react';
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-  SidebarProvider,
-  SidebarInset,
-  SidebarTrigger,
-  SidebarGroup,
-  SidebarGroupLabel,
-} from '@/components/ui/sidebar'
-import { QrCode, History, BarChart, User, Settings as SettingsIcon, LogOutIcon, Loader2 } from 'lucide-react'
-import { usePathname, useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { clientSignOut } from '@/lib/clientAuth';
+import { useEffect, useMemo, useState } from 'react';
+import { QrCode, History, BarChart, User, Settings as SettingsIcon, LogOutIcon } from 'lucide-react';
+import RoleSidebarLayout, { SidebarSectionConfig } from '@/components/navigation/RoleSidebarLayout';
 import RequireAuth from '@/components/RequireAuth';
 
-export default function AppLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  const pathname = usePathname()
-  const router = useRouter()
-  const [signingOut, setSigningOut] = useState(false)
-  const [sessionInfo, setSessionInfo] = useState<{ permissions: string[] } | null>(null)
+export default function AppLayout({ children }: { children: React.ReactNode }) {
+  const [permissions, setPermissions] = useState<string[] | null>(null);
 
   useEffect(() => {
-    let mounted = true
+    let mounted = true;
     async function load() {
       try {
-        const res = await fetch('/api/session/verify', { cache: 'no-store', credentials: 'include' })
-        if (!mounted) return
+        const res = await fetch('/api/session/verify', { cache: 'no-store', credentials: 'include' });
+        if (!mounted) return;
         if (res.ok) {
-          const data = await res.json().catch(() => ({}))
-          setSessionInfo({ permissions: Array.isArray(data?.permissions) ? data.permissions : [] })
+          const data = await res.json().catch(() => ({}));
+          setPermissions(Array.isArray(data?.permissions) ? data.permissions : []);
         } else {
-          setSessionInfo(null)
+          setPermissions([]);
         }
       } catch {
-        if (mounted) setSessionInfo(null)
+        if (mounted) setPermissions([]);
       }
     }
-    load()
-    return () => { mounted = false }
-  }, [])
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
-  const menuItems = [
-    { href: '/generate-qr', label: 'Generate QR', icon: QrCode, permission: 'generate-qr' },
-    { href: '/transactions', label: 'Transactions', icon: History, permission: 'transactions' },
-    { href: '/summary', label: 'Summary', icon: BarChart, permission: 'summary' },
-  ]
-
-  const accountItems = [
-      { href: '/profile', label: 'Profile', icon: User, permission: 'profile' },
-      { href: '/signout', label: 'Sign Out', icon: LogOutIcon },
-  ]
-
-  const handleSignOut = async (e?: React.MouseEvent) => {
-    e?.preventDefault();
-    if (signingOut) return;
-    setSigningOut(true);
-    try {
-      await clientSignOut();
-      // Replace history entry so back-button won't return to a protected page
-      router.replace('/signin');
-    } catch (err) {
-      console.error('Sign out failed', err);
-      setSigningOut(false);
-    }
-  };
-
-  // Auth verification is done in the `RequireAuth` client wrapper.
+  const sections = useMemo<SidebarSectionConfig[]>(() => [
+    {
+      label: 'Payments',
+      links: [
+        { href: '/generate-qr', label: 'Generate QR', icon: QrCode, permission: 'generate-qr' },
+        { href: '/transactions', label: 'Transactions', icon: History, permission: 'transactions' },
+        { href: '/summary', label: 'Summary', icon: BarChart, permission: 'summary' },
+      ],
+    },
+    {
+      label: 'Account',
+      links: [
+        { href: '/profile', label: 'Profile', icon: User, permission: 'profile' },
+        //{ href: '/settings', label: 'Settings', icon: SettingsIcon, permission: 'settings' },
+        { href: '/signout', label: 'Sign Out', icon: LogOutIcon, action: 'signout' },
+      ],
+    },
+  ], []);
 
   return (
-    <SidebarProvider>
-      {/* Mobile fixed header: place open button above all on small screens */}
-      <header className="fixed inset-x-0 top-0 z-50 flex items-center justify-center p-3 md:hidden">
-        {/* left: trigger */}
-        <div className="absolute left-3">
-          <SidebarTrigger />
-        </div>
-        {/* center: logo + title (visible on mobile header) */}
-        <div className="flex items-center gap-2">
-          <QrCode className="h-6 w-6 text-primary" />
-          <h1 className="text-lg font-bold">QR Bridge</h1>
-        </div>
-      </header>
-
-      <Sidebar>
-        <SidebarHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 group-data-[collapsible=icon]:-ml-1 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:opacity-0 transition-all duration-200">
-              <QrCode className="h-6 w-6 text-primary" />
-              <h1 className="text-lg font-bold">QR Bridge</h1>
-            </div>
-            <div className="md:hidden">
-              <SidebarTrigger />
-            </div>
-          </div>
-        </SidebarHeader>
-        <SidebarContent>
-            <SidebarMenu>
-                {menuItems.filter((item) => !item.permission || sessionInfo?.permissions?.includes(item.permission)).map((item) => (
-                    <SidebarMenuItem key={item.href}>
-                        <SidebarMenuButton
-                        asChild
-                        isActive={pathname === item.href}
-                        tooltip={item.label}
-                        >
-                            <Link href={item.href}>
-                                <item.icon />
-                                <span>{item.label}</span>
-                            </Link>
-                        </SidebarMenuButton>
-                    </SidebarMenuItem>
-                ))}
-            </SidebarMenu>
-            <SidebarGroup>
-                <SidebarGroupLabel>Account</SidebarGroupLabel>
-                <SidebarMenu>
-                    {accountItems.filter((item) => !item.permission || sessionInfo?.permissions?.includes(item.permission)).map((item) => (
-                        <SidebarMenuItem key={item.href}>
-                            <SidebarMenuButton
-                            asChild
-                            isActive={pathname === item.href}
-                            tooltip={item.label}
-                            >
-                                {item.href === '/signout' ? (
-                                  <button
-                                    onClick={handleSignOut}
-                                    className="flex items-center gap-2"
-                                    disabled={signingOut}
-                                  >
-                                    {signingOut ? <Loader2 className="animate-spin h-4 w-4" /> : <item.icon />}
-                                    <span>{item.label}</span>
-                                  </button>
-                                ) : (
-                                  <Link href={item.href}>
-                                    <item.icon />
-                                    <span>{item.label}</span>
-                                  </Link>
-                                )}
-                            </SidebarMenuButton>
-                        </SidebarMenuItem>
-                    ))}
-                </SidebarMenu>
-            </SidebarGroup>
-        </SidebarContent>
-      </Sidebar>
-      {/* Add mobile top padding so content is not covered by the fixed header */}
-      <SidebarInset className="pt-14 md:pt-0">
-        <RequireAuth>{children}</RequireAuth>
-      </SidebarInset>
-    </SidebarProvider>
-  )
+    <RoleSidebarLayout
+      title="QR Bridge"
+      sections={sections}
+      permissions={permissions}
+    >
+      <RequireAuth>{children}</RequireAuth>
+    </RoleSidebarLayout>
+  );
 }
