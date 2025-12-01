@@ -53,7 +53,7 @@ export default function PaymentsSidebarShell({ children, basePath = '', title = 
       label: 'Account',
       links: [
         { href: joinPath(basePath || '', '/profile'), label: 'Profile', icon: User, permission: 'profile' },
-        { href: joinPath(basePath || '', '/settings'), label: 'Settings', icon: SettingsIcon, permission: 'settings' },
+        //{ href: joinPath(basePath || '', '/settings'), label: 'Settings', icon: SettingsIcon, permission: 'settings' },
         { href: joinPath(basePath || '', '/signout'), label: 'Sign Out', icon: LogOutIcon, action: 'signout' },
       ],
     },
