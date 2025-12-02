@@ -1,0 +1,110 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function hasRole(r) {
+      return isSignedIn() && request.auth.token.role == r;
+    }
+
+    function hasPermission(p) {
+      return isSignedIn()
+        && request.auth.token.permissions is list
+        && p in request.auth.token.permissions;
+    }
+
+    function sameCompany(companyId) {
+      return isSignedIn()
+        && request.auth.token.companyId != null
+        && request.auth.token.companyId == companyId;
+    }
+
+    function sameBranch(companyId, branchId) {
+      return sameCompany(companyId)
+        && request.auth.token.branchId != null
+        && request.auth.token.branchId == branchId;
+    }
+
+    function isSelf(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // ----- users -----
+    match /users/{userId} {
+      allow get, list: if isSelf(userId)
+        || (
+          hasPermission('company:branches')
+          && resource.data.companyId != null
+          && sameCompany(resource.data.companyId)
+        );
+
+      allow create, update: if isSelf(userId);
+      allow delete: if false;
+    }
+
+    // ----- companies root -----
+    match /companies/{companyId} {
+      allow get, list: if sameCompany(companyId)
+        && (hasRole('company-owner') || hasRole('branch-manager'));
+
+      allow create: if false;
+      allow update: if hasRole('company-owner') && sameCompany(companyId);
+      allow delete: if false;
+
+      // ----- branches -----
+      match /branches/{branchId} {
+        allow get, list: if sameCompany(companyId)
+          && (
+            hasRole('company-owner')
+            || hasRole('branch-manager')
+            || hasRole('cashier')
+          );
+
+        allow create, update, delete: if hasRole('company-owner') && sameCompany(companyId);
+
+        // ----- cashiers -----
+        match /cashiers/{cashierId} {
+          allow get, list: if sameCompany(companyId)
+            && (
+              hasRole('company-owner')
+              || hasRole('branch-manager')
+              || (hasRole('cashier') && request.auth.uid == cashierId)
+            );
+
+          allow create, update, delete: if sameCompany(companyId)
+            && (
+              hasRole('company-owner')
+              || (hasRole('branch-manager') && sameBranch(companyId, branchId))
+            );
+        }
+      }
+    }
+
+    // ----- transactions (adjust path/names if different) -----
+    match /transactions/{txId} {
+      allow get, list: if isSignedIn()
+        && (
+          resource.data.uid == request.auth.uid
+          || (
+            resource.data.companyId != null
+            && sameCompany(resource.data.companyId)
+            && hasPermission('transactions')
+          )
+        );
+
+      allow create: if hasPermission('transactions')
+        || hasRole('individual')
+        || hasRole('cashier');
+      allow update, delete: if false;
+    }
+
+    // ----- deny everything else -----
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
