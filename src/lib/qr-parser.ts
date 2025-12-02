@@ -4,8 +4,6 @@
  */
 
 export interface LankaQRData {
-  amount: string;
-  reference_number: string;
   merchant_id: string;
   bank_code: string;
   terminal_id: string;
@@ -95,24 +93,6 @@ function extractMerchantAccountInfo(tag26Value: string): {
 }
 
 /**
- * Extracts reference number from tag 62 (Additional Data Field)
- */
-function extractReferenceNumber(tag62Value: string): string | null {
-  if (!tag62Value) return null;
-
-  try {
-    // Parse sub-TLV structure within tag 62
-    const subTlvMap = parseTLVStructure(tag62Value);
-    
-    // Look for reference number in sub-tags 05 or 06
-    return subTlvMap.get('05') || subTlvMap.get('06') || null;
-  } catch (error) {
-    console.error('Error extracting reference number:', error);
-    return null;
-  }
-}
-
-/**
  * Parses a LankaQR payment QR code string
  * @param qrString - The QR code string to parse
  * @returns Parsed QR data or null if parsing fails
@@ -136,45 +116,33 @@ export function parseLankaQR(qrString: string): LankaQRData | null {
     }
 
     // Extract other fields from TLV map
-    const amount = tlvMap.get('54');
     const merchant_name = tlvMap.get('59');
     const merchant_city = tlvMap.get('60');
     const mcc = tlvMap.get('52');
     const currency_code = tlvMap.get('53');
     const country_code = tlvMap.get('58');
-    
-    // Extract reference number from tag 62
-    const tag62Value = tlvMap.get('62');
-    const reference_number = extractReferenceNumber(tag62Value || '');
 
     console.log('Extracted fields:', {
-      amount,
       merchant_name,
       merchant_city,
       mcc,
       currency_code,
-      country_code,
-      reference_number
+      country_code
     });
 
     // Validate required fields
-    if (!amount || !merchant_name || !merchant_city || !mcc || 
-        !currency_code || !country_code || !reference_number) {
-      console.error('Missing required fields in QR code', {
-        amount: !!amount,
+    if (!merchant_name || !merchant_city || !mcc || !currency_code || !country_code) {
+      console.error('Missing required merchant fields in QR code', {
         merchant_name: !!merchant_name,
         merchant_city: !!merchant_city,
         mcc: !!mcc,
         currency_code: !!currency_code,
-        country_code: !!country_code,
-        reference_number: !!reference_number
+        country_code: !!country_code
       });
       return null;
     }
 
     return {
-      amount,
-      reference_number,
       merchant_id: merchantInfo.merchant_id,
       bank_code: merchantInfo.bank_code,
       terminal_id: merchantInfo.terminal_id,
@@ -199,6 +167,6 @@ export function validateLankaQRFormat(qrString: string): boolean {
   if (!qrString || typeof qrString !== 'string') return false;
   
   // Basic validation: check for required tags
-  const requiredTags = ['26', '52', '53', '54', '58', '59', '60', '62'];
+  const requiredTags = ['01', '26', '52', '53', '58', '59', '60'];
   return requiredTags.every(tag => qrString.includes(tag));
 }
