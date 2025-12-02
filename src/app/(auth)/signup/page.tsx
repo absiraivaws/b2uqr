@@ -1,5 +1,5 @@
- 'use client'
-import { useState } from 'react';
+'use client'
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Loader2, LogIn } from "lucide-react";
 import { useRouter } from 'next/navigation';
-import SignupKycSection, { KycValues } from '@/components/signup/SignupKycSection';
+import SignupKycSection, { KycValues, KycRequiredFlags } from '@/components/signup/SignupKycSection';
 import SignupOtpSection from '@/components/signup/SignupOtpSection';
 import SignupPinSection from '@/components/signup/SignupPinSection';
 import { auth } from '@/lib/firebase';
@@ -43,8 +43,67 @@ export default function SignUpPage() {
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [savingUser, setSavingUser] = useState(false);
+  const [kycRequiredFlags, setKycRequiredFlags] = useState<KycRequiredFlags>({});
 
   // Phone OTP logic (recaptcha, send/verify) moved to `use-phone-otp` hook.
+
+  const ensureOtpPrerequisites = () => {
+    const missing: KycRequiredFlags = {};
+    const trackMissing = (key: keyof KycRequiredFlags, value: string | null | undefined) => {
+      if (!value || !value.toString().trim()) {
+        missing[key] = true;
+      }
+    };
+
+    if (accountType === 'company') {
+      trackMissing('companyName', kyc.companyName ?? '');
+    }
+
+    trackMissing('displayName', kyc.displayName);
+    trackMissing('nic', kyc.nic);
+    trackMissing('businessReg', kyc.businessReg);
+    trackMissing('address', kyc.address);
+
+    if (!kyc.lat.toString().trim()) {
+      missing.lat = true;
+    }
+    if (!kyc.lng.toString().trim()) {
+      missing.lng = true;
+    }
+
+    setKycRequiredFlags(missing);
+    return Object.keys(missing).length ? 'missing-fields' : null;
+  };
+
+  useEffect(() => {
+    setKycRequiredFlags((prev) => {
+      if (!Object.keys(prev).length) return prev;
+      const next = { ...prev };
+      let changed = false;
+      const clearIfFilled = (key: keyof KycRequiredFlags, filled: boolean) => {
+        if (next[key] && filled) {
+          delete next[key];
+          changed = true;
+        }
+      };
+
+      if (accountType !== 'company' && next.companyName) {
+        delete next.companyName;
+        changed = true;
+      } else if (accountType === 'company') {
+        clearIfFilled('companyName', Boolean(kyc.companyName?.trim()));
+      }
+
+      clearIfFilled('displayName', Boolean(kyc.displayName.trim()));
+      clearIfFilled('nic', Boolean(kyc.nic.trim()));
+      clearIfFilled('businessReg', Boolean(kyc.businessReg.trim()));
+      clearIfFilled('address', Boolean(kyc.address.trim()));
+      clearIfFilled('lat', Boolean(kyc.lat.toString().trim()));
+      clearIfFilled('lng', Boolean(kyc.lng.toString().trim()));
+
+      return changed ? next : prev;
+    });
+  }, [accountType, kyc.companyName, kyc.displayName, kyc.nic, kyc.businessReg, kyc.address, kyc.lat, kyc.lng]);
 
   const handleSavePinAndCreateUser = async () => {
     setError(null);
@@ -198,7 +257,7 @@ export default function SignUpPage() {
                 </RadioGroup>
               </div>
 
-              <SignupKycSection values={kyc} onChange={setKyc} accountType={accountType} />
+              <SignupKycSection values={kyc} onChange={setKyc} accountType={accountType} requiredFlags={kycRequiredFlags} />
               <SignupOtpSection
                 email={email}
                 setEmail={setEmail}
@@ -207,6 +266,7 @@ export default function SignUpPage() {
                 fullName={kyc.displayName}
                 enablePhoneOtp={enablePhoneOtp}
                 errorBelowEmail={error}
+                ensureReadyForOtp={ensureOtpPrerequisites}
                 onVerified={(u) => setVerifiedUser({
                   uid: u.uid,
                   phone: u.phone ?? (phone && phone.toString().trim() ? phone : null),

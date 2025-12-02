@@ -24,6 +24,7 @@ interface SignupOtpSectionProps {
   onVerified: (u: VerifiedUser) => void;
   showSocial?: boolean;
   errorBelowEmail?: string | null;
+  ensureReadyForOtp?: () => string | null;
 }
 
 export default function SignupOtpSection({
@@ -36,6 +37,7 @@ export default function SignupOtpSection({
   onVerified,
   showSocial = false,
   errorBelowEmail,
+  ensureReadyForOtp,
 }: SignupOtpSectionProps) {
   const [socialLoading, setSocialLoading] = useState(false);
   const [resendSecondsLeft, setResendSecondsLeft] = useState<number | null>(null);
@@ -86,6 +88,10 @@ export default function SignupOtpSection({
   };
 
   const sendOtpToEmail = async (emailParam?: string) => {
+    if (ensureReadyForOtp) {
+      const guardResult = ensureReadyForOtp();
+      if (guardResult) return;
+    }
     try {
       const res: any = await handleSendEmailOtp(emailParam);
       if (res && res.ok) {
@@ -100,6 +106,10 @@ export default function SignupOtpSection({
   };
 
   const sendOtpToPhone = async (phoneParam?: string) => {
+    if (ensureReadyForOtp) {
+      const guardResult = ensureReadyForOtp();
+      if (guardResult) return;
+    }
     return await handleSendCode(phoneParam);
   };
 
