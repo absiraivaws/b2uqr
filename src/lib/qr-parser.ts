@@ -76,14 +76,14 @@ function extractMerchantAccountInfo(tag26Value: string): {
     
     // Tag 00 contains: bank_code(5) + merchant_id(19) + terminal_id(4) = 28 digits
     const tag00Value = subTlvMap.get('00');
-    if (!tag00Value || tag00Value.length !== 28) {
-      console.warn('Tag 00 within tag 26 not found or invalid length');
+    if (!tag00Value || tag00Value.length < 10) {
+      console.warn('Tag 00 within tag 26 not found or too short');
       return null;
     }
 
     const bank_code = tag00Value.substring(0, 5);
-    const merchant_id = tag00Value.substring(5, 24);
-    const terminal_id = tag00Value.substring(24, 28);
+    const terminal_id = tag00Value.substring(tag00Value.length - 4);
+    const merchant_id = tag00Value.substring(5, tag00Value.length - 4);
 
     return { bank_code, merchant_id, terminal_id };
   } catch (error) {
