@@ -33,6 +33,11 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
+    function isAdmin() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
     // ----- users -----
     match /users/{userId} {
       allow get, list: if isSelf(userId)
@@ -44,6 +49,15 @@ service cloud.firestore {
 
       allow create, update: if isSelf(userId);
       allow delete: if false;
+    }
+
+    // ----- admin console collections -----
+    match /admins/{adminId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /staff/{staffId} {
+      allow read, write: if isAdmin();
     }
 
     // ----- companies root -----
@@ -86,13 +100,16 @@ service cloud.firestore {
 
     // ----- transactions (adjust path/names if different) -----
     match /transactions/{txId} {
-      allow get, list: if isSignedIn()
-        && (
-          resource.data.uid == request.auth.uid
-          || (
-            resource.data.companyId != null
-            && sameCompany(resource.data.companyId)
-            && hasPermission('transactions')
+      allow get, list: if isAdmin()
+        || (
+          isSignedIn()
+          && (
+            resource.data.uid == request.auth.uid
+            || (
+              resource.data.companyId != null
+              && sameCompany(resource.data.companyId)
+              && hasPermission('transactions')
+            )
           )
         );
 
