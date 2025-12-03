@@ -12,8 +12,9 @@ import {
 } from "@/lib/actions";
 import type { Transaction } from "@/lib/types";
 import { generateQRImage } from "@/lib/qr-image-generator";
-import { db } from "@/lib/firebase";
-import { collection, limit, onSnapshot, orderBy, query } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
+import { collection, limit, onSnapshot, orderBy, query, where } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
 
 export function useTransactionManager() {
   const [currentTransaction, setCurrentTransaction] = useState<Transaction | null>(null);
@@ -25,6 +26,7 @@ export function useTransactionManager() {
   const [lastTxNumber, setLastTxNumber] = useState(0);
   const [amount, setAmount] = useState("");
   const [isLoadingCounter, setIsLoadingCounter] = useState(true);
+  const [currentUserUid, setCurrentUserUid] = useState<string | null>(null);
   const processedSaleIdsRef = useRef<Set<string>>(new Set());
   const salesListenerInitializedRef = useRef(false);
 
@@ -136,6 +138,18 @@ export function useTransactionManager() {
       setReferenceNumber('');
     }
   }, [referenceType, isLoadingCounter, lastTxNumber, terminalId]);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUserUid(user?.uid ?? null);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    processedSaleIdsRef.current.clear();
+    salesListenerInitializedRef.current = false;
+  }, [currentUserUid]);
 
   const performTransactionCreation = useCallback(
     async (amountValue: string, referenceValue: string, source: "manual" | "auto" = "manual") => {
@@ -277,8 +291,13 @@ export function useTransactionManager() {
   );
 
   useEffect(() => {
+    if (!currentUserUid) {
+      return () => {};
+    }
+
     const salesQuery = query(
       collection(db, "phppos_sales"),
+      where("createdBy", "==", currentUserUid),
       orderBy("createdAt", "desc"),
       limit(20)
     );
@@ -316,7 +335,7 @@ export function useTransactionManager() {
     return () => {
       unsubscribe();
     };
-  }, [handleIncomingSale]);
+  }, [handleIncomingSale, currentUserUid]);
 
   const handleVerifyTransaction = async () => {
     if (!currentTransaction) return;

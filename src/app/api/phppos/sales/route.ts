@@ -62,6 +62,29 @@ function normalizeReference(value: unknown): string | null {
   return null;
 }
 
+function extractUid(request: Request, body: any): string | null {
+  const searchParamsUid = (() => {
+    try {
+      const url = new URL(request.url);
+      return url.searchParams.get("uid") ?? url.searchParams.get("userUid");
+    } catch {
+      return null;
+    }
+  })();
+
+  return (
+    normalizeReference(body?.uid) ??
+    normalizeReference(body?.userUid) ??
+    normalizeReference(body?.user_id) ??
+    normalizeReference(body?.user) ??
+    normalizeReference(body?.sale?.uid) ??
+    normalizeReference(body?.sale?.userUid) ??
+    normalizeReference(body?.sale?.user_id) ??
+    normalizeReference(body?.sale?.user) ??
+    normalizeReference(searchParamsUid)
+  );
+}
+
 
 
 export async function POST(request: Request) {
@@ -91,10 +114,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: message }, { status: 400 });
     }
 
+    const requestedUid = extractUid(request, body);
+    const resolvedUid = auth.mode === "session" ? auth.uid : requestedUid;
+
+    if (!resolvedUid) {
+      return NextResponse.json(
+        { error: "Webhook requests must include a uid so sales can be attributed." },
+        { status: 400 }
+      );
+    }
+
     await persistPhpposSale(salePayload, {
       transactionUuid,
       referenceNumber,
-      uid: auth.uid,
+      uid: resolvedUid,
     });
 
     const status = auth.mode === "webhook" ? 202 : 201;
