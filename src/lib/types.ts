@@ -20,6 +20,9 @@ export interface Transaction {
   created_at: string;
   updated_at: string;
   bankResponse?: any;
+  phppos_sale_id?: string | number | null;
+  phppos_sale_total?: string | null;
+  phppos_sale_recorded_at?: string | null;
 }
 
 export interface BankWebhookPayload {
@@ -31,4 +34,14 @@ export interface BankWebhookPayload {
   auth_code: string;
   paid_at: string;
   terminal_id?: string;
+}
+
+export interface PhpposSale {
+  sale_id?: number;
+  total?: number | string;
+  sale_time?: string;
+  created_at?: string;
+  updated_at?: string;
+  receipt_url?: string;
+  [key: string]: any;
 }
