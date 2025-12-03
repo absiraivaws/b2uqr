@@ -245,17 +245,16 @@ export function useTransactionManager() {
     async (saleData: Record<string, any>) => {
       if (isSubmitting) return;
 
-      const rawTotal = saleData?.total ?? saleData?.payload?.total;
+      const rawTotal =
+        saleData?.total ??
+        saleData?.calculatedTotal ??
+        null;
       const parsedTotal = typeof rawTotal === 'number' ? rawTotal : parseFloat(rawTotal ?? '0');
       if (!rawTotal || Number.isNaN(parsedTotal) || parsedTotal <= 0) {
         return;
       }
 
-      const saleReference =
-        saleData?.reference_number ??
-        saleData?.payload?.reference_number ??
-        saleData?.sale_id ??
-        saleData?.payload?.sale_id;
+      const saleReference = saleData?.saleId ?? referenceNumber;
 
       let referenceToUse = referenceNumber;
       if (referenceType !== 'serial' && saleReference) {
@@ -280,7 +279,7 @@ export function useTransactionManager() {
   useEffect(() => {
     const salesQuery = query(
       collection(db, "phppos_sales"),
-      orderBy("recorded_at", "desc"),
+      orderBy("createdAt", "desc"),
       limit(20)
     );
 
@@ -288,7 +287,7 @@ export function useTransactionManager() {
       if (!salesListenerInitializedRef.current) {
         salesListenerInitializedRef.current = true;
         snapshot.docs.forEach(docSnap => {
-          const existingId = docSnap.data()?.sale_id ?? docSnap.id;
+          const existingId = docSnap.data()?.saleId ?? docSnap.id;
           if (existingId) {
             processedSaleIdsRef.current.add(String(existingId));
           }
@@ -299,7 +298,7 @@ export function useTransactionManager() {
       snapshot.docChanges().forEach(change => {
         if (change.type !== "added" && change.type !== "modified") return;
         const data = change.doc.data();
-        const saleId = data?.sale_id ?? change.doc.id;
+        const saleId = data?.saleId ?? change.doc.id;
         if (saleId && processedSaleIdsRef.current.has(String(saleId))) {
           if (change.type === "modified") {
             processedSaleIdsRef.current.delete(String(saleId));
