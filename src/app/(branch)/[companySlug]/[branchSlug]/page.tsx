@@ -4,7 +4,7 @@ import { getServerUser } from '@/lib/serverUser';
 import { getCompanyBySlug, getBranchBySlug } from '@/lib/companyData';
 import BranchManagerClient from '@/components/company/BranchManagerClient';
 
-export default async function BranchDashboardPage({ params }: { params: { companySlug: string; branchSlug: string } }) {
+export default async function BranchDashboardPage({ params }: { params: Promise<{ companySlug: string; branchSlug: string }> }) {
   const { companySlug, branchSlug } = await params;
   const session = await getServerUser();
   if (!session || session.claims?.role !== 'branch-manager') {

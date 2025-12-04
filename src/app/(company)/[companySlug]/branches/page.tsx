@@ -33,7 +33,7 @@ async function getBranchesWithCashiers(companyId: string) {
   return branches;
 }
 
-export default async function CompanyBranchesPage({ params }: { params: { companySlug: string } }) {
+export default async function CompanyBranchesPage({ params }: { params: Promise<{ companySlug: string }> }) {
   const { companySlug } = await params;
   const session = await getServerUser();
   if (!session || session.claims?.role !== 'company-owner') {
