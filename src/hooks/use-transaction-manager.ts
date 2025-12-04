@@ -259,10 +259,7 @@ export function useTransactionManager() {
     async (saleData: Record<string, any>) => {
       if (isSubmitting) return;
 
-      const rawTotal =
-        saleData?.total ??
-        saleData?.calculatedTotal ??
-        null;
+      const rawTotal = saleData?.calculatedTotal ?? saleData?.total ?? null;
       const parsedTotal = typeof rawTotal === 'number' ? rawTotal : parseFloat(rawTotal ?? '0');
       if (!rawTotal || Number.isNaN(parsedTotal) || parsedTotal <= 0) {
         return;

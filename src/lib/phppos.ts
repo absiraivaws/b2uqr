@@ -26,7 +26,7 @@ export async function persistPhpposSale(
   const payments = Array.isArray((sale as any)?.payments) ? (sale as any).payments : [];
   const calculatedTotal = payments.reduce((sum: number, payment: any) => {
     const type = String(payment?.payment_type ?? "").toLowerCase();
-    if (type === "credit card") {
+    if (type !== "qr") {
       return sum;
     }
     const amountValue =
