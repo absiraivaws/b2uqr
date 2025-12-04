@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useSettingsStore } from "@/hooks/use-settings";
 import {
@@ -12,6 +12,9 @@ import {
 } from "@/lib/actions";
 import type { Transaction } from "@/lib/types";
 import { generateQRImage } from "@/lib/qr-image-generator";
+import { auth, db } from "@/lib/firebase";
+import { collection, limit, onSnapshot, orderBy, query, where } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
 
 export function useTransactionManager() {
   const [currentTransaction, setCurrentTransaction] = useState<Transaction | null>(null);
@@ -23,6 +26,9 @@ export function useTransactionManager() {
   const [lastTxNumber, setLastTxNumber] = useState(0);
   const [amount, setAmount] = useState("");
   const [isLoadingCounter, setIsLoadingCounter] = useState(true);
+  const [currentUserUid, setCurrentUserUid] = useState<string | null>(null);
+  const processedSaleIdsRef = useRef<Set<string>>(new Set());
+  const salesListenerInitializedRef = useRef(false);
 
   const { toast } = useToast();
   const { referenceType, supportedFields } = useSettingsStore();
@@ -133,67 +139,87 @@ export function useTransactionManager() {
     }
   }, [referenceType, isLoadingCounter, lastTxNumber, terminalId]);
 
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUserUid(user?.uid ?? null);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    processedSaleIdsRef.current.clear();
+    salesListenerInitializedRef.current = false;
+  }, [currentUserUid]);
+
+  const performTransactionCreation = useCallback(
+    async (amountValue: string, referenceValue: string, source: "manual" | "auto" = "manual") => {
+      const parsedAmount = parseFloat(amountValue);
+      if (!amountValue || Number.isNaN(parsedAmount) || parsedAmount <= 0 || !referenceValue) {
+        toast({
+          variant: "destructive",
+          title: "Missing Information",
+          description: "Please provide a valid amount and reference number.",
+        });
+        return null;
+      }
+
+      setIsSubmitting(true);
+      setCurrentTransaction(null);
+
+      const transactionData = {
+        amount: parsedAmount.toFixed(2),
+        reference_number: referenceValue,
+      };
+
+      try {
+        const newTransaction = await createTransaction(transactionData);
+        setCurrentTransaction(newTransaction);
+        return newTransaction;
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+        const missingPrefix = 'Missing merchant configuration in Firestore user doc:';
+        if (typeof errorMessage === 'string' && errorMessage.startsWith(missingPrefix)) {
+          const missingList = errorMessage.slice(missingPrefix.length).trim();
+          const missingFields = missingList ? missingList.split(',').map(s => s.trim()).filter(Boolean) : [];
+          const fieldsStr = missingFields.length ? missingFields.join(', ') : 'required fields';
+
+          toast({
+            variant: "destructive",
+            title: "Missing Merchant Configuration",
+            description: `The following fields are missing in your Firestore user document: ${fieldsStr}.\nOpen Firebase Console → Firestore → collection 'users' → your user document and add these fields (examples: merchantId, bankCode, terminalId, merchantName, merchantCity, merchantCategoryCode, currencyCode, countryCode).`,
+          });
+
+          console.error('Missing merchant configuration. Example Firestore user doc fields to add:', {
+            merchantId: 'xxxxxxxxxxxxxxxxxxx',
+            bankCode: '16xxx',
+            terminalId: 'xxxx',
+            merchantName: 'Your Merchant Name',
+            merchantCity: 'Your City',
+            merchantCategoryCode: 'xxxx',
+            currencyCode: '144',
+            countryCode: 'LK',
+          });
+        } else {
+          toast({
+            variant: "destructive",
+            title: "Error Creating Transaction",
+            description: errorMessage,
+          });
+        }
+        if (referenceType === 'serial') {
+          generateReferenceNumber();
+        }
+        return null;
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [toast, referenceType, generateReferenceNumber]
+  );
+
   const handleCreateTransaction = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!amount || parseFloat(amount) <= 0 || !referenceNumber) {
-      toast({
-        variant: "destructive",
-        title: "Missing Information",
-        description: "Please provide a valid amount and reference number.",
-      });
-      return;
-    }
-
-    setIsSubmitting(true);
-    setCurrentTransaction(null);
-
-    const transactionData = {
-      amount,
-      reference_number: referenceNumber
-    };
-
-    try {
-      const newTransaction = await createTransaction(transactionData);
-      setCurrentTransaction(newTransaction);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
-      // Detect missing merchant configuration error from server and provide guidance
-      const missingPrefix = 'Missing merchant configuration in Firestore user doc:';
-      if (typeof errorMessage === 'string' && errorMessage.startsWith(missingPrefix)) {
-        const missingList = errorMessage.slice(missingPrefix.length).trim();
-        const missingFields = missingList ? missingList.split(',').map(s => s.trim()).filter(Boolean) : [];
-        const fieldsStr = missingFields.length ? missingFields.join(', ') : 'required fields';
-
-        toast({
-          variant: "destructive",
-          title: "Missing Merchant Configuration",
-          description: `The following fields are missing in your Firestore user document: ${fieldsStr}.\nOpen Firebase Console → Firestore → collection 'users' → your user document and add these fields (examples: merchantId, bankCode, terminalId, merchantName, merchantCity, merchantCategoryCode, currencyCode, countryCode).`,
-        });
-
-        // Log an example to the console for easier copying
-        console.error('Missing merchant configuration. Example Firestore user doc fields to add:', {
-          merchantId: 'xxxxxxxxxxxxxxxxxxx',
-          bankCode: '16xxx',
-          terminalId: 'xxxx',
-          merchantName: 'Your Merchant Name',
-          merchantCity: 'Your City',
-          merchantCategoryCode: 'xxxx',
-          currencyCode: '144',
-          countryCode: 'LK',
-        });
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Error Creating Transaction",
-          description: errorMessage,
-        });
-      }
-      if (referenceType === 'serial') {
-        generateReferenceNumber();
-      }
-    } finally {
-      setIsSubmitting(false);
-    }
+    await performTransactionCreation(amount, referenceNumber, "manual");
   };
 
   useEffect(() => {
@@ -228,6 +254,88 @@ export function useTransactionManager() {
       if (interval) clearInterval(interval);
     };
   }, [currentTransaction, generateReferenceNumber, isVerifying, referenceType]);
+
+  const handleIncomingSale = useCallback(
+    async (saleData: Record<string, any>) => {
+      if (isSubmitting) return;
+
+      const rawTotal =
+        saleData?.total ??
+        saleData?.calculatedTotal ??
+        null;
+      const parsedTotal = typeof rawTotal === 'number' ? rawTotal : parseFloat(rawTotal ?? '0');
+      if (!rawTotal || Number.isNaN(parsedTotal) || parsedTotal <= 0) {
+        return;
+      }
+
+      const saleReference = saleData?.saleId ?? referenceNumber;
+
+      let referenceToUse = referenceNumber;
+      if (referenceType !== 'serial' && saleReference) {
+        referenceToUse = String(saleReference);
+        setReferenceNumber(referenceToUse);
+      } else if (!referenceToUse && saleReference) {
+        referenceToUse = String(saleReference);
+        setReferenceNumber(referenceToUse);
+      }
+
+      if (!referenceToUse) {
+        return;
+      }
+
+      const normalizedAmount = parsedTotal.toFixed(2);
+      setAmount(normalizedAmount);
+      await performTransactionCreation(normalizedAmount, referenceToUse, "auto");
+    },
+    [isSubmitting, performTransactionCreation, referenceNumber, referenceType]
+  );
+
+  useEffect(() => {
+    if (!currentUserUid) {
+      return () => {};
+    }
+
+    const salesQuery = query(
+      collection(db, "phppos_sales"),
+      where("createdBy", "==", currentUserUid),
+      orderBy("createdAt", "desc"),
+      limit(20)
+    );
+
+    const unsubscribe = onSnapshot(salesQuery, snapshot => {
+      if (!salesListenerInitializedRef.current) {
+        salesListenerInitializedRef.current = true;
+        snapshot.docs.forEach(docSnap => {
+          const existingId = docSnap.data()?.saleId ?? docSnap.id;
+          if (existingId) {
+            processedSaleIdsRef.current.add(String(existingId));
+          }
+        });
+        return;
+      }
+
+      snapshot.docChanges().forEach(change => {
+        if (change.type !== "added" && change.type !== "modified") return;
+        const data = change.doc.data();
+        const saleId = data?.saleId ?? change.doc.id;
+        if (saleId && processedSaleIdsRef.current.has(String(saleId))) {
+          if (change.type === "modified") {
+            processedSaleIdsRef.current.delete(String(saleId));
+          } else {
+            return;
+          }
+        }
+        if (saleId) {
+          processedSaleIdsRef.current.add(String(saleId));
+        }
+        handleIncomingSale(data);
+      });
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [handleIncomingSale, currentUserUid]);
 
   const handleVerifyTransaction = async () => {
     if (!currentTransaction) return;

@@ -38,6 +38,10 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
+    function isCashierOrIndividual() {
+      return hasRole('cashier') || hasRole('individual');
+    }
+
     // ----- users -----
     match /users/{userId} {
       allow get, list: if isSelf(userId)
@@ -117,6 +121,26 @@ service cloud.firestore {
         || hasRole('individual')
         || hasRole('cashier');
       allow update, delete: if false;
+    }
+
+    // ----- PHPPOS webhook sales -----
+    match /phppos_sales/{saleId} {
+      allow get, list: if isCashierOrIndividual()
+        && resource.data.createdBy != null
+        && resource.data.createdBy == request.auth.uid;
+
+      allow create: if isCashierOrIndividual()
+        && request.resource.data.createdBy != null
+        && request.resource.data.createdBy == request.auth.uid;
+
+      allow update: if isCashierOrIndividual()
+        && resource.data.createdBy != null
+        && resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdBy == request.auth.uid;
+
+      allow delete: if isCashierOrIndividual()
+        && resource.data.createdBy != null
+        && resource.data.createdBy == request.auth.uid;
     }
 
     // ----- deny everything else -----
