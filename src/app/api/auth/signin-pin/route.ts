@@ -1,14 +1,23 @@
 import { NextResponse } from 'next/server';
 import { adminDb, adminAuth } from '@/lib/firebaseAdmin';
 import { verifyPin, hashPin, isArgonHash } from '@/lib/pinHash';
+import { buildCorsHeaders, buildPreflightHeaders } from '@/lib/cors';
+
+export function OPTIONS(req: Request) {
+  return new NextResponse(null, { status: 204, headers: buildPreflightHeaders(req) });
+}
 
 export async function POST(req: Request) {
   try {
+    const origin = req.headers.get('origin');
+    const corsHeaders = buildCorsHeaders(origin);
+    const respond = (body: any, status = 200) => NextResponse.json(body, { status, headers: corsHeaders });
+
     const body = await req.json();
     const identifier = (body?.identifier || '').toString().trim();
     const normalizedIdentifier = identifier.toLowerCase();
     const pin = (body?.pin || '').toString().trim();
-    if (!identifier || !pin) return NextResponse.json({ ok: false, message: 'Missing identifier or pin' }, { status: 400 });
+    if (!identifier || !pin) return respond({ ok: false, message: 'Missing identifier or pin' }, 400);
 
     // find user doc by email or phone
     let userDocSnap = null;
@@ -24,14 +33,14 @@ export async function POST(req: Request) {
       if (!usernameLookup.empty) userDocSnap = usernameLookup.docs[0];
     }
 
-    if (!userDocSnap) return NextResponse.json({ ok: false, message: 'User not found' }, { status: 404 });
+    if (!userDocSnap) return respond({ ok: false, message: 'User not found' }, 404);
 
     const data: any = userDocSnap.data();
     if (data?.status === 'disabled') {
-      return NextResponse.json({ ok: false, message: 'Account disabled' }, { status: 403 });
+      return respond({ ok: false, message: 'Account disabled' }, 403);
     }
     const storedHash = data?.pinHash;
-    if (!storedHash) return NextResponse.json({ ok: false, message: 'PIN not set' }, { status: 400 });
+    if (!storedHash) return respond({ ok: false, message: 'PIN not set' }, 400);
 
     let valid = false;
     // If stored hash looks like an Argon2 hash, verify using argon2
@@ -57,16 +66,18 @@ export async function POST(req: Request) {
       }
     }
 
-    if (!valid) return NextResponse.json({ ok: false, message: 'Invalid PIN' }, { status: 401 });
+    if (!valid) return respond({ ok: false, message: 'Invalid PIN' }, 401);
 
     const uid = data.uid;
-    if (!uid) return NextResponse.json({ ok: false, message: 'No uid associated' }, { status: 500 });
+    if (!uid) return respond({ ok: false, message: 'No uid associated' }, 500);
 
     // create custom token
     const customToken = await adminAuth.createCustomToken(uid);
-    return NextResponse.json({ ok: true, customToken, uid });
+    return respond({ ok: true, customToken, uid });
   } catch (err: any) {
     console.error('signin-pin error', err);
-    return NextResponse.json({ ok: false, message: err?.message || 'Server error' }, { status: 500 });
+    const origin = req.headers.get('origin');
+    const corsHeaders = buildCorsHeaders(origin);
+    return NextResponse.json({ ok: false, message: err?.message || 'Server error' }, { status: 500, headers: corsHeaders });
   }
 }
