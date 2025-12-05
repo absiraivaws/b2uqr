@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { signInWithCustomToken } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { getDefaultRouteForRole, getRequiredPermissionForPath } from '@/lib/roleRouting';
+import { useSessionRefresher } from '@/hooks/use-session-refresher';
 
 let ensureFirebaseUserPromise: Promise<void> | null = null;
 
@@ -36,6 +37,8 @@ export default function RequireAuth({ children }: { children: React.ReactNode })
   useEffect(() => {
     ensureFirebaseUserFromSession();
   }, []);
+
+  useSessionRefresher();
 
   useEffect(() => {
     let cancelled = false;
