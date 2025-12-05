@@ -17,6 +17,7 @@ import {
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Loader2, QrCode } from 'lucide-react';
+import { getMarketingOrigin } from '@/lib/marketingOrigin';
 
 type MenuItem = { href: string; label: string; icon: React.ComponentType<any> };
 
@@ -36,6 +37,7 @@ export default function RoleSidebar({
   const pathname = usePathname();
   const router = useRouter();
   const [signingOut, setSigningOut] = React.useState(false);
+  const marketingOrigin = getMarketingOrigin();
 
   const handleSignOut = async () => {
     setSigningOut(true);
@@ -44,8 +46,8 @@ export default function RoleSidebar({
     } catch (err) {
       console.error('signout failed', err);
     } finally {
-      // always redirect to signin
-      window.location.href = `/${role}/signin`;
+      const destination = marketingOrigin || `/${role}/signin`;
+      window.location.href = destination;
     }
   };
 
