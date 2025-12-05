@@ -16,7 +16,7 @@ export function getDefaultRouteForRole(role?: string | null, context?: RoleRoute
       return '/generate-qr';
     case 'cashier':
       if (context?.companySlug && context?.branchSlug && context?.cashierSlug) {
-        return `/${context.companySlug}/${context.branchSlug}/${context.cashierSlug}/generate-qr`;
+        return `/${context.companySlug}/${context.branchSlug}/${context.cashierSlug}`;
       }
       return '/generate-qr';
     case 'individual':

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { verifySessionCookieFromRequest } from '@/lib/sessionAdmin';
 import { getCompanyById } from '@/lib/companyData';
 import { PERMISSIONS } from '@/lib/organizations';
-import { adminAuth } from '@/lib/firebaseAdmin';
+import { adminAuth, adminDb } from '@/lib/firebaseAdmin';
 
 const ROLE_PERMISSION_KEY: Record<string, keyof typeof PERMISSIONS> = {
   individual: 'individual',
@@ -31,17 +31,30 @@ function arraysEqual(a: string[], b: string[]) {
 const CLAIM_KEYS = ['role', 'accountType', 'companyId', 'companySlug', 'branchId', 'branchSlug', 'cashierSlug'] as const;
 type ClaimKey = (typeof CLAIM_KEYS)[number];
 
-async function ensureClaimsPermissions(decoded: any, mergedPerms: string[]) {
+async function ensureClaimsPermissions(
+  decoded: any,
+  mergedPerms: string[],
+  overrides: Partial<Record<ClaimKey, any>> = {}
+) {
   const existingPerms = Array.isArray(decoded?.permissions) ? decoded.permissions : [];
-  if (arraysEqual(existingPerms, mergedPerms)) return;
+  const needsPermissionUpdate = !arraysEqual(existingPerms, mergedPerms);
+  const needsClaimUpdate = CLAIM_KEYS.some((key) => {
+    if (!(key in overrides)) return false;
+    return decoded?.[key] !== overrides[key];
+  });
+
+  if (!needsPermissionUpdate && !needsClaimUpdate) return;
 
   const claimPayload: Record<string, any> = {};
   CLAIM_KEYS.forEach((key: ClaimKey) => {
-    if (decoded?.[key] !== undefined && decoded?.[key] !== null) {
-      claimPayload[key] = decoded[key];
+    const overrideValue = overrides[key];
+    const baseValue = overrideValue !== undefined ? overrideValue : decoded?.[key];
+    if (baseValue !== undefined && baseValue !== null) {
+      claimPayload[key] = baseValue;
     }
   });
   claimPayload.permissions = mergedPerms;
+
   await adminAuth.setCustomUserClaims(decoded.uid, claimPayload).catch((err) => {
     console.warn('failed to upgrade permissions claims', err);
   });
@@ -51,15 +64,31 @@ export async function GET(req: Request) {
   try {
     const decoded: any = await verifySessionCookieFromRequest(req);
     if (!decoded) return NextResponse.json({ ok: false, message: 'No valid session' }, { status: 401 });
-    let companySlug = decoded.companySlug || null;
-    if (!companySlug && decoded?.role === 'company-owner' && decoded?.companyId) {
-      const company = await getCompanyById(decoded.companyId).catch(() => null);
-      if (company?.slug) {
-        companySlug = company.slug;
+    let companyId = decoded.companyId ?? null;
+    let companySlug = decoded.companySlug ?? null;
+
+    if (decoded?.role === 'company-owner') {
+      if (!companyId || !companySlug) {
+        const userDoc = await adminDb.collection('users').doc(decoded.uid).get().catch(() => null);
+        if (userDoc?.exists) {
+          const userData = userDoc.data() as Record<string, any>;
+          if (!companyId && userData?.companyId) companyId = userData.companyId;
+          if (!companySlug && userData?.companySlug) companySlug = userData.companySlug;
+        }
+      }
+
+      if (!companySlug && companyId) {
+        const company = await getCompanyById(companyId).catch(() => null);
+        if (company?.slug) {
+          companySlug = company.slug;
+        }
       }
     }
     const permissions = withRoleDefaults(decoded.role, decoded.permissions);
-    await ensureClaimsPermissions(decoded, permissions);
+    const claimOverrides: Partial<Record<ClaimKey, any>> = {};
+    if (companyId) claimOverrides.companyId = companyId;
+    if (companySlug) claimOverrides.companySlug = companySlug;
+    await ensureClaimsPermissions(decoded, permissions, claimOverrides);
     return NextResponse.json({
       ok: true,
       uid: decoded.uid,
@@ -67,11 +96,11 @@ export async function GET(req: Request) {
       name: decoded.name,
       role: decoded.role || null,
       accountType: decoded.accountType || null,
-      companyId: decoded.companyId || null,
-       companySlug,
+      companyId,
+      companySlug,
       branchId: decoded.branchId || null,
-       branchSlug: decoded.branchSlug || null,
-       cashierSlug: decoded.cashierSlug || null,
+      branchSlug: decoded.branchSlug || null,
+      cashierSlug: decoded.cashierSlug || null,
       permissions,
     });
   } catch (err: any) {
