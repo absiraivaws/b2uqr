@@ -14,6 +14,7 @@ interface TransactionFormProps {
   status?: string | null;
   referenceType: 'serial' | 'invoice';
   manualReferencePlaceholder: string;
+  cashierNumber?: string | null;
 }
 
 export function TransactionForm({
@@ -25,8 +26,11 @@ export function TransactionForm({
   onAmountChange,
   status,
   referenceType,
-  manualReferencePlaceholder
+  manualReferencePlaceholder,
+  cashierNumber
 }: TransactionFormProps) {
+  const showCashierNumber = Boolean(cashierNumber);
+
   return (
     <Card>
       <CardHeader>
@@ -38,18 +42,45 @@ export function TransactionForm({
           onSubmit={onSubmit}
           className="space-y-6"
         >
-          <div className="space-y-2">
-            <Label htmlFor="reference_number">Reference Number</Label>
-            <Input
-              id="reference_number"
-              name="reference_number"
-              value={referenceNumber}
-              readOnly={referenceType === 'serial'}
-              onChange={(e) => setReferenceNumber(e.target.value)}
-              className={`font-mono ${referenceType === 'serial' ? 'bg-muted' : ''}`}
-              placeholder={referenceType === 'invoice' ? manualReferencePlaceholder : ''}
-            />
-          </div>
+          {showCashierNumber ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="reference_number">Reference Number</Label>
+                <Input
+                  id="reference_number"
+                  name="reference_number"
+                  value={referenceNumber}
+                  readOnly={referenceType === 'serial'}
+                  onChange={(e) => setReferenceNumber(e.target.value)}
+                  className={`font-mono ${referenceType === 'serial' ? 'bg-muted' : ''}`}
+                  placeholder={referenceType === 'invoice' ? manualReferencePlaceholder : ''}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cashier_number">Cashier Number</Label>
+                <Input
+                  id="cashier_number"
+                  name="cashier_number"
+                  value={cashierNumber ?? ''}
+                  readOnly
+                  className="bg-muted font-bold text-primary"
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Label htmlFor="reference_number">Reference Number</Label>
+              <Input
+                id="reference_number"
+                name="reference_number"
+                value={referenceNumber}
+                readOnly={referenceType === 'serial'}
+                onChange={(e) => setReferenceNumber(e.target.value)}
+                className={`font-mono ${referenceType === 'serial' ? 'bg-muted' : ''}`}
+                placeholder={referenceType === 'invoice' ? manualReferencePlaceholder : ''}
+              />
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="amount">Amount</Label>
             <Input

@@ -104,6 +104,9 @@ export function useTransactionManager() {
   const [userCashierNumber, setUserCashierNumber] = useState<number | null>(null);
 
   const isCashierUser = userRole === 'cashier';
+  const cashierNumberDisplay = isCashierUser
+    ? formatNumericSegment(userCashierNumber, 2, CASHIER_SEGMENT_FALLBACK)
+    : null;
 
   // Load terminalId and other merchant settings from Firestore user document (server-side action)
   useEffect(() => {
@@ -564,6 +567,8 @@ export function useTransactionManager() {
     terminalId,
     manualReferencePlaceholder,
     referenceType,
+    cashierNumberDisplay,
+    isCashierUser,
     // Actions
     handleCreateTransaction,
     handleVerifyTransaction,

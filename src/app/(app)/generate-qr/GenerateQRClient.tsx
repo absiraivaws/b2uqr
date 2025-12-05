@@ -18,6 +18,7 @@ export default function GenerateQRClient() {
     setAmount,
     manualReferencePlaceholder,
     referenceType,
+    cashierNumberDisplay,
     handleCreateTransaction,
     handleVerifyTransaction,
     handleShareQR,
@@ -38,6 +39,7 @@ export default function GenerateQRClient() {
             status={currentTransaction?.status}
             referenceType={referenceType}
             manualReferencePlaceholder={manualReferencePlaceholder}
+            cashierNumber={cashierNumberDisplay}
           />
         </div>
         <div className="lg:col-span-2">
