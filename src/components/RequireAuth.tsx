@@ -1,10 +1,41 @@
 "use client";
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { signInWithCustomToken } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 import { getDefaultRouteForRole, getRequiredPermissionForPath } from '@/lib/roleRouting';
+
+let ensureFirebaseUserPromise: Promise<void> | null = null;
+
+async function ensureFirebaseUserFromSession() {
+  if (auth.currentUser) return;
+  if (ensureFirebaseUserPromise) return ensureFirebaseUserPromise;
+
+  ensureFirebaseUserPromise = (async () => {
+    try {
+      const res = await fetch('/api/auth/custom-token', { cache: 'no-store', credentials: 'include' });
+      if (res.status === 401 || res.status === 403) return;
+      if (!res.ok) throw new Error('custom token request failed');
+      const data = await res.json().catch(() => ({}));
+      const customToken = data?.customToken as string | undefined;
+      if (!customToken || auth.currentUser) return;
+      await signInWithCustomToken(auth, customToken);
+    } catch (err) {
+      console.warn('Failed to hydrate Firebase client from session', err);
+    } finally {
+      ensureFirebaseUserPromise = null;
+    }
+  })();
+
+  return ensureFirebaseUserPromise;
+}
 
 export default function RequireAuth({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+
+  useEffect(() => {
+    ensureFirebaseUserFromSession();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
