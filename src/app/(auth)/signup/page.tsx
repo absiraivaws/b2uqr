@@ -26,7 +26,7 @@ export default function SignUpPage() {
     lng: '',
     companyName: '',
   });
-  const [phone, setPhone] = useState('');
+  const [whatsappNumber, setWhatsappNumber] = useState('');
   const [email, setEmail] = useState('');
 
   // this is to enable/disable phone OTP button
@@ -36,7 +36,7 @@ export default function SignUpPage() {
   const [error, setError] = useState<string | null>(null);
   const [verifiedUser, setVerifiedUser] = useState<{
     uid: string;
-    phone: string | null;
+    whatsappNumber: string | null;
     displayName?: string | null;
     email?: string | null;
   } | null>(null);
@@ -140,7 +140,7 @@ export default function SignUpPage() {
       const json = await res.json();
       if (!res.ok || !json?.ok) throw new Error(json?.message || 'Failed to save PIN');
 
-      const finalPhone = verifiedUser.phone ?? (phone && phone.toString().trim() ? phone : null);
+      const finalWhatsappNumber = verifiedUser.whatsappNumber ?? (whatsappNumber && whatsappNumber.toString().trim() ? whatsappNumber : null);
       const finalEmail = verifiedUser.email ?? (email && email.toString().trim() ? email : null);
 
       const onboardRes = await fetch('/api/merchant/onboard', {
@@ -150,7 +150,7 @@ export default function SignUpPage() {
           accountType,
           kyc,
           contact: {
-            phone: finalPhone,
+            whatsappNumber: finalWhatsappNumber,
             email: finalEmail,
           },
         }),
@@ -211,7 +211,7 @@ export default function SignUpPage() {
       <Card>
         <CardHeader>
           <CardTitle>Create account</CardTitle>
-          <CardDescription>Sign up with phone (OTP) or continue with a social account.</CardDescription>
+          <CardDescription>Sign up with your WhatsApp number (OTP) or continue with a social account.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {error && (
@@ -261,15 +261,15 @@ export default function SignUpPage() {
               <SignupOtpSection
                 email={email}
                 setEmail={setEmail}
-                phone={phone}
-                setPhone={setPhone}
+                whatsappNumber={whatsappNumber}
+                setWhatsappNumber={setWhatsappNumber}
                 fullName={kyc.displayName}
                 enablePhoneOtp={enablePhoneOtp}
                 errorBelowEmail={error}
                 ensureReadyForOtp={ensureOtpPrerequisites}
                 onVerified={(u) => setVerifiedUser({
                   uid: u.uid,
-                  phone: u.phone ?? (phone && phone.toString().trim() ? phone : null),
+                  whatsappNumber: u.whatsappNumber ?? (whatsappNumber && whatsappNumber.toString().trim() ? whatsappNumber : null),
                   displayName: u.displayName ?? (kyc.displayName && kyc.displayName.toString().trim() ? kyc.displayName : null),
                   email: u.email ?? (email && email.toString().trim() ? email : null),
                 })}
@@ -277,7 +277,7 @@ export default function SignUpPage() {
 
               {verifiedUser && (
                 <>
-                  <div className="text-sm">Verified: <strong>{verifiedUser.email ?? verifiedUser.phone}</strong></div>
+                  <div className="text-sm">Verified: <strong>{verifiedUser.email ?? verifiedUser.whatsappNumber}</strong></div>
                   <SignupPinSection
                     pin={pin}
                     setPin={setPin}

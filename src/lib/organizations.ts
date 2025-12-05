@@ -27,6 +27,7 @@ export interface BaseProfileInput {
 export interface ContactInput {
   email?: string | null;
   phone?: string | null;
+  whatsappNumber?: string | null;
 }
 
 export interface OnboardIndividualInput {
@@ -157,7 +158,7 @@ export async function onboardIndividualMerchant(input: OnboardIndividualInput) {
       address: profile.address || null,
       location: toGeoPoint(profile.lat, profile.lng) || null,
       email: contact.email || null,
-      phone: contact.phone || null,
+      whatsappNumber: contact.whatsappNumber || null,
       ...timestamps,
     }, { merge: true });
   });
@@ -225,7 +226,7 @@ export async function onboardCompanyMerchant(input: OnboardCompanyInput) {
       address: owner.address || company.address,
       location: toGeoPoint(owner.lat, owner.lng) || toGeoPoint(company.lat, company.lng) || null,
       email: contact.email || null,
-      phone: contact.phone || null,
+      whatsappNumber: contact.whatsappNumber || null,
       ...timestamps,
     }, { merge: true });
   });

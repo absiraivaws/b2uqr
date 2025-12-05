@@ -23,6 +23,7 @@ export async function POST(req: Request) {
 
     const kyc = body?.kyc || {};
     const contact = body?.contact || {};
+    const whatsappNumber = (contact?.whatsappNumber ?? '').toString().trim();
     const baseProfile = {
       displayName: (kyc.displayName || '').toString().trim(),
       nic: (kyc.nic || '').toString().trim(),
@@ -42,7 +43,7 @@ export async function POST(req: Request) {
         profile: baseProfile,
         contact: {
           email: contact.email || null,
-          phone: contact.phone || null,
+          whatsappNumber: whatsappNumber || null,
         },
       });
       return NextResponse.json({ ok: true, accountType: 'individual' });
@@ -58,7 +59,7 @@ export async function POST(req: Request) {
       owner: baseProfile,
       contact: {
         email: contact.email || null,
-        phone: contact.phone || null,
+        whatsappNumber: whatsappNumber || null,
       },
       company: {
         name: companyName,

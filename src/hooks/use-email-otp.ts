@@ -4,7 +4,7 @@ import { signInWithCustomToken } from 'firebase/auth';
 
 type VerifiedUser = {
   uid: string;
-  phone: string | null;
+  whatsappNumber: string | null;
   displayName?: string | null;
   email?: string | null;
 };
@@ -89,7 +89,7 @@ export function useEmailOtp({ email, fullName, onVerified }: { email: string; fu
           }
           const verifiedUser = {
             uid: userCred.user.uid,
-            phone: userCred.user.phoneNumber ?? null,
+            whatsappNumber: userCred.user.phoneNumber ?? null,
             displayName: userCred.user.displayName ?? fullName ?? null,
             email: userCred.user.email ?? email ?? null,
           };
@@ -101,7 +101,7 @@ export function useEmailOtp({ email, fullName, onVerified }: { email: string; fu
           const displayName = data.displayName as string | undefined;
           const verifiedUser = {
             uid: uid || '',
-            phone: null,
+            whatsappNumber: null,
             displayName: displayName ?? fullName ?? null,
             email: email ?? null,
           };

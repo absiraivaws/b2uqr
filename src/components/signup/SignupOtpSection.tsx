@@ -9,7 +9,7 @@ import { usePhoneOtp } from '@/hooks/use-phone-otp';
 
 type VerifiedUser = {
   uid: string;
-  phone: string | null;
+  whatsappNumber: string | null;
   displayName?: string | null;
   email?: string | null;
 };
@@ -17,8 +17,8 @@ type VerifiedUser = {
 interface SignupOtpSectionProps {
   email: string;
   setEmail: (v: string) => void;
-  phone: string;
-  setPhone: (v: string) => void;
+  whatsappNumber: string;
+  setWhatsappNumber: (v: string) => void;
   fullName: string;
   enablePhoneOtp?: boolean;
   onVerified: (u: VerifiedUser) => void;
@@ -30,8 +30,8 @@ interface SignupOtpSectionProps {
 export default function SignupOtpSection({
   email,
   setEmail,
-  phone,
-  setPhone,
+  whatsappNumber,
+  setWhatsappNumber,
   fullName,
   enablePhoneOtp = false,
   onVerified,
@@ -73,7 +73,7 @@ export default function SignupOtpSection({
     handleSendCode,
     handleVerifyOtp,
   } = usePhoneOtp({
-    phone,
+    whatsappNumber,
     fullName,
     onVerified,
   });
@@ -105,12 +105,12 @@ export default function SignupOtpSection({
     }
   };
 
-  const sendOtpToPhone = async (phoneParam?: string) => {
+  const sendOtpToWhatsapp = async (whatsappParam?: string) => {
     if (ensureReadyForOtp) {
       const guardResult = ensureReadyForOtp();
       if (guardResult) return;
     }
-    return await handleSendCode(phoneParam);
+    return await handleSendCode(whatsappParam);
   };
 
   // Reset OTP UI when email or phone change
@@ -126,7 +126,7 @@ export default function SignupOtpSection({
         countdownRef.id = undefined;
       }
     } catch {}
-  }, [email, phone]);
+  }, [email, whatsappNumber]);
 
   // Start resend countdown after sending
   useEffect(() => {
@@ -165,11 +165,11 @@ export default function SignupOtpSection({
       )}
 
       <div>
-        <label className="text-sm">Phone Number</label>
+        <label className="text-sm">WhatsApp Number</label>
         <div className='flex gap-2'>
-          <Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+947xxxxxxxx" required />
+          <Input value={whatsappNumber} onChange={e => setWhatsappNumber(e.target.value)} placeholder="+947xxxxxxxx" required />
           {enablePhoneOtp && (
-            <Button type="button" onClick={() => sendOtpToPhone(phone)} disabled={emailSending || sendingCode || (resendSecondsLeft !== null && resendSecondsLeft > 0)}>
+            <Button type="button" onClick={() => sendOtpToWhatsapp(whatsappNumber)} disabled={emailSending || sendingCode || (resendSecondsLeft !== null && resendSecondsLeft > 0)}>
               {emailSending || sendingCode ? (
                 <Loader2 className="animate-spin h-4 w-4" />
               ) : resendSecondsLeft && resendSecondsLeft > 0 ? (
