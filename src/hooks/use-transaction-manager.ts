@@ -16,6 +16,66 @@ import { auth, db } from "@/lib/firebase";
 import { collection, limit, onSnapshot, orderBy, query, where } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 
+const SERIAL_COUNTER_DIGITS = 6;
+const COMPANY_SEGMENT_FALLBACK = 'MERCHANT';
+const BRANCH_SEGMENT_FALLBACK = '000';
+const CASHIER_SEGMENT_FALLBACK = '00';
+
+const formatDateSegment = (date: Date) => {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yyyy}${mm}${dd}`;
+};
+
+const normalizeCompanySegment = (input?: string | null) => {
+  if (!input) return COMPANY_SEGMENT_FALLBACK;
+  const cleaned = input.trim().replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+  return cleaned || COMPANY_SEGMENT_FALLBACK;
+};
+
+const formatNumericSegment = (
+  value: number | string | null | undefined,
+  length: number,
+  fallback: string
+) => {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+    return String(value).padStart(length, '0');
+  }
+  if (typeof value === 'string') {
+    const parsed = parseInt(value, 10);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return String(parsed).padStart(length, '0');
+    }
+  }
+  return fallback;
+};
+
+const parsePositiveInteger = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const parsed = parseInt(value, 10);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+  return null;
+};
+
+const coalesceString = (...values: unknown[]): string | null => {
+  for (const value of values) {
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed.length) {
+        return trimmed;
+      }
+    }
+  }
+  return null;
+};
+
 export function useTransactionManager() {
   const [currentTransaction, setCurrentTransaction] = useState<Transaction | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -38,6 +98,12 @@ export function useTransactionManager() {
   // Terminal ID will be loaded from Firestore user doc when available.
   const [terminalId, setTerminalId] = useState<string>(fallbackTerminalId);
   const [userSettingsLoaded, setUserSettingsLoaded] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [userCompanyName, setUserCompanyName] = useState<string | null>(null);
+  const [userBranchNumber, setUserBranchNumber] = useState<number | null>(null);
+  const [userCashierNumber, setUserCashierNumber] = useState<number | null>(null);
+
+  const isCashierUser = userRole === 'cashier';
 
   // Load terminalId and other merchant settings from Firestore user document (server-side action)
   useEffect(() => {
@@ -48,8 +114,34 @@ export function useTransactionManager() {
         if (!mounted) return;
         if (userSettings) {
           // support both `terminalId` and `terminal_id` field names
-          const tid = (userSettings.terminalId ?? userSettings.terminal_id ?? userSettings.terminal_id)?.toString();
+          const tid = (userSettings.terminalId ?? userSettings.terminal_id)?.toString();
           if (tid) setTerminalId(tid);
+
+          const resolvedRole = typeof userSettings.role === 'string' ? userSettings.role : null;
+          setUserRole(resolvedRole);
+
+          const resolvedCompanyName = coalesceString(
+            userSettings.companyName,
+            userSettings.company_name,
+            userSettings.companyMerchantSettings?.companyName,
+            userSettings.companyMerchantSettings?.merchant_name
+          );
+          setUserCompanyName(resolvedCompanyName);
+
+          const branchNumeric = parsePositiveInteger(
+            userSettings.branchNumber ?? userSettings.branch_number
+          );
+          setUserBranchNumber(branchNumeric);
+
+          const cashierNumeric = parsePositiveInteger(
+            userSettings.cashierNumber ?? userSettings.cashier_number
+          );
+          setUserCashierNumber(cashierNumeric);
+        } else {
+          setUserRole(null);
+          setUserCompanyName(null);
+          setUserBranchNumber(null);
+          setUserCashierNumber(null);
         }
       } catch (err) {
         console.error('Failed to load user settings:', err);
@@ -64,11 +156,31 @@ export function useTransactionManager() {
 
   // Function to extract counter from reference number
   const extractCounterFromReference = useCallback((refNum: string): number => {
-    // Reference format: <terminalId>YYYYMMDD<6-digit-counter>
-    // Extract last 6 digits
-    const last6 = refNum.slice(-6);
-    return parseInt(last6, 10) || 0;
+    const lastDigits = refNum.slice(-SERIAL_COUNTER_DIGITS);
+    return parseInt(lastDigits, 10) || 0;
   }, []);
+
+  const buildReferenceBase = useCallback(
+    (date: Date = new Date()) => {
+      const dateSegment = formatDateSegment(date);
+      if (isCashierUser) {
+        const companySegment = normalizeCompanySegment(userCompanyName);
+        const branchSegment = formatNumericSegment(userBranchNumber, 3, BRANCH_SEGMENT_FALLBACK);
+        const cashierSegment = formatNumericSegment(userCashierNumber, 2, CASHIER_SEGMENT_FALLBACK);
+        return `${companySegment}-${branchSegment}-${cashierSegment}-${dateSegment}`;
+      }
+      return dateSegment;
+    },
+    [isCashierUser, userCompanyName, userBranchNumber, userCashierNumber]
+  );
+
+  const buildReferenceValue = useCallback(
+    (counter: number, date: Date = new Date()) => {
+      const counterPart = String(counter).padStart(SERIAL_COUNTER_DIGITS, '0');
+      return `${buildReferenceBase(date)}${counterPart}`;
+    },
+    [buildReferenceBase]
+  );
 
   // Load the last transaction counter for today
   useEffect(() => {
@@ -84,18 +196,12 @@ export function useTransactionManager() {
       try {
         const lastTx = await getLastTransactionToday(terminalId);
         if (lastTx && lastTx.reference_number) {
-          const date = new Date();
-          const yyyy = date.getFullYear();
-          const mm = String(date.getMonth() + 1).padStart(2, '0');
-          const dd = String(date.getDate()).padStart(2, '0');
-          const todayPrefix = `${terminalId}${yyyy}${mm}${dd}`;
-          
-          // Check if the last transaction is from today
+          const todayPrefix = buildReferenceBase(new Date());
+
           if (lastTx.reference_number.startsWith(todayPrefix)) {
             const counter = extractCounterFromReference(lastTx.reference_number);
             setLastTxNumber(counter);
           } else {
-            // Last transaction was from a previous day, reset to 0
             setLastTxNumber(0);
           }
         } else {
@@ -111,33 +217,23 @@ export function useTransactionManager() {
     }
     
     loadTodayCounter();
-  }, [terminalId, referenceType, extractCounterFromReference, userSettingsLoaded]);
+  }, [terminalId, referenceType, extractCounterFromReference, userSettingsLoaded, buildReferenceBase]);
 
   const generateReferenceNumber = useCallback(() => {
     if (referenceType !== 'serial') return;
-    const date = new Date();
-    const yyyy = date.getFullYear();
-    const mm = String(date.getMonth() + 1).padStart(2, '0');
-    const dd = String(date.getDate()).padStart(2, '0');
     const nextTxNumber = lastTxNumber + 1;
-    const randomPart = String(nextTxNumber).padStart(6, '0');
-    setReferenceNumber(`${terminalId}${yyyy}${mm}${dd}${randomPart}`);
+    setReferenceNumber(buildReferenceValue(nextTxNumber));
     setLastTxNumber(nextTxNumber);
-  }, [lastTxNumber, referenceType, terminalId]);
+  }, [buildReferenceValue, lastTxNumber, referenceType]);
 
   useEffect(() => {
     if (referenceType === 'serial' && !isLoadingCounter) {
-      const date = new Date();
-      const yyyy = date.getFullYear();
-      const mm = String(date.getMonth() + 1).padStart(2, '0');
-      const dd = String(date.getDate()).padStart(2, '0');
       const nextTxNumber = lastTxNumber + 1;
-      const randomPart = String(nextTxNumber).padStart(6, '0');
-      setReferenceNumber(`${terminalId}${yyyy}${mm}${dd}${randomPart}`);
+      setReferenceNumber(buildReferenceValue(nextTxNumber));
     } else if (referenceType !== 'serial') {
       setReferenceNumber('');
     }
-  }, [referenceType, isLoadingCounter, lastTxNumber, terminalId]);
+  }, [referenceType, isLoadingCounter, lastTxNumber, buildReferenceValue]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
