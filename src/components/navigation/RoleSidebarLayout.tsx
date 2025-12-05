@@ -19,6 +19,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { Loader2, QrCode } from 'lucide-react';
 import { clientSignOut } from '@/lib/clientAuth';
+import { getMarketingOrigin } from '@/lib/marketingOrigin';
 
 export interface SidebarLinkConfig {
   href: string;
@@ -50,6 +51,7 @@ export default function RoleSidebarLayout({
   sections,
   children,
 }: RoleSidebarLayoutProps) {
+  const marketingOrigin = getMarketingOrigin();
   const router = useRouter();
   const pathname = usePathname();
   const [signingOut, setSigningOut] = useState(false);
@@ -74,7 +76,8 @@ export default function RoleSidebarLayout({
     setSigningOut(true);
     try {
       await clientSignOut();
-      router.replace('/signin');
+      const destination = marketingOrigin || '/signin';
+      window.location.href = destination;
     } catch (err) {
       console.error('Sign out failed', err);
       setSigningOut(false);
