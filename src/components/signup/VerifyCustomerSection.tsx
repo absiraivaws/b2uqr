@@ -48,7 +48,7 @@ export default function VerifyCustomerSection({ uid, next }: VerifyCustomerSecti
   const [cameraActive, setCameraActive] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
   const [redirectEmail, setRedirectEmail] = useState<string | null>(null);
-  const [redirectCountdown, setRedirectCountdown] = useState<number>(10);
+  const [redirectCountdown, setRedirectCountdown] = useState<number>(5);
 
   useEffect(() => {
     return () => {
