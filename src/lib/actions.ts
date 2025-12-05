@@ -70,12 +70,18 @@ function pickFirstValue(...values: any[]): string | undefined {
   return undefined;
 }
 
-async function loadCompanyMerchantSettings(companyId: string): Promise<Record<string, any> | null> {
+async function loadCompanyMerchantSettings(
+  companyId: string,
+  preloadedData?: Record<string, any> | null
+): Promise<Record<string, any> | null> {
   try {
-    const snap = await adminDb.collection('companies').doc(companyId).get();
-    if (!snap.exists) return null;
-    const data = snap.data() || {};
-    return (data.merchantSettings ?? null) as Record<string, any> | null;
+    let data = preloadedData ?? null;
+    if (!data) {
+      const snap = await adminDb.collection('companies').doc(companyId).get();
+      if (!snap.exists) return null;
+      data = snap.data() || {};
+    }
+    return (data?.merchantSettings ?? null) as Record<string, any> | null;
   } catch (err) {
     console.error('Failed to load company merchant settings', err);
     return null;
@@ -284,13 +290,58 @@ export async function getUserSettings(): Promise<Record<string, any> | null> {
     const userDoc = await adminDb.collection('users').doc(decoded.uid).get();
     if (!userDoc.exists) return null;
     const raw = userDoc.data() as Record<string, any>;
+
+    let companyDocData: Record<string, any> | null = null;
+    let branchDocData: Record<string, any> | null = null;
+
+    if (raw?.companyId) {
+      try {
+        const companyRef = adminDb.collection('companies').doc(String(raw.companyId));
+        const branchPromise = raw?.branchId
+          ? companyRef.collection('branches').doc(String(raw.branchId)).get()
+          : Promise.resolve(null);
+        const [companySnap, branchSnap] = await Promise.all([
+          companyRef.get(),
+          branchPromise,
+        ]);
+        if (companySnap.exists) {
+          companyDocData = companySnap.data() as Record<string, any>;
+        }
+        if (branchSnap && branchSnap.exists) {
+          branchDocData = branchSnap.data() as Record<string, any>;
+        }
+      } catch (metaErr) {
+        console.warn('Failed to fetch company metadata for user', metaErr);
+      }
+    }
+
     if (raw?.accountType === 'company' && raw?.companyId) {
-      const companySettings = await loadCompanyMerchantSettings(String(raw.companyId));
+      const companySettings = await loadCompanyMerchantSettings(String(raw.companyId), companyDocData);
       applyCompanySettingsToUserData(raw, companySettings);
       if (companySettings) {
         raw.companyMerchantSettings = companySettings;
       }
     }
+
+    if (companyDocData && raw?.companyName == null && typeof companyDocData.name === 'string') {
+      raw.companyName = companyDocData.name;
+    }
+
+    if (branchDocData) {
+      if (raw?.branchNumber == null) {
+        const branchNumberValue =
+          typeof branchDocData.branchNumber === 'number'
+            ? branchDocData.branchNumber
+            : parseInt(branchDocData.branchNumber, 10);
+        if (Number.isFinite(branchNumberValue)) {
+          raw.branchNumber = branchNumberValue;
+        }
+      }
+      if (!raw?.branchName && typeof branchDocData.name === 'string') {
+        raw.branchName = branchDocData.name;
+      }
+    }
+
     return sanitize(raw);
   } catch (err) {
     console.error('Error fetching user settings:', err);

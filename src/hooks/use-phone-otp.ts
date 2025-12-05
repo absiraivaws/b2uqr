@@ -4,12 +4,12 @@ import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult, updatePro
 
 type VerifiedUser = {
   uid: string;
-  phone: string | null;
+  whatsappNumber: string | null;
   displayName?: string | null;
   email?: string | null;
 };
 
-export function usePhoneOtp({ phone, fullName, onVerified }: { phone: string; fullName?: string; onVerified: (u: VerifiedUser) => void }) {
+export function usePhoneOtp({ whatsappNumber, fullName, onVerified }: { whatsappNumber: string; fullName?: string; onVerified: (u: VerifiedUser) => void }) {
   const [sendingCode, setSendingCode] = useState(false);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
@@ -46,13 +46,13 @@ export function usePhoneOtp({ phone, fullName, onVerified }: { phone: string; fu
     }
   };
 
-  const handleSendCode = async (overridePhone?: string) => {
-    const targetPhone = (overridePhone ?? phone)?.toString().trim();
-    if (!targetPhone) return;
+  const handleSendCode = async (overrideWhatsapp?: string) => {
+    const targetNumber = (overrideWhatsapp ?? whatsappNumber)?.toString().trim();
+    if (!targetNumber) return;
     setSendingCode(true);
     try {
       const appVerifier = await setupRecaptcha();
-      const result = await signInWithPhoneNumber(auth, targetPhone, appVerifier as any);
+      const result = await signInWithPhoneNumber(auth, targetNumber, appVerifier as any);
       setConfirmationResult(result);
     } catch (err: any) {
       console.error(err);
@@ -74,7 +74,7 @@ export function usePhoneOtp({ phone, fullName, onVerified }: { phone: string; fu
       }
       const verifiedUser = {
         uid: userCredential.user.uid,
-        phone: userCredential.user.phoneNumber ?? phone,
+        whatsappNumber: userCredential.user.phoneNumber ?? whatsappNumber ?? null,
         displayName: userCredential.user.displayName ?? fullName ?? null,
         email: userCredential.user.email ?? null,
       };

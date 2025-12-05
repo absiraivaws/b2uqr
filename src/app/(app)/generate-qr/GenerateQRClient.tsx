@@ -16,9 +16,9 @@ export default function GenerateQRClient() {
     setReferenceNumber,
     amount,
     setAmount,
-    terminalId,
     manualReferencePlaceholder,
     referenceType,
+    cashierNumberDisplay,
     handleCreateTransaction,
     handleVerifyTransaction,
     handleShareQR,
@@ -34,12 +34,12 @@ export default function GenerateQRClient() {
             isSubmitting={isSubmitting}
             referenceNumber={referenceNumber}
             setReferenceNumber={setReferenceNumber}
-            terminalId={terminalId}
             amount={amount}
             onAmountChange={setAmount}
             status={currentTransaction?.status}
             referenceType={referenceType}
             manualReferencePlaceholder={manualReferencePlaceholder}
+            cashierNumber={cashierNumberDisplay}
           />
         </div>
         <div className="lg:col-span-2">

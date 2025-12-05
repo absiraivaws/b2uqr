@@ -1,10 +1,10 @@
-# QR Bridge Development Guide
+# B2U QR Development Guide
 
-This document provides a guide for developers working on the QR Bridge application.
+This document provides a guide for developers working on the B2U QR application.
 
 ## 1. Project Overview
 
-QR Bridge is a Next.js application designed to bridge the gap between legacy banking APIs and modern QR code payment systems, specifically focusing on the LankaQR standard. It allows users to generate dynamic QR codes for transactions, simulate webhook notifications, and view transaction history.
+B2U QR is a Next.js application designed to bridge the gap between legacy banking APIs and modern QR code payment systems, specifically focusing on the LankaQR standard. It allows users to generate dynamic QR codes for transactions, simulate webhook notifications, and view transaction history.
 
 ## 2. Getting Started
 
@@ -80,7 +80,7 @@ Here is an overview of the key directories and files in the project:
 
 ## 6. Key Application Logic
 
-This section details the core logic that powers the QR Bridge application.
+This section details the core logic that powers the B2U QR application.
 
 ### Transaction Flow
 

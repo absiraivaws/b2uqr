@@ -1,6 +1,7 @@
 "use client"
 
 import React from 'react';
+import { CheckCircle } from 'lucide-react';
 import { maskEmail } from '@/lib/verificationHelpers';
 
 interface Props {
@@ -10,22 +11,26 @@ interface Props {
 
 export default function CompleteStep({ redirectCountdown, redirectEmail }: Props) {
   return (
-    <div className="relative pb-16 flex flex-col items-center text-center">
-      <p className="text-lg mb-4 text-center">All steps completed.</p>
-      <div className="flex justify-center mb-3">
-        <div className="w-36 h-36">
-          <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" className="w-full h-full rounded-full">
-            <rect width="64" height="64" rx="32" fill="#10B981" />
-            <path d="M45 23.5c0 .8-.3 1.6-.9 2.2L30.6 39.3c-.6.6-1.6.6-2.2 0L20.9 31.8c-.6-.6-.6-1.6 0-2.2.6-.6 1.6-.6 2.2 0l6.1 6.1L42.5 23.5c.6-.6 1.6-.6 2.2 0 .6.6.6 1.6 0 2.2z" fill="#fff" />
-          </svg>
+    <div className="relative flex flex-col items-center text-center gap-4 rounded-2xl border border-border/60 bg-gradient-to-b from-background to-muted/40 px-6 py-10 shadow-md">
+      <p className="text-xl font-semibold text-foreground">All steps completed</p>
+
+      <div className="flex justify-center">
+        <div className="w-40 h-40 sm:w-48 sm:h-48 flex items-center justify-center rounded-3xl bg-white border border-green-100 shadow-lg">
+          <div className="w-28 h-28 sm:w-32 sm:h-32 flex items-center justify-center rounded-full bg-green-50 text-green-500">
+            <CheckCircle className="h-16 w-16 sm:h-20 sm:w-20" strokeWidth={1.5} />
+          </div>
         </div>
       </div>
-      <p className="text-sm text-gray-600 mb-2">
-        Redirecting to sign-in in <span className="font-medium">{redirectCountdown}</span>s
+
+      <p className="text-base sm:text-lg text-muted-foreground">
+        Redirecting to sign-in in {' '}
+        <span className="text-3xl font-bold text-foreground">{redirectCountdown}</span>
+        <span className="ml-1 text-sm font-semibold uppercase tracking-wider text-muted-foreground">sec</span>
       </p>
+
       {redirectEmail && (
-        <p className="text-sm text-gray-700 mb-4">
-          Autofill email: <span className="font-mono text-sm text-gray-800">{maskEmail(redirectEmail)}</span>
+        <p className="text-sm sm:text-base text-muted-foreground">
+          Autofill email: <span className="font-mono text-base text-foreground">{maskEmail(redirectEmail)}</span>
         </p>
       )}
     </div>
