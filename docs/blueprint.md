@@ -1,4 +1,4 @@
-# **App Name**: QR Bridge
+# **App Name**: B2U QR
 
 ## Core Features:
 

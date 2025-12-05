@@ -1,16 +1,16 @@
-# QR Bridge Bank Integration API
+# B2U QR Bank Integration API
 
-This document provides the necessary details for a banking partner to integrate with the QR Bridge application.
+This document provides the necessary details for a banking partner to integrate with the B2U QR application.
 
 ## 1. Overview
 
 The integration allows the bank to:
-1.  **Send Webhook Notifications**: Inform the QR Bridge app about the status of a transaction (e.g., SUCCESS, FAILED).
+1.  **Send Webhook Notifications**: Inform the B2U QR app about the status of a transaction (e.g., SUCCESS, FAILED).
 2.  **Retrieve Transaction History**: Fetch a list of all transactions processed through the system for reconciliation purposes.
 
 ## 2. Security
 
-All communication between the bank's server and the QR Bridge API must be secured.
+All communication between the bank's server and the B2U QR API must be secured.
 
 ### Webhook Secret Key
 

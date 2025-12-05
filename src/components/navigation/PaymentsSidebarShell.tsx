@@ -17,7 +17,7 @@ function joinPath(basePath: string, routePath: string) {
   return `${sanitizedBase}${routePath}`;
 }
 
-export default function PaymentsSidebarShell({ children, basePath = '', title = 'QR Bridge', subtitle }: PaymentsSidebarShellProps) {
+export default function PaymentsSidebarShell({ children, basePath = '', title = 'B2U QR', subtitle }: PaymentsSidebarShellProps) {
   const [permissions, setPermissions] = useState<string[] | null>(null);
 
   useEffect(() => {

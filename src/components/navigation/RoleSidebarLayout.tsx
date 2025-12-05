@@ -44,7 +44,7 @@ interface RoleSidebarLayoutProps {
 }
 
 export default function RoleSidebarLayout({
-  title = 'QR Bridge',
+  title = 'B2U QR',
   subtitle,
   logoIcon: LogoIcon = QrCode,
   permissions,
