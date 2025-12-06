@@ -84,7 +84,7 @@ export default function ProfilePage() {
 				</CardHeader>
 					{/* Top-right profile picture in a circular frame */}
 					<div className="absolute top-2 right-2">
-						<Avatar className="h-28 w-28 border-8 border-gray-200 shadow-sm">
+						<Avatar className="h-28 w-28 border-8 dark:border-2 border-gray-200 dark:border-slate-700 shadow-sm ">
 							{profileImageURL ? (
 								<AvatarImage src={profileImageURL} alt="Profile" />
 							) : (

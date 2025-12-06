@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -21,6 +21,11 @@ import type { LucideIcon } from 'lucide-react';
 import { Loader2, QrCode } from 'lucide-react';
 import { clientSignOut } from '@/lib/clientAuth';
 import { getMarketingOrigin } from '@/lib/marketingOrigin';
+import ThemeToggleButton from './ThemeToggleButton';
+import SpaceNetwork from '../ui/SpaceNetwork';
+import NetworkBackground from '../ui/NetworkBackground';
+import { useTheme } from 'next-themes';
+import { BackgroundGraph } from '../ui/BackgroundGraph';
 
 export interface SidebarLinkConfig {
   href: string;
@@ -128,9 +133,24 @@ export default function RoleSidebarLayout({
     }
   };
 
+  const {resolvedTheme} = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   return (
-    <SidebarProvider>
-      <header className="fixed inset-x-0 top-0 z-50 flex items-center justify-center p-3 md:hidden bg-background">
+    <SidebarProvider className="app-shell">
+      {mounted ? (
+        <>
+          <SpaceNetwork isDark={resolvedTheme === 'dark'} />
+          <NetworkBackground />
+        </>
+      ) : null}
+      <BackgroundGraph />
+      <ThemeToggleButton className="theme-toggle-glow" />
+      <header className="fixed inset-x-0 top-0 z-50 flex items-center justify-center border-b border-border/40 bg-white/80 p-3 backdrop-blur-md md:hidden dark:bg-slate-950/70">
         <div className="absolute left-3">
           <SidebarTrigger />
         </div>
@@ -143,7 +163,7 @@ export default function RoleSidebarLayout({
         </div>
       </header>
 
-      <Sidebar collapsible="icon">
+      <Sidebar collapsible="icon" className="sidebar-glass">
         <SidebarHeader>
           <LayoutSidebarBrand title={title} subtitle={subtitle} LogoIcon={LogoIcon} />
         </SidebarHeader>
@@ -183,7 +203,7 @@ export default function RoleSidebarLayout({
         </SidebarContent>
       </Sidebar>
 
-      <SidebarInset className="pt-14 md:pt-0">
+      <SidebarInset className="app-content pt-14 md:pt-0">
         {children}
       </SidebarInset>
     </SidebarProvider>
