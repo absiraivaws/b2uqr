@@ -54,9 +54,30 @@ export function TransactionStatus({
         <div className="flex flex-col items-center justify-center p-4 sm:p-6 bg-muted/50 rounded-lg">
 
           {transaction.status === "PENDING" && qrDataUrl ? (
-            <div className="w-full flex flex-col md:flex-row items-center justify-center gap-6 flex-wrap">
+            <div className="w-full flex flex-col md:flex-row md:flex-nowrap items-center justify-center gap-6">
               {/* QR + Logo */}
-              <div className="relative w-full max-w-[320px] aspect-square flex-shrink-0 mx-auto md:mx-0">
+              <div className="flex flex-col text-center w-full md:w-1/2 md:flex-1">
+                <div className="font-bold text-3xl sm:text-4xl text-green-600 mb-6">
+                  LKR {parseFloat(transaction.amount ?? "0").toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </div>
+                <div className="text-lg sm:text-xl mb-2">
+                  Reference:
+                  <span className="font-semibold ml-1">{transaction.reference_number}</span>
+                </div>
+                <div className="text-lg sm:text-xl mb-1">
+                  Merchant:
+                  <span className="font-semibold ml-1">{transaction.merchant_name ?? "-"}, {transaction.merchant_city ?? "-"}</span>
+                </div>
+                <div className="italic text-sm sm:text-base text-muted-foreground mt-2">
+                  Scan this QR code to complete the payment
+                </div>
+              </div>
+
+              {/* Right Panel Text */}
+              <div className="relative w-full md:w-1/2 md:flex-1 aspect-square mx-auto md:mx-0">
                 <Image
                   src={qrDataUrl}
                   alt="QR Code"
@@ -71,31 +92,6 @@ export function TransactionStatus({
                     height={80}
                     className="object-contain pointer-events-none drop-shadow-lg"
                   />
-                </div>
-              </div>
-              {/* Right Panel Text */}
-              <div className="flex flex-col text-center w-full max-w-[320px]">
-                <div className="font-bold text-xl sm:text-2xl mb-3">Payment QR Code</div>
-                <div className="font-bold text-3xl sm:text-4xl text-green-600 mb-6">
-                  LKR {parseFloat(transaction.amount ?? "0").toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </div>
-                <div className="text-lg sm:text-xl mb-2">
-                  Reference:
-                  <span className="font-semibold ml-1">{transaction.reference_number}</span>
-                </div>
-                <div className="text-lg sm:text-xl mb-1">
-                  Merchant:
-                  <span className="font-semibold ml-1">{transaction.merchant_name ?? "-"}</span>
-                </div>
-                <div className="text-lg sm:text-xl mb-4">
-                  City:
-                  <span className="font-semibold ml-1">{transaction.merchant_city ?? "-"}</span>
-                </div>
-                <div className="italic text-sm sm:text-base text-muted-foreground mt-2">
-                  Scan this QR code to complete the payment
                 </div>
               </div>
             </div>

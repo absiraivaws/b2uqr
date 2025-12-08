@@ -81,29 +81,35 @@ export function TransactionForm({
               />
             </div>
           )}
-          <div className="space-y-2">
-            <Label htmlFor="amount">Amount</Label>
-            <Input
-              id="amount"
-              name="amount"
-              placeholder="Enter amount to generate QR"
-              required
-              type="number"
-              step="0.01"
-              value={amount}
-              onChange={(e) => onAmountChange(e.target.value)}
-              disabled={isSubmitting || status === 'PENDING'}
-            />
-          </div>
+          <div className="space-y-2 md:space-y-0 md:grid md:grid-cols-3 md:gap-4 md:items-end">
+            <div className="space-y-2 md:space-y-0 md:col-span-1">
+              <Label htmlFor="amount">Amount</Label>
+              <Input
+                id="amount"
+                name="amount"
+                placeholder="Enter amount to generate QR"
+                required
+                type="number"
+                step="0.01"
+                value={amount}
+                onChange={(e) => onAmountChange(e.target.value)}
+                disabled={isSubmitting || status === 'PENDING'}
+              />
+            </div>
 
-          <Button type="submit" disabled={isSubmitting || !amount || !referenceNumber || status === 'PENDING'} className="w-full">
-            {isSubmitting ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="mr-2 h-4 w-4" />
-            )}
-            Generate QR Code
-          </Button>
+            <Button
+              type="submit"
+              disabled={isSubmitting || !amount || !referenceNumber || status === 'PENDING'}
+              className="w-full md:col-span-2"
+            >
+              {isSubmitting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="mr-2 h-4 w-4" />
+              )}
+              Generate QR Code
+            </Button>
+          </div>
         </form>
       </CardContent>
     </Card>

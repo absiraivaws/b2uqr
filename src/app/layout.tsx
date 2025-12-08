@@ -1,5 +1,6 @@
 import type {Metadata} from 'next';
 import './globals.css';
+import { ThemeProvider } from '@/components/providers/theme-provider';
 import { Toaster } from "@/components/ui/toaster"
 
 const marketingOrigin =
@@ -55,8 +56,10 @@ export default function RootLayout({
             dangerouslySetInnerHTML={{ __html: `window.__MARKETING_ORIGIN__ = ${JSON.stringify(marketingOrigin)};` }}
           />
         ) : null}
-        {children}
-        <Toaster />
+        <ThemeProvider>
+          {children}
+          <Toaster />
+        </ThemeProvider>
       </body>
     </html>
   );

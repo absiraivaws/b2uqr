@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -15,11 +15,17 @@ import {
   SidebarGroupLabel,
   SidebarInset,
   SidebarTrigger,
+  useSidebar,
 } from '@/components/ui/sidebar';
 import type { LucideIcon } from 'lucide-react';
 import { Loader2, QrCode } from 'lucide-react';
 import { clientSignOut } from '@/lib/clientAuth';
 import { getMarketingOrigin } from '@/lib/marketingOrigin';
+import ThemeToggleButton from './ThemeToggleButton';
+import SpaceNetwork from '../ui/SpaceNetwork';
+import NetworkBackground from '../ui/NetworkBackground';
+import { useTheme } from 'next-themes';
+import { BackgroundGraph } from '../ui/BackgroundGraph';
 
 export interface SidebarLinkConfig {
   href: string;
@@ -41,6 +47,49 @@ interface RoleSidebarLayoutProps {
   permissions?: string[] | null;
   sections: SidebarSectionConfig[];
   children: React.ReactNode;
+}
+
+function LayoutSidebarBrand({
+  title,
+  subtitle,
+  LogoIcon,
+  onNavigate,
+}: {
+  title: string;
+  subtitle?: string;
+  LogoIcon: LucideIcon;
+  onNavigate?: () => void;
+}) {
+  const { state } = useSidebar();
+  const isCollapsed = state === 'collapsed';
+  const clickable = Boolean(onNavigate);
+
+  return (
+    <div className="flex items-center justify-between px-3 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-2">
+      <div
+        className={`group/logo relative flex flex-1 items-center justify-start group-data-[collapsible=icon]:justify-center gap-2 transition-all duration-200 ${
+          clickable ? 'cursor-pointer' : 'cursor-default'
+        }`}
+        onClick={() => {
+          if (!isCollapsed) {
+            onNavigate?.();
+          }
+        }}
+      >
+        <LogoIcon className="h-6 w-6 text-primary transition-opacity duration-150 group-data-[collapsible=icon]:group-hover/logo:opacity-0" />
+        <div className="flex flex-col gap-0.5 transition-all duration-200 group-data-[collapsible=icon]:hidden text-center">
+          <h1 className="text-lg font-bold">{title}</h1>
+          {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
+        </div>
+        <SidebarTrigger
+          className="absolute inset-0 hidden items-center justify-center rounded-md opacity-0 pointer-events-none transition-opacity duration-150 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:group-hover/logo:opacity-100 group-data-[collapsible=icon]:group-hover/logo:pointer-events-auto"
+        />
+      </div>
+      <div className="shrink-0 group-data-[collapsible=icon]:hidden">
+        <SidebarTrigger />
+      </div>
+    </div>
+  );
 }
 
 export default function RoleSidebarLayout({
@@ -84,9 +133,24 @@ export default function RoleSidebarLayout({
     }
   };
 
+  const {resolvedTheme} = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   return (
-    <SidebarProvider>
-      <header className="fixed inset-x-0 top-0 z-50 flex items-center justify-center p-3 md:hidden bg-background">
+    <SidebarProvider className="app-shell">
+      {mounted ? (
+        <>
+          <SpaceNetwork isDark={resolvedTheme === 'dark'} />
+          <NetworkBackground />
+        </>
+      ) : null}
+      <BackgroundGraph />
+      <ThemeToggleButton className="theme-toggle-glow" />
+      <header className="fixed inset-x-0 top-0 z-50 flex items-center justify-center border-b border-border/40 bg-white/80 p-3 backdrop-blur-md md:hidden dark:bg-slate-950/70">
         <div className="absolute left-3">
           <SidebarTrigger />
         </div>
@@ -99,20 +163,9 @@ export default function RoleSidebarLayout({
         </div>
       </header>
 
-      <Sidebar>
+      <Sidebar collapsible="icon" className="sidebar-glass">
         <SidebarHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex flex-col gap-0.5 group-data-[collapsible=icon]:-ml-1 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:opacity-0 transition-all duration-200">
-              <div className="flex items-center gap-2">
-                <LogoIcon className="h-6 w-6 text-primary" />
-                <h1 className="text-lg font-bold">{title}</h1>
-              </div>
-              {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
-            </div>
-            <div className="md:hidden">
-              <SidebarTrigger />
-            </div>
-          </div>
+          <LayoutSidebarBrand title={title} subtitle={subtitle} LogoIcon={LogoIcon} />
         </SidebarHeader>
         <SidebarContent>
           {filteredSections.map((section, idx) => (
@@ -133,12 +186,12 @@ export default function RoleSidebarLayout({
                           disabled={signingOut}
                         >
                           {signingOut ? <Loader2 className="h-4 w-4 animate-spin" /> : <link.icon />}
-                          <span>{signingOut ? 'Signing out...' : link.label}</span>
+                          <span className="group-data-[collapsible=icon]:hidden">{signingOut ? 'Signing out...' : link.label}</span>
                         </button>
                       ) : (
                         <Link href={link.href} className="flex items-center gap-2">
                           <link.icon />
-                          <span>{link.label}</span>
+                          <span className="group-data-[collapsible=icon]:hidden">{link.label}</span>
                         </Link>
                       )}
                     </SidebarMenuButton>
@@ -150,7 +203,7 @@ export default function RoleSidebarLayout({
         </SidebarContent>
       </Sidebar>
 
-      <SidebarInset className="pt-14 md:pt-0">
+      <SidebarInset className="app-content pt-14 md:pt-0">
         {children}
       </SidebarInset>
     </SidebarProvider>
