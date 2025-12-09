@@ -375,6 +375,18 @@ export function useTransactionManager() {
         setReferenceNumber(referenceToUse);
       }
 
+      // If this sale originated from PHPPOS (has a saleId) and we have a reference,
+      // append the saleId to the reference for QR generation so the QR's caption
+      // includes the PHPPOS sale identifier. Avoid double-appending if already present.
+      const incomingSaleId = saleData?.saleId ?? null;
+      if (incomingSaleId && referenceToUse) {
+        const sid = String(incomingSaleId);
+        if (!String(referenceToUse).endsWith(`-${sid}`)) {
+          referenceToUse = `${referenceToUse}-${sid}`;
+          setReferenceNumber(referenceToUse);
+        }
+      }
+
       if (!referenceToUse) {
         return;
       }
@@ -473,16 +485,22 @@ export function useTransactionManager() {
       const merchantName = supportedFields.find(f => f.id === 'merchant_name')?.value || 'Merchant';
       const merchantCity = supportedFields.find(f => f.id === 'merchant_city')?.value || '';
 
+      const displayReference = (() => {
+        const ref = currentTransaction.reference_number ?? '';
+        const sid = currentTransaction.phppos_sale_id ?? null;
+        if (sid && !ref.endsWith(`-${sid}`)) return `${ref}-${sid}`;
+        return ref;
+      })();
+
       const compositeBlob = await generateQRImage(
         currentTransaction.qr_payload,
         currentTransaction.amount,
-        currentTransaction.reference_number,
+        displayReference,
         merchantName,
         merchantCity,
-        terminalId
       );
 
-      const file = new File([compositeBlob], `Payment-QR-${currentTransaction.reference_number}.png`, { type: 'image/png' });
+      const file = new File([compositeBlob], `Payment-QR-${displayReference}.png`, { type: 'image/png' });
 
       if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({
@@ -494,7 +512,7 @@ export function useTransactionManager() {
         const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(currentTransaction.qr_payload)}&logo=https://storage.googleapis.com/proudcity/mebanenc/uploads/2021/03/Peoples-Pay-Logo.png`;
         const whatsappMessage = `*Payment QR Code*\n\n` +
           `Amount: LKR ${parseFloat(currentTransaction.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n` +
-          `Reference: ${currentTransaction.reference_number}\n` +
+          `Reference: ${displayReference}\n` +
           `Merchant: ${merchantName}${merchantCity ? `, ${merchantCity}` : ''}\n` +
           `Terminal: ${terminalId}\n\n` +
           `View QR: ${qrUrl}`;
@@ -522,19 +540,25 @@ export function useTransactionManager() {
       const merchantName = supportedFields.find(f => f.id === 'merchant_name')?.value || 'Merchant';
       const merchantCity = supportedFields.find(f => f.id === 'merchant_city')?.value || '';
 
+      const displayReference = (() => {
+        const ref = currentTransaction.reference_number ?? '';
+        const sid = currentTransaction.phppos_sale_id ?? null;
+        if (sid && !ref.endsWith(`-${sid}`)) return `${ref}-${sid}`;
+        return ref;
+      })();
+
       const compositeBlob = await generateQRImage(
         currentTransaction.qr_payload,
         currentTransaction.amount,
-        currentTransaction.reference_number,
+        displayReference,
         merchantName,
         merchantCity,
-        terminalId
       );
 
       const url = URL.createObjectURL(compositeBlob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `Payment-QR-${currentTransaction.reference_number}.png`;
+      link.download = `Payment-QR-${displayReference}.png`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
