@@ -31,7 +31,6 @@ import type { Transaction } from '@/lib/types';
 
 interface SummaryDashboardProps {
   transactions: Transaction[];
-  loading: boolean;
   title?: string;
   description?: string;
 }
@@ -44,40 +43,15 @@ type ChartData = {
 
 export default function SummaryDashboard({
   transactions,
-  loading,
   title = "Summary",
   description = "View transaction summary and statistics."
 }: SummaryDashboardProps) {
-  const [terminalId, setTerminalId] = useState("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [chartLoading, setChartLoading] = useState(false);
   const [chartMode, setChartMode] = useState<"monthly" | "daily">("monthly");
-
-  // Determine available terminals dynamically from transactions if possible, or keep static list
-  // Keeping static list logic compatibility for now, but ideally this should be dynamic or passed in.
-  // For company view, terminal IDs might be different. Let's infer unique terminal IDs from transactions.
-  const terminalIdOptions = useMemo(() => {
-    const uniqueTerminals = new Set<string>();
-    transactions.forEach(tx => {
-      const tid = tx.bankResponse?.terminal_id ?? tx.terminal_id;
-      if (tid) uniqueTerminals.add(tid);
-    });
-    return ["all", ...Array.from(uniqueTerminals).sort()];
-  }, [transactions]);
-
-
-  function handleFilter() {
-    setChartLoading(true);
-    setTimeout(() => setChartLoading(false), 150); // small UX pulse
-  }
 
   const filteredTransactions = useMemo(() => {
     return (transactions || []).filter((tx) => {
-      // Terminal filter
-      if (terminalId !== "all") {
-        if ((tx.terminal_id ?? tx.bankResponse?.terminal_id) !== terminalId) return false;
-      }
 
       // Parse created_at defensively
       let created: Date;
@@ -108,7 +82,7 @@ export default function SummaryDashboard({
 
       return true;
     });
-  }, [transactions, terminalId, startDate, endDate]);
+  }, [transactions, startDate, endDate]);
 
   // Group by month/day
   const monthMap: Record<string, { count: number; amount: number }> = {};
@@ -169,23 +143,6 @@ export default function SummaryDashboard({
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
             />
-            <div className="w-full sm:w-auto">
-              <Select value={terminalId} onValueChange={setTerminalId}>
-                <SelectTrigger className="w-full sm:w-[180px]">
-                  <SelectValue placeholder="Select Terminal" />
-                </SelectTrigger>
-                <SelectContent>
-                  {terminalIdOptions.map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {option === "all" ? "All Terminals" : option}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button onClick={handleFilter} disabled={loading || chartLoading}>
-              {loading || chartLoading ? "Loading..." : "Filter"}
-            </Button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

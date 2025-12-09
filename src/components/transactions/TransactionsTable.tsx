@@ -8,6 +8,13 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@
 import { Badge } from "@/components/ui/badge";
 import { Search, Loader2 } from "lucide-react";
 import { format } from 'date-fns';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { Transaction } from '@/lib/types';
 
 interface TransactionsTableProps {
@@ -28,14 +35,16 @@ export default function TransactionsTable({
   const [searchTerm, setSearchTerm] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
 
   const clearFilters = () => {
     setSearchTerm('');
     setStartDate('');
     setEndDate('');
+    setStatusFilter('ALL');
   };
 
-  const filtersActive = searchTerm !== '' || startDate !== '' || endDate !== '';
+  const filtersActive = searchTerm !== '' || startDate !== '' || endDate !== '' || statusFilter !== 'ALL';
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter(tx => {
@@ -69,9 +78,14 @@ export default function TransactionsTable({
         if (createdAtDate >= e) return false;
       }
 
+      // Status filter
+      if (statusFilter !== 'ALL' && tx.status !== statusFilter) {
+        return false;
+      }
+
       return searchMatch;
     });
-  }, [transactions, searchTerm, startDate, endDate]);
+  }, [transactions, searchTerm, startDate, endDate, statusFilter]);
 
   const getStatusVariant = (status: string) => {
     switch (status) {
@@ -112,6 +126,17 @@ export default function TransactionsTable({
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
           />
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-full sm:w-[150px]">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Statuses</SelectItem>
+              <SelectItem value="SUCCESS">Success</SelectItem>
+              <SelectItem value="FAILED">Failed</SelectItem>
+              <SelectItem value="PENDING">Pending</SelectItem>
+            </SelectContent>
+          </Select>
           <Button
             type="button"
             variant="outline"
@@ -127,7 +152,6 @@ export default function TransactionsTable({
             <TableHeader>
               <TableRow>
                 <TableHead>Date</TableHead>
-                <TableHead>Terminal ID</TableHead>
                 <TableHead>Amount</TableHead>
                 <TableHead>Reference No</TableHead>
                 <TableHead className="text-right">Status</TableHead>
@@ -136,7 +160,7 @@ export default function TransactionsTable({
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center">
+                  <TableCell colSpan={4} className="text-center">
                     <div className="flex justify-center items-center p-8">
                       <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                       <span className="ml-4">Loading transactions...</span>
@@ -145,7 +169,7 @@ export default function TransactionsTable({
                 </TableRow>
               ) : error ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-red-500 py-8">
+                  <TableCell colSpan={4} className="text-center text-red-500 py-8">
                     {typeof error === 'string' ? error : error?.message ?? 'Failed to fetch transactions.'}
                   </TableCell>
                 </TableRow>
@@ -164,7 +188,6 @@ export default function TransactionsTable({
                         }
                       })()
                     }</TableCell>
-                    <TableCell>{tx.bankResponse?.terminal_id ?? tx.terminal_id ?? 'N/A'}</TableCell>
                     <TableCell>{parseFloat(tx.amount).toFixed(2)} {tx.currency}</TableCell>
                     <TableCell>{tx.reference_number}</TableCell>
                     <TableCell className="text-right">
@@ -174,7 +197,7 @@ export default function TransactionsTable({
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
                     No transactions found.
                   </TableCell>
                 </TableRow>
