@@ -74,15 +74,15 @@ export default function BranchTotalsChart({ companyId }: Props) {
 
 
   return (
-    <Card>
-      <CardContent>
-        <div className="p-4 sm:p-6 lg:p-8">
+    <Card className="h-full">
+      <CardContent className="h-full p-4 sm:p-6 lg:p-8 flex flex-col">
+        <div className="mb-8">
           <h2 className="text-2xl font-medium text-muted-foreground">
             Branch totals
           </h2>
         </div>
 
-        <div className="w-full h-72 sm:h-80 md:h-96">
+        <div className="w-full flex-1">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={chartData}

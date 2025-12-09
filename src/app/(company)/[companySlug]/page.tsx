@@ -1,6 +1,7 @@
 import { getCompanyBySlug } from '@/lib/companyData';
 import BranchTotalsChart from '@/components/company/BranchTotalsChart';
 import CompanyTodayTotal from '@/components/company/CompanyTodayTotal';
+import CompanyBranchviseTotal from '@/components/company/CompanyBranchviseTotal';
 
 export default async function CompanySlugIndex({ params }: { params: Promise<{ companySlug: string }> }) {
   const { companySlug } = await params;
@@ -14,10 +15,21 @@ export default async function CompanySlugIndex({ params }: { params: Promise<{ c
       </div>
 
       {company?.id ? (
-        <>
-          <CompanyTodayTotal companyId={company.id} />
-          <BranchTotalsChart companyId={company.id} />
-        </>
+        <div className="grid gap-4">
+          <div className="grid md:grid-cols-3 gap-4">
+            <div className="space-y-4 h-full flex flex-col">
+              <div className="flex-1">
+                <CompanyTodayTotal companyId={company.id} />
+              </div>
+              <div className="flex-1">
+                <CompanyBranchviseTotal companyId={company.id} />
+              </div>
+            </div>
+            <div className='md:col-span-2 h-full'>
+              <BranchTotalsChart companyId={company.id} />
+            </div>
+          </div>
+        </div>
       ) : (
         <div className="text-sm text-muted-foreground">Company not found.</div>
       )}
