@@ -8,7 +8,7 @@ const VIRTUAL_LOGIN_DOMAIN = process.env.VIRTUAL_LOGIN_DOMAIN || 'lqr.internal';
 
 export const PERMISSIONS = {
   individual: ['generate-qr', 'transactions', 'summary', 'profile'],
-  companyOwner: ['company:dashboard', 'company:branches', 'company:cashiers', 'profile'],
+  companyOwner: ['company:dashboard', 'company:branches', 'company:cashiers', 'profile', 'transactions', 'summary'],
   branchManager: ['company:branches', 'company:cashiers', 'profile'],
   cashier: ['generate-qr', 'transactions', 'summary'],
 } as const;
