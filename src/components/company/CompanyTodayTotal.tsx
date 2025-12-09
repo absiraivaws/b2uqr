@@ -2,6 +2,7 @@
 
 import React, { useMemo } from "react";
 import useCompanyTransactions from "@/hooks/use-company-transactions";
+import { Card, CardContent } from "@/components/ui/card";
 import type { Transaction as Tx } from "@/lib/types";
 
 interface Props {
@@ -32,14 +33,16 @@ export default function CompanyTodayTotal({ companyId }: Props) {
   }, [transactions, todayStr]);
 
   return (
-    <div className="mb-6">
-      <div className="rounded-lg bg-blue-50 dark:bg-blue-900/30 p-6 flex flex-col items-center justify-center">
-        <div className="text-sm text-muted-foreground mb-1">Today's Total Amount</div>
-        <div className="text-3xl font-bold text-blue-700 dark:text-blue-300">
-          LKR {total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-        </div>
-        {loading && <div className="text-xs text-muted-foreground mt-1">Loading...</div>}
-      </div>
+    <div className="mb-6 h-full">
+      <Card className="h-full">
+        <CardContent className="h-full flex flex-col items-center justify-center p-6">
+          <div className="text-lg md:text-2xl text-muted-foreground mb-6">Today's Total</div>
+          <div className="text-4xl md:text-7xl font-bold text-blue-800 dark:text-blue-300">
+            LKR {total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+          </div>
+          {loading && <div className="text-xs text-muted-foreground mt-1">Loading...</div>}
+        </CardContent>
+      </Card>
     </div>
   );
 }
