@@ -7,7 +7,7 @@ interface RoleRouteContext {
 export function getDefaultRouteForRole(role?: string | null, context?: RoleRouteContext) {
   switch (role) {
     case 'company-owner':
-      if (context?.companySlug) return `/${context.companySlug}/branches`;
+      if (context?.companySlug) return `/${context.companySlug}`;
       return '/generate-qr';
     case 'branch-manager':
       if (context?.companySlug && context?.branchSlug) {

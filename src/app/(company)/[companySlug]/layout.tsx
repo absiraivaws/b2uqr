@@ -39,7 +39,8 @@ export default async function CompanySlugLayout({ children, params }: CompanyLay
     redirect('/generate-qr');
   }
   if (requestedSlug !== canonicalSlug) {
-    redirect(`/${canonicalSlug}/branches`);
+    // Keep owners on the company root page (company home) after canonicalizing slug.
+    redirect(`/${canonicalSlug}`);
   }
 
   const permissions = Array.isArray(session.claims?.permissions)

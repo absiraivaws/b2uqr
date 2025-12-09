@@ -6,6 +6,11 @@ export interface Transaction {
   merchant_name: string;
   merchant_city: string;
   uid?: string;
+  companyId?: string;
+  companySlug?: string;
+  branchId?: string;
+  branchSlug?: string;
+  cashierId?: string;
   terminal_id?: string;
   amount: string;
   currency: string;

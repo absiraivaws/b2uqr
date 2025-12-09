@@ -126,7 +126,7 @@ function applyCompanySettingsToUserData(raw: Record<string, any>, companySetting
   }
 }
 
-export async function createTransaction(transactionData: {amount: string, reference_number: string}): Promise<Transaction> {
+export async function createTransaction(transactionData: { amount: string, reference_number: string }): Promise<Transaction> {
   const parsed = TransactionSchema.safeParse(transactionData);
 
   if (!parsed.success) {
@@ -140,7 +140,7 @@ export async function createTransaction(transactionData: {amount: string, refere
   const data = parsed.data;
 
   // 1. Generate transaction_uuid
-   const transaction_uuid = `uuid_${crypto.randomBytes(12).toString('hex')}`;
+  const transaction_uuid = `uuid_${crypto.randomBytes(12).toString('hex')}`;
 
   // For security and correctness, merchant configuration is read from Firestore
   // users/{uid} document. We require the user to be signed in (session cookie).
@@ -198,7 +198,12 @@ export async function createTransaction(transactionData: {amount: string, refere
     terminal_id: sanitizedSettings.terminal_id,
     currency: 'LKR',
     merchant_name: sanitizedSettings.merchant_name,
-    merchant_city: sanitizedSettings.merchant_city
+    merchant_city: sanitizedSettings.merchant_city,
+    ...(userData.companyId ? { companyId: userData.companyId } : {}),
+    ...(userData.companySlug ? { companySlug: userData.companySlug } : {}),
+    ...(userData.branchId ? { branchId: userData.branchId } : {}),
+    ...(userData.branchSlug ? { branchSlug: userData.branchSlug } : {}),
+    ...(userData.role === 'cashier' ? { cashierId: uid! } : {}),
   };
 
   // 3. Call Bank API to create QR
@@ -229,12 +234,12 @@ export async function createTransaction(transactionData: {amount: string, refere
 }
 
 export async function getTransactionStatus(uuid: string): Promise<Transaction | null> {
-    const tx = await getDbTransaction(uuid);
-    return tx || null;
+  const tx = await getDbTransaction(uuid);
+  return tx || null;
 }
 
 export async function getAllTransactions(): Promise<Transaction[]> {
-    return await getAllDbTransactions();
+  return await getAllDbTransactions();
 }
 
 export async function getLastTransaction(): Promise<Transaction | null> {
@@ -351,27 +356,27 @@ export async function getUserSettings(): Promise<Record<string, any> | null> {
 
 
 export async function verifyTransaction(uuid: string): Promise<Transaction> {
-    console.log(`Verifying transaction ${uuid}`);
-    const bankStatus = await callBankReconciliationAPI(uuid);
+  console.log(`Verifying transaction ${uuid}`);
+  const bankStatus = await callBankReconciliationAPI(uuid);
 
-    if (!bankStatus) {
-        throw new Error("Could not verify transaction with the bank.");
-    }
-    
-    // In a real scenario, you'd get more details from the bank.
-    // Here we're just updating the status.
-    const bankResponsePayload = {
-      status: bankStatus.status,
-      verified_at: new Date().toISOString()
-    }
-    
-    const updatedTx = await updateDbTransactionStatus(uuid, bankStatus.status, bankResponsePayload);
+  if (!bankStatus) {
+    throw new Error("Could not verify transaction with the bank.");
+  }
 
-    if (!updatedTx) {
-      throw new Error("Transaction not found after verification.");
-    }
-    
-    return updatedTx;
+  // In a real scenario, you'd get more details from the bank.
+  // Here we're just updating the status.
+  const bankResponsePayload = {
+    status: bankStatus.status,
+    verified_at: new Date().toISOString()
+  }
+
+  const updatedTx = await updateDbTransactionStatus(uuid, bankStatus.status, bankResponsePayload);
+
+  if (!updatedTx) {
+    throw new Error("Transaction not found after verification.");
+  }
+
+  return updatedTx;
 }
 
 
@@ -381,7 +386,7 @@ export async function simulateWebhook(uuid: string, status: "SUCCESS" | "FAILED"
   if (!tx) {
     throw new Error("Transaction not found for webhook simulation.");
   }
-  
+
   const payload: BankWebhookPayload = {
     transaction_uuid: tx.transaction_uuid,
     reference_number: tx.reference_number,
@@ -403,7 +408,7 @@ export async function simulateWebhook(uuid: string, status: "SUCCESS" | "FAILED"
   const baseUrl =
     process.env.APP_BASE_URL ||
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : `http://localhost:${process.env.PORT || 9002}`);
-  
+
   await fetch(new URL(webhookUrl, baseUrl), {
     method: 'POST',
     headers: {
@@ -415,79 +420,79 @@ export async function simulateWebhook(uuid: string, status: "SUCCESS" | "FAILED"
 }
 
 export async function handleWebhook(request: Request) {
-    const rawBody = await request.text();
-    const signature = request.headers.get('X-Bank-Signature');
+  const rawBody = await request.text();
+  const signature = request.headers.get('X-Bank-Signature');
 
-    if (!signature) {
-        await alertFailures({
-            failureType: "webhook failure",
-            details: "Missing X-Bank-Signature header.",
-        });
-        return { status: 400, body: { error: 'Missing signature' } };
-    }
+  if (!signature) {
+    await alertFailures({
+      failureType: "webhook failure",
+      details: "Missing X-Bank-Signature header.",
+    });
+    return { status: 400, body: { error: 'Missing signature' } };
+  }
 
-    const isValid = await verifyWebhookSignature(rawBody, signature);
-    if (!isValid) {
-        await alertFailures({
-            failureType: "webhook failure",
-            details: "Invalid signature on incoming webhook.",
-        });
-        return { status: 403, body: { error: 'Invalid signature' } };
-    }
+  const isValid = await verifyWebhookSignature(rawBody, signature);
+  if (!isValid) {
+    await alertFailures({
+      failureType: "webhook failure",
+      details: "Invalid signature on incoming webhook.",
+    });
+    return { status: 403, body: { error: 'Invalid signature' } };
+  }
 
-    const payload: BankWebhookPayload = JSON.parse(rawBody);
+  const payload: BankWebhookPayload = JSON.parse(rawBody);
 
-    const tx = await getDbTransaction(payload.transaction_uuid);
+  const tx = await getDbTransaction(payload.transaction_uuid);
 
-    if (!tx) {
-        await alertFailures({
-            failureType: "unmatched transaction",
-            details: `Webhook received for unknown transaction UUID: ${payload.transaction_uuid}`,
-        });
-        return { status: 404, body: { error: 'Transaction not found' } };
-    }
-    
-    if (parseFloat(tx.amount).toFixed(2) !== parseFloat(payload.amount).toFixed(2)) {
-        await alertFailures({
-            failureType: "unmatched transaction",
-            details: `Amount mismatch for UUID ${payload.transaction_uuid}. Expected ${tx.amount}, got ${payload.amount}.`,
-        });
-        return { status: 400, body: { error: 'Amount mismatch' } };
-    }
+  if (!tx) {
+    await alertFailures({
+      failureType: "unmatched transaction",
+      details: `Webhook received for unknown transaction UUID: ${payload.transaction_uuid}`,
+    });
+    return { status: 404, body: { error: 'Transaction not found' } };
+  }
 
-    if (tx.status !== 'PENDING') {
-        console.log(`Webhook for already processed transaction ${tx.transaction_uuid}. Status: ${tx.status}. Ignoring.`);
-        return { status: 200, body: { message: 'Already processed' } };
-    }
+  if (parseFloat(tx.amount).toFixed(2) !== parseFloat(payload.amount).toFixed(2)) {
+    await alertFailures({
+      failureType: "unmatched transaction",
+      details: `Amount mismatch for UUID ${payload.transaction_uuid}. Expected ${tx.amount}, got ${payload.amount}.`,
+    });
+    return { status: 400, body: { error: 'Amount mismatch' } };
+  }
 
-    await updateDbTransactionStatus(payload.transaction_uuid, payload.status, payload);
+  if (tx.status !== 'PENDING') {
+    console.log(`Webhook for already processed transaction ${tx.transaction_uuid}. Status: ${tx.status}. Ignoring.`);
+    return { status: 200, body: { message: 'Already processed' } };
+  }
 
-    console.log(`Webhook processed successfully for ${payload.transaction_uuid}. New status: ${payload.status}`);
-    return { status: 200, body: { message: 'Webhook received' } };
+  await updateDbTransactionStatus(payload.transaction_uuid, payload.status, payload);
+
+  console.log(`Webhook processed successfully for ${payload.transaction_uuid}. New status: ${payload.status}`);
+  return { status: 200, body: { message: 'Webhook received' } };
 }
 
 export async function runReconciliation(): Promise<{ message: string; alert?: AlertFailuresOutput }> {
-    console.log("Running reconciliation job...");
-    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+  console.log("Running reconciliation job...");
+  const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
 
-    const pendingTxs = await findPendingTransactions(tenMinutesAgo);
+  const pendingTxs = await findPendingTransactions(tenMinutesAgo);
 
-    if (pendingTxs.length === 0) {
-        console.log("No stale pending transactions found.");
-        return { message: "No stale pending transactions found." };
-    }
+  if (pendingTxs.length === 0) {
+    console.log("No stale pending transactions found.");
+    return { message: "No stale pending transactions found." };
+  }
 
-    console.log(`Found ${pendingTxs.length} stale transaction(s) to reconcile.`);
+  console.log(`Found ${pendingTxs.length} stale transaction(s) to reconcile.`);
 
-    for (const tx of pendingTxs) {
-        console.log(`Failing stale transaction ${tx.transaction_uuid}`);
-        await updateDbTransactionStatus(tx.transaction_uuid, 'FAILED', { reconciled_at: new Date().toISOString(), reason: 'Stale' });
-    }
-    
-    const alert = await alertFailures({
-        failureType: 'Reconciliation Complete',
-        details: `Found and failed ${pendingTxs.length} stale transactions that were older than 10 minutes.`,
-    });
+  for (const tx of pendingTxs) {
+    console.log(`Failing stale transaction ${tx.transaction_uuid}`);
+    await updateDbTransactionStatus(tx.transaction_uuid, 'FAILED', { reconciled_at: new Date().toISOString(), reason: 'Stale' });
+  }
 
-    return { message: `Reconciliation complete. Failed ${pendingTxs.length} stale transactions.`, alert };
+  const alert = await alertFailures({
+    failureType: 'Reconciliation Complete',
+    details: `Found and failed ${pendingTxs.length} stale transactions that were older than 10 minutes.`,
+  });
+
+  return { message: `Reconciliation complete. Failed ${pendingTxs.length} stale transactions.`, alert };
 }

@@ -1,48 +1,39 @@
-import { redirect } from 'next/navigation';
-import { adminDb } from '@/lib/firebaseAdmin';
-import { getServerUser } from '@/lib/serverUser';
 import { getCompanyBySlug, getBranchBySlug } from '@/lib/companyData';
-import BranchManagerClient from '@/components/company/BranchManagerClient';
+import CashierTotalsChart from '@/components/branch/CashierTotalsChart';
+import BranchTodayTotal from '@/components/branch/BranchTodayTotal';
+import BranchCashierviseTotal from '@/components/branch/BranchCashierviseTotal';
 
-export default async function BranchDashboardPage({ params }: { params: Promise<{ companySlug: string; branchSlug: string }> }) {
+export default async function BranchDashboardPage({ params }: { params: { companySlug: string; branchSlug: string } | Promise<{ companySlug: string; branchSlug: string }> }) {
   const { companySlug, branchSlug } = await params;
-  const session = await getServerUser();
-  if (!session || session.claims?.role !== 'branch-manager') {
-    redirect('/signin');
-  }
-
   const company = await getCompanyBySlug(companySlug);
-  if (!company) {
-    redirect('/signin');
-  }
-  const branch = await getBranchBySlug(company.id, branchSlug);
-  if (!branch) {
-    redirect('/signin');
-  }
-  if (branch.id !== session.claims?.branchId) {
-    redirect('/signin');
-  }
-
-  const branchRef = adminDb.collection('companies').doc(company.id).collection('branches').doc(branch.id);
-  const cashiersSnap = await branchRef.collection('cashiers').orderBy('created_at', 'desc').get();
-  const cashiers = cashiersSnap.docs.map((doc) => {
-    const data = doc.data() as Record<string, any>;
-    return {
-      id: doc.id,
-      username: data.username,
-      displayName: data.displayName,
-      status: data.status || 'active',
-    };
-  });
+  const branch = company?.id ? await getBranchBySlug(company.id, branchSlug) : null;
 
   return (
-    <BranchManagerClient
-      branch={{
-        id: branch.id,
-        name: branch?.name || 'Branch',
-        username: branch?.username || '',
-        cashiers,
-      }}
-    />
+    <main className="p-4 sm:p-6 lg:p-8">
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold">Branch Dashboard</h1>
+        <p className="text-muted-foreground">{company?.name || companySlug} / {branch?.name || branchSlug}</p>
+      </div>
+
+      {company?.id && branch?.id ? (
+        <div className="grid gap-4">
+          <div className="grid md:grid-cols-3 gap-4">
+            <div className="space-y-4 h-full flex flex-col">
+              <div className="flex-1">
+                <BranchTodayTotal companyId={company.id} branchId={branch.id} />
+              </div>
+              <div className="flex-1">
+                <BranchCashierviseTotal companyId={company.id} branchId={branch.id} />
+              </div>
+            </div>
+            <div className='md:col-span-2 h-full'>
+              <CashierTotalsChart companyId={company.id} branchId={branch.id} />
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="text-sm text-muted-foreground">Branch or company not found.</div>
+      )}
+    </main>
   );
 }

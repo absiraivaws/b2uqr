@@ -1,7 +1,7 @@
 'use client'
 
 import RoleSidebarLayout, { SidebarSectionConfig } from './RoleSidebarLayout';
-import { Building2, Users2, LogOutIcon, User, Settings as SettingsIcon } from 'lucide-react';
+import { Building2, Users2, LogOutIcon, User, Settings as SettingsIcon, FileText, PieChart, Home } from 'lucide-react';
 import { useMemo } from 'react';
 
 interface CompanySidebarShellProps {
@@ -17,7 +17,16 @@ export default function CompanySidebarShell({ permissions, companyName, companyS
     {
       label: 'Company',
       links: [
+        { href: `${base}`, label: 'Dashboard', icon: Home, permission: 'company:dashboard' },
         { href: `${base}/branches`, label: 'Branches', icon: Users2, permission: 'company:branches' },
+
+      ],
+    },
+    {
+      label: 'Payments',
+      links: [
+        { href: `${base}/transactions`, label: 'Transactions', icon: FileText, permission: 'transactions' },
+        { href: `${base}/summary`, label: 'Summary', icon: PieChart, permission: 'summary' },
       ],
     },
     {
