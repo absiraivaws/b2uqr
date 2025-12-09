@@ -126,7 +126,6 @@ export default function GenerateQRClient() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Date</TableHead>
-                      <TableHead>Terminal ID</TableHead>
                       <TableHead>Amount</TableHead>
                       <TableHead>Reference No</TableHead>
                       <TableHead className="text-right">Status</TableHead>
@@ -152,7 +151,6 @@ export default function GenerateQRClient() {
                       recentTransactions.map((tx, index) => (
                         <TableRow key={tx.transaction_uuid ?? tx.reference_number ?? tx.transaction_id ?? index}>
                           <TableCell>{formatCreatedAt(tx.created_at)}</TableCell>
-                          <TableCell>{tx.bankResponse?.terminal_id ?? tx.terminal_id ?? "N/A"}</TableCell>
                           <TableCell>{formatAmount(tx.amount, tx.currency)}</TableCell>
                           <TableCell>{tx.reference_number ?? "-"}</TableCell>
                           <TableCell className="text-right">
