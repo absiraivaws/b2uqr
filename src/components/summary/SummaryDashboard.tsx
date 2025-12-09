@@ -152,6 +152,18 @@ export default function SummaryDashboard({
   const totalCount = filteredTransactions.length;
   const totalAmount = filteredTransactions.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
 
+  const filtersActive = startDate !== '' || endDate !== '' || chartMode !== 'monthly' || effectiveBranch !== 'ALL' || effectiveCashier !== 'ALL';
+
+  const clearFilters = () => {
+    setStartDate('');
+    setEndDate('');
+    setChartMode('monthly');
+    setBranchFilter('ALL');
+    setCashierFilter('ALL');
+    if (onBranchChange) onBranchChange(undefined);
+    if (onCashierChange) onCashierChange(undefined);
+  };
+
   return (
     <div className="space-y-8">
       <Card>
@@ -227,6 +239,15 @@ export default function SummaryDashboard({
                 </SelectContent>
               </Select>
             )}
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full sm:w-auto"
+              onClick={clearFilters}
+              disabled={!filtersActive}
+            >
+              Clear
+            </Button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

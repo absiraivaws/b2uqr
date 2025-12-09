@@ -65,10 +65,10 @@ export default function TransactionsTable({
     if (onCashierChange) onCashierChange(undefined);
   };
 
-  const filtersActive = searchTerm !== '' || startDate !== '' || endDate !== '' || statusFilter !== 'ALL' || cashierFilter !== 'ALL' || branchFilter !== 'ALL';
-
   const effectiveBranch = selectedBranchId ?? branchFilter;
   const effectiveCashier = selectedCashierId ?? cashierFilter;
+
+  const filtersActive = searchTerm !== '' || startDate !== '' || endDate !== '' || statusFilter !== 'ALL' || (effectiveCashier !== 'ALL') || (effectiveBranch !== 'ALL');
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter(tx => {
