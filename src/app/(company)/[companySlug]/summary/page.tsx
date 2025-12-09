@@ -16,5 +16,12 @@ export default async function CompanySummaryPage({ params }: { params: Promise<{
   const showBranchSelect = !(role === 'branch-manager' || role === 'cashier' || !role || role === 'user');
   const showCashierSelect = role !== 'cashier';
 
-  return <CompanySummaryView companyId={company.id} showBranchSelect={showBranchSelect} showCashierSelect={showCashierSelect} />;
+  return (
+    <main className="p-4 sm:p-6 lg:p-8">
+      <CompanySummaryView
+        companyId={company.id}
+        showBranchSelect={showBranchSelect}
+        showCashierSelect={showCashierSelect} />
+    </main>
+  );
 }

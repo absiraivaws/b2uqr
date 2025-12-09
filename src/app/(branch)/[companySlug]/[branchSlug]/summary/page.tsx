@@ -23,5 +23,15 @@ export default async function BranchSummaryPage({ params }: { params: Promise<{ 
   const showBranchSelect = false;
   const showCashierSelect = role !== 'cashier';
 
-  return <BranchSummaryView companyId={company.id} branchId={branch.id} selectedBranchId={signedBranchId} showBranchSelect={showBranchSelect} showCashierSelect={showCashierSelect} />;
+  return (
+    <main className="p-4 sm:p-6 lg:p-8">
+      <BranchSummaryView
+        companyId={company.id}
+        branchId={branch.id}
+        selectedBranchId={signedBranchId}
+        showBranchSelect={showBranchSelect}
+        showCashierSelect={showCashierSelect}
+      />
+    </main>
+  );
 }

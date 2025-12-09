@@ -51,9 +51,11 @@ export default async function CompanyBranchesPage({ params }: { params: Promise<
   const branches = await getBranchesWithCashiers(company.id);
 
   return (
-    <CompanyBranchesClient
-      companyName={company?.name || 'Company'}
-      initialBranches={branches}
-    />
+    <main className="p-4 sm:p-6 lg:p-8">
+      <CompanyBranchesClient
+        companyName={company?.name || 'Company'}
+        initialBranches={branches}
+      />
+    </main>
   );
 }

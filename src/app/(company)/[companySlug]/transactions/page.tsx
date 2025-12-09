@@ -18,5 +18,13 @@ export default async function CompanyTransactionsPage({ params }: { params: Prom
   // hide cashier select for cashiers
   const showCashierSelect = role !== 'cashier';
 
-  return <CompanyTransactionsView companyId={company.id} showBranchSelect={showBranchSelect} showCashierSelect={showCashierSelect} />;
+  return (
+    <main className="p-4 sm:p-6 lg:p-8">
+      <CompanyTransactionsView
+        companyId={company.id}
+        showBranchSelect={showBranchSelect} 
+        showCashierSelect={showCashierSelect}
+      />
+    </main>
+  );
 }
