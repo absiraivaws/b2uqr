@@ -4,7 +4,7 @@ export async function generateQRImage(
   referenceNumber: string,
   merchantName: string,
   merchantCity: string,
-  terminalId: string
+
 ): Promise<Blob> {
   const qrSize = 500;
   const padding = 30;
@@ -82,9 +82,7 @@ export async function generateQRImage(
   ctx.fillText(`Reference: ${referenceNumber}`, canvas.width / 2, yPos);
   yPos += 30;
   ctx.fillText(`Merchant: ${merchantName}${merchantCity ? `, ${merchantCity}` : ''}`, canvas.width / 2, yPos);
-  yPos += 30;
-  ctx.fillText(`Terminal: ${terminalId}`, canvas.width / 2, yPos);
-  yPos += 35;
+  yPos += 30
 
   // Footer
   ctx.font = 'italic 16px Arial';
