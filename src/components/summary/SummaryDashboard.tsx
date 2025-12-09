@@ -33,6 +33,7 @@ interface SummaryDashboardProps {
   transactions: Transaction[];
   title?: string;
   description?: string;
+  cashierOptions?: { id: string; username?: string; displayName?: string }[];
 }
 
 type ChartData = {
@@ -45,10 +46,12 @@ export default function SummaryDashboard({
   transactions,
   title = "Summary",
   description = "View transaction summary and statistics."
+  , cashierOptions,
 }: SummaryDashboardProps) {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [chartMode, setChartMode] = useState<"monthly" | "daily">("monthly");
+  const [cashierFilter, setCashierFilter] = useState('ALL');
 
   const filteredTransactions = useMemo(() => {
     return (transactions || []).filter((tx) => {
@@ -80,9 +83,14 @@ export default function SummaryDashboard({
       // Only include successful transactions
       if (tx.status !== 'SUCCESS') return false;
 
+      // Cashier filter
+      if (cashierFilter !== 'ALL') {
+        if (!tx.cashierId || tx.cashierId !== cashierFilter) return false;
+      }
+
       return true;
     });
-  }, [transactions, startDate, endDate]);
+  }, [transactions, startDate, endDate, cashierFilter]);
 
   // Group by month/day
   const monthMap: Record<string, { count: number; amount: number }> = {};
@@ -143,6 +151,21 @@ export default function SummaryDashboard({
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
             />
+
+            {/* Cashier filter appears next to date filter when provided */}
+            {cashierOptions && (
+              <Select value={cashierFilter} onValueChange={setCashierFilter}>
+                <SelectTrigger className="w-full sm:w-[220px]">
+                  <SelectValue placeholder="Cashier" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Cashiers</SelectItem>
+                  {cashierOptions.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.displayName || c.username || c.id}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

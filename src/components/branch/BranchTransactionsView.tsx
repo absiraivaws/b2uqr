@@ -2,9 +2,31 @@
 
 import useBranchTransactions from '@/hooks/use-branch-transactions';
 import TransactionsTable from '@/components/transactions/TransactionsTable';
+import { useEffect, useState } from 'react';
 
 export default function BranchTransactionsView({ companyId, branchId }: { companyId: string; branchId: string }) {
   const { transactions, loading, error } = useBranchTransactions(companyId, branchId);
+  const [cashiers, setCashiers] = useState<{ id: string; username?: string; displayName?: string }[] | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    if (!branchId) return;
+    fetch(`/api/company/branches/${branchId}/cashiers`, { credentials: 'same-origin' })
+      .then((res) => res.json())
+      .then((data) => {
+        if (!mounted) return;
+        if (data?.ok && Array.isArray(data.cashiers)) {
+          setCashiers(data.cashiers.map((c: any) => ({ id: c.id, username: c.username, displayName: c.displayName })));
+        } else {
+          setCashiers([]);
+        }
+      })
+      .catch(() => {
+        if (mounted) setCashiers([]);
+      });
+
+    return () => { mounted = false; };
+  }, [branchId]);
 
   return (
     <TransactionsTable
@@ -13,6 +35,7 @@ export default function BranchTransactionsView({ companyId, branchId }: { compan
       error={error}
       title="Branch Transactions"
       description="View transactions for this branch."
+      cashierOptions={cashiers ?? undefined}
     />
   );
 }

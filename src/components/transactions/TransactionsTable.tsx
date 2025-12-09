@@ -23,6 +23,7 @@ interface TransactionsTableProps {
   error: Error | null;
   title?: string;
   description?: string;
+  cashierOptions?: { id: string; username?: string; displayName?: string }[];
 }
 
 export default function TransactionsTable({
@@ -30,21 +31,24 @@ export default function TransactionsTable({
   loading,
   error,
   title = "Transactions History",
-  description = "Search and view your past transactions."
+  description = "Search and view your past transactions.",
+  cashierOptions,
 }: TransactionsTableProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [cashierFilter, setCashierFilter] = useState('ALL');
 
   const clearFilters = () => {
     setSearchTerm('');
     setStartDate('');
     setEndDate('');
     setStatusFilter('ALL');
+    setCashierFilter('ALL');
   };
 
-  const filtersActive = searchTerm !== '' || startDate !== '' || endDate !== '' || statusFilter !== 'ALL';
+  const filtersActive = searchTerm !== '' || startDate !== '' || endDate !== '' || statusFilter !== 'ALL' || cashierFilter !== 'ALL';
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter(tx => {
@@ -83,9 +87,14 @@ export default function TransactionsTable({
         return false;
       }
 
+      // Cashier filter: only apply if cashierFilter is set and tx has cashierId
+      if (cashierFilter !== 'ALL') {
+        if (!tx.cashierId || tx.cashierId !== cashierFilter) return false;
+      }
+
       return searchMatch;
     });
-  }, [transactions, searchTerm, startDate, endDate, statusFilter]);
+  }, [transactions, searchTerm, startDate, endDate, statusFilter, cashierFilter]);
 
   const getStatusVariant = (status: string) => {
     switch (status) {
@@ -113,6 +122,7 @@ export default function TransactionsTable({
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+        
           <Input
             type="date"
             className="w-full sm:w-[200px]"
@@ -126,6 +136,19 @@ export default function TransactionsTable({
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
           />
+          {cashierOptions && (
+            <Select value={cashierFilter} onValueChange={setCashierFilter}>
+              <SelectTrigger className="w-full sm:w-[220px]">
+                <SelectValue placeholder="Cashier" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Cashiers</SelectItem>
+                {cashierOptions.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>{c.displayName || c.username || c.id}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-full sm:w-[150px]">
               <SelectValue placeholder="Status" />
