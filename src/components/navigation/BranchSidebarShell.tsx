@@ -1,7 +1,7 @@
 'use client'
 
 import RoleSidebarLayout, { SidebarSectionConfig } from './RoleSidebarLayout';
-import { Store, Users, User, LogOutIcon } from 'lucide-react';
+import { Store, Users, User, LogOutIcon, FileText, PieChart } from 'lucide-react';
 import { useMemo } from 'react';
 
 interface BranchSidebarShellProps {
@@ -19,6 +19,8 @@ export default function BranchSidebarShell({ permissions, branchName, companySlu
       label: 'Branch',
       links: [
         { href: base, label: 'Manage Cashiers', icon: Users, permission: 'company:cashiers' },
+        { href: `${base}/transactions`, label: 'Transactions', icon: FileText, permission: 'transactions' },
+        { href: `${base}/summary`, label: 'Summary', icon: PieChart, permission: 'summary' },
       ],
     },
     {
