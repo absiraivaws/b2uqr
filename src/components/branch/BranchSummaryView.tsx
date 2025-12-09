@@ -4,7 +4,7 @@ import useBranchTransactions from '@/hooks/use-branch-transactions';
 import SummaryDashboard from '@/components/summary/SummaryDashboard';
 import { useEffect, useState } from 'react';
 
-export default function BranchSummaryView({ companyId, branchId }: { companyId: string; branchId: string }) {
+export default function BranchSummaryView({ companyId, branchId, selectedBranchId, showBranchSelect = false, showCashierSelect = true }: { companyId: string; branchId: string; selectedBranchId?: string; showBranchSelect?: boolean; showCashierSelect?: boolean }) {
   const { transactions } = useBranchTransactions(companyId, branchId);
   const [cashiers, setCashiers] = useState<{ id: string; username?: string; displayName?: string }[] | null>(null);
 
@@ -34,6 +34,9 @@ export default function BranchSummaryView({ companyId, branchId }: { companyId: 
       title="Branch Summary"
       description="Overview of branch performance."
       cashierOptions={cashiers ?? undefined}
+      selectedBranchId={selectedBranchId}
+      showBranchSelect={showBranchSelect}
+      showCashierSelect={showCashierSelect}
     />
   );
 }

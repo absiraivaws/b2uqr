@@ -7,7 +7,7 @@ export default function SummaryPage() {
 
   return (
     <main className="p-4 sm:p-6 lg:p-8">
-      <SummaryDashboard transactions={transactions} loading={loading} />
+      <SummaryDashboard transactions={transactions} showCashierSelect={false} showBranchSelect={false} />
     </main>
   );
 }

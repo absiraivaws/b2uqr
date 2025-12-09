@@ -4,7 +4,7 @@ import useBranchTransactions from '@/hooks/use-branch-transactions';
 import TransactionsTable from '@/components/transactions/TransactionsTable';
 import { useEffect, useState } from 'react';
 
-export default function BranchTransactionsView({ companyId, branchId }: { companyId: string; branchId: string }) {
+export default function BranchTransactionsView({ companyId, branchId, selectedBranchId, showBranchSelect = false, showCashierSelect = true }: { companyId: string; branchId: string; selectedBranchId?: string; showBranchSelect?: boolean; showCashierSelect?: boolean }) {
   const { transactions, loading, error } = useBranchTransactions(companyId, branchId);
   const [cashiers, setCashiers] = useState<{ id: string; username?: string; displayName?: string }[] | null>(null);
 
@@ -36,6 +36,9 @@ export default function BranchTransactionsView({ companyId, branchId }: { compan
       title="Branch Transactions"
       description="View transactions for this branch."
       cashierOptions={cashiers ?? undefined}
+      selectedBranchId={selectedBranchId}
+      showBranchSelect={showBranchSelect}
+      showCashierSelect={showCashierSelect}
     />
   );
 }

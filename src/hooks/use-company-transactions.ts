@@ -19,7 +19,11 @@ type UseCompanyTransactionsResult = {
  * - Orders by `created_at` descending.
  * - Returns real-time updates via onSnapshot.
  */
-export function useCompanyTransactions(companyId: string | undefined): UseCompanyTransactionsResult {
+export function useCompanyTransactions(
+  companyId: string | undefined,
+  branchId?: string | undefined,
+  cashierId?: string | undefined,
+): UseCompanyTransactionsResult {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -42,14 +46,12 @@ export function useCompanyTransactions(companyId: string | undefined): UseCompan
         return;
       }
 
-      // Check if user has permission to view this company's transactions?
-      // Security rules should ideally enforce this, but client-side we proceed if companyId is present.
+      // Build query constraints. Include companyId always so rules can validate.
+      const constraints: any[] = [where("companyId", "==", companyId)];
+      if (branchId) constraints.push(where("branchId", "==", branchId));
+      if (cashierId) constraints.push(where("cashierId", "==", cashierId));
 
-      const q = query(
-        collection(db, "transactions"),
-        where("companyId", "==", companyId),
-        orderBy("created_at", "desc")
-      );
+      const q = query(collection(db, "transactions"), ...constraints, orderBy("created_at", "desc"));
 
       setLoading(true);
       unsubSnapshot = onSnapshot(q, (snap) => {
@@ -69,7 +71,7 @@ export function useCompanyTransactions(companyId: string | undefined): UseCompan
         try { unsubSnapshot(); } catch { }
       }
     };
-  }, [companyId]);
+  }, [companyId, branchId, cashierId]);
 
   return { transactions, loading, error };
 }

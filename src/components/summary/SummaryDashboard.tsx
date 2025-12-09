@@ -33,7 +33,14 @@ interface SummaryDashboardProps {
   transactions: Transaction[];
   title?: string;
   description?: string;
+  branchOptions?: { id: string; slug?: string; name?: string }[];
   cashierOptions?: { id: string; username?: string; displayName?: string }[];
+  selectedBranchId?: string | undefined;
+  onBranchChange?: (branchId: string | 'ALL' | undefined) => void;
+  selectedCashierId?: string | undefined;
+  onCashierChange?: (cashierId: string | 'ALL' | undefined) => void;
+  showCashierSelect?: boolean;
+  showBranchSelect?: boolean;
 }
 
 type ChartData = {
@@ -45,13 +52,24 @@ type ChartData = {
 export default function SummaryDashboard({
   transactions,
   title = "Summary",
-  description = "View transaction summary and statistics."
-  , cashierOptions,
+  description = "View transaction summary and statistics.",
+  branchOptions,
+  cashierOptions,
+  selectedBranchId,
+  onBranchChange,
+  selectedCashierId,
+  onCashierChange,
+  showCashierSelect = true,
+  showBranchSelect = true,
 }: SummaryDashboardProps) {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [chartMode, setChartMode] = useState<"monthly" | "daily">("monthly");
   const [cashierFilter, setCashierFilter] = useState('ALL');
+  const [branchFilter, setBranchFilter] = useState('ALL');
+
+  const effectiveBranch = selectedBranchId ?? branchFilter;
+  const effectiveCashier = selectedCashierId ?? cashierFilter;
 
   const filteredTransactions = useMemo(() => {
     return (transactions || []).filter((tx) => {
@@ -83,14 +101,19 @@ export default function SummaryDashboard({
       // Only include successful transactions
       if (tx.status !== 'SUCCESS') return false;
 
+      // Branch filter
+      if (effectiveBranch !== 'ALL') {
+        if (!tx.branchId || tx.branchId !== effectiveBranch) return false;
+      }
+
       // Cashier filter
-      if (cashierFilter !== 'ALL') {
-        if (!tx.cashierId || tx.cashierId !== cashierFilter) return false;
+      if (effectiveCashier !== 'ALL') {
+        if (!tx.cashierId || tx.cashierId !== effectiveCashier) return false;
       }
 
       return true;
     });
-  }, [transactions, startDate, endDate, cashierFilter]);
+  }, [transactions, startDate, endDate, cashierFilter, branchFilter, selectedBranchId, selectedCashierId]);
 
   // Group by month/day
   const monthMap: Record<string, { count: number; amount: number }> = {};
@@ -152,17 +175,55 @@ export default function SummaryDashboard({
               onChange={(e) => setEndDate(e.target.value)}
             />
 
-            {/* Cashier filter appears next to date filter when provided */}
-            {cashierOptions && (
-              <Select value={cashierFilter} onValueChange={setCashierFilter}>
-                <SelectTrigger className="w-full sm:w-[220px]">
-                  <SelectValue placeholder="Cashier" />
+            {/* Branch filter appears before cashier filter and renders immediately (optional) */}
+            {showBranchSelect && (
+            <Select
+              value={selectedBranchId ?? branchFilter}
+              onValueChange={(val) => {
+                if (onBranchChange) onBranchChange(val === 'ALL' ? undefined : val);
+                else setBranchFilter(val);
+                // clear cashier when branch changes
+                if (onCashierChange) onCashierChange(undefined);
+                else setCashierFilter('ALL');
+              }}
+            >
+              <SelectTrigger className="w-full sm:w-[200px]">
+                <SelectValue placeholder="Branch" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Branches</SelectItem>
+                {branchOptions == null ? (
+                  <SelectItem value="LOADING" disabled>Loading branches...</SelectItem>
+                ) : (
+                  branchOptions.map((b) => (
+                    <SelectItem key={b.id} value={b.id}>{b.name || b.slug || b.id}</SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+            )}
+
+            {/* Cashier select (can be hidden for individual users) */}
+            {showCashierSelect && (
+              <Select
+                value={selectedCashierId ?? cashierFilter}
+                onValueChange={(val) => {
+                  if (onCashierChange) onCashierChange(val === 'ALL' ? undefined : val);
+                  else setCashierFilter(val);
+                }}
+              >
+                <SelectTrigger className="w-full sm:w-[200px]" disabled={!((selectedBranchId ?? branchFilter) !== 'ALL')}>
+                  <SelectValue placeholder={(selectedBranchId ?? branchFilter) === 'ALL' ? 'Select branch first' : 'Cashier'} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">All Cashiers</SelectItem>
-                  {cashierOptions.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.displayName || c.username || c.id}</SelectItem>
-                  ))}
+                  {cashierOptions == null ? (
+                    <SelectItem value="LOADING" disabled>Loading cashiers...</SelectItem>
+                  ) : (
+                    cashierOptions.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.displayName || c.username || c.id}</SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             )}

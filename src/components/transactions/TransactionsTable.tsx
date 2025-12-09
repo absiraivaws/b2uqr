@@ -16,14 +16,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { Transaction } from '@/lib/types';
-
 interface TransactionsTableProps {
   transactions: Transaction[];
   loading: boolean;
   error: Error | null;
   title?: string;
   description?: string;
+  branchOptions?: { id: string; slug?: string; name?: string }[];
   cashierOptions?: { id: string; username?: string; displayName?: string }[];
+  selectedBranchId?: string | undefined;
+  onBranchChange?: (branchId: string | 'ALL' | undefined) => void;
+  selectedCashierId?: string | undefined;
+  onCashierChange?: (cashierId: string | 'ALL' | undefined) => void;
+  showCashierSelect?: boolean;
+  showBranchSelect?: boolean;
 }
 
 export default function TransactionsTable({
@@ -32,13 +38,21 @@ export default function TransactionsTable({
   error,
   title = "Transactions History",
   description = "Search and view your past transactions.",
+  branchOptions,
   cashierOptions,
+  selectedBranchId,
+  onBranchChange,
+  selectedCashierId,
+  onCashierChange,
+  showCashierSelect = true,
+  showBranchSelect = true,
 }: TransactionsTableProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [cashierFilter, setCashierFilter] = useState('ALL');
+  const [branchFilter, setBranchFilter] = useState('ALL');
 
   const clearFilters = () => {
     setSearchTerm('');
@@ -46,9 +60,15 @@ export default function TransactionsTable({
     setEndDate('');
     setStatusFilter('ALL');
     setCashierFilter('ALL');
+    setBranchFilter('ALL');
+    if (onBranchChange) onBranchChange(undefined);
+    if (onCashierChange) onCashierChange(undefined);
   };
 
-  const filtersActive = searchTerm !== '' || startDate !== '' || endDate !== '' || statusFilter !== 'ALL' || cashierFilter !== 'ALL';
+  const filtersActive = searchTerm !== '' || startDate !== '' || endDate !== '' || statusFilter !== 'ALL' || cashierFilter !== 'ALL' || branchFilter !== 'ALL';
+
+  const effectiveBranch = selectedBranchId ?? branchFilter;
+  const effectiveCashier = selectedCashierId ?? cashierFilter;
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter(tx => {
@@ -87,14 +107,19 @@ export default function TransactionsTable({
         return false;
       }
 
-      // Cashier filter: only apply if cashierFilter is set and tx has cashierId
-      if (cashierFilter !== 'ALL') {
-        if (!tx.cashierId || tx.cashierId !== cashierFilter) return false;
+      // Cashier filter: only apply if effectiveCashier is set and tx has cashierId
+      if (effectiveCashier !== 'ALL') {
+        if (!tx.cashierId || tx.cashierId !== effectiveCashier) return false;
+      }
+
+      // Branch filter
+      if (effectiveBranch !== 'ALL') {
+        if (!tx.branchId || tx.branchId !== effectiveBranch) return false;
       }
 
       return searchMatch;
     });
-  }, [transactions, searchTerm, startDate, endDate, statusFilter, cashierFilter]);
+  }, [transactions, searchTerm, startDate, endDate, statusFilter, cashierFilter, branchFilter]);
 
   const getStatusVariant = (status: string) => {
     switch (status) {
@@ -136,17 +161,58 @@ export default function TransactionsTable({
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
           />
-          {cashierOptions && (
-            <Select value={cashierFilter} onValueChange={setCashierFilter}>
-              <SelectTrigger className="w-full sm:w-[220px]">
-                <SelectValue placeholder="Cashier" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Cashiers</SelectItem>
-                {cashierOptions.map((c) => (
+          {/* Branch select: optionally render and show loading item until branches load */}
+          {showBranchSelect && (
+          <Select
+            value={selectedBranchId ?? branchFilter}
+            onValueChange={(val) => {
+              if (onBranchChange) onBranchChange(val === 'ALL' ? undefined : val);
+              else setBranchFilter(val);
+              // when branch changes, clear cashier selection
+              if (!onCashierChange) setCashierFilter('ALL');
+              if (onCashierChange) onCashierChange(undefined);
+            }}
+          >
+            <SelectTrigger className="w-full sm:w-[200px]">
+              <SelectValue placeholder="Branch" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Branches</SelectItem>
+              {branchOptions == null ? (
+                <SelectItem value="LOADING" disabled>Loading branches...</SelectItem>
+              ) : (
+                branchOptions.map((b) => (
+                  <SelectItem key={b.id} value={b.id}>{b.name || b.slug || b.id}</SelectItem>
+                ))
+              )}
+            </SelectContent>
+          </Select>
+          )}
+
+          {/* Cashier select is always shown; it's disabled until a branch is selected (cashierOptions provided) */}
+          {showCashierSelect && (
+          <Select
+            value={selectedCashierId ?? cashierFilter}
+            onValueChange={(val) => {
+              if (onCashierChange) onCashierChange(val === 'ALL' ? undefined : val);
+              else setCashierFilter(val);
+            }}
+          >
+            {/* enable the select as soon as a branch is picked; options populate when cashierOptions arrives */}
+            <SelectTrigger className="w-full sm:w-[200px]" disabled={!(effectiveBranch !== 'ALL')}>
+              <SelectValue placeholder={effectiveBranch === 'ALL' ? 'Select branch first' : 'Cashier'} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Cashiers</SelectItem>
+              {/* show a loading item until cashierOptions is available */}
+              {cashierOptions == null ? (
+                <SelectItem value="LOADING" disabled>Loading cashiers...</SelectItem>
+              ) : (
+                cashierOptions.map((c) => (
                   <SelectItem key={c.id} value={c.id}>{c.displayName || c.username || c.id}</SelectItem>
-                ))}
-              </SelectContent>
+                ))
+              )}
+            </SelectContent>
             </Select>
           )}
           <Select value={statusFilter} onValueChange={setStatusFilter}>

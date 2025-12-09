@@ -13,6 +13,8 @@ export default function TransactionsPage() {
 				transactions={transactions}
 				loading={loading}
 				error={error}
+				showCashierSelect={false}
+				showBranchSelect={false}
 			/>
 		</main>
 	);
