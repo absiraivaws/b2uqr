@@ -14,6 +14,7 @@ interface TransactionStatusProps {
   isSharing: boolean;
   onDownload: () => void;
   isDownloading: boolean;
+  includeReference?: boolean;
 }
 
 function StatusIcon({ status }: { status: Transaction["status"] }) {
@@ -33,6 +34,7 @@ export function TransactionStatus({
   isSharing,
   onDownload,
   isDownloading,
+  includeReference = true,
 }: TransactionStatusProps) {
   const [qrDataUrl, setQrDataUrl] = useState<string>("");
 
@@ -63,10 +65,12 @@ export function TransactionStatus({
                     maximumFractionDigits: 2,
                   })}
                 </div>
-                <div className="text-lg sm:text-xl mb-2">
-                  Reference:
-                  <span className="font-semibold ml-1">{transaction.reference_number}</span>
-                </div>
+                {includeReference && transaction.reference_number ? (
+                  <div className="text-lg sm:text-xl mb-2">
+                    Reference:
+                    <span className="font-semibold ml-1">{transaction.reference_number}</span>
+                  </div>
+                ) : null}
                 <div className="text-lg sm:text-xl mb-1">
                   Merchant:
                   <span className="font-semibold ml-1">{transaction.merchant_name ?? "-"}, {transaction.merchant_city ?? "-"}</span>

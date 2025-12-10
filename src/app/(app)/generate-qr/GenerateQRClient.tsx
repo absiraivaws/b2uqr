@@ -112,6 +112,7 @@ export default function GenerateQRClient() {
                 isSharing={isSharing}
                 onDownload={handleDownloadQR}
                 isDownloading={isDownloading}
+                includeReference={includeReference}
               />
             ) : (
               <TransactionEmpty />
