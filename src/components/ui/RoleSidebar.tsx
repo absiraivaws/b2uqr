@@ -74,7 +74,18 @@ export default function RoleSidebar({
     } catch (err) {
       console.error('signout failed', err);
     } finally {
-      const destination = marketingOrigin || `/${role}/signin`;
+      let destination: string;
+      if (marketingOrigin) {
+        try {
+          const u = new URL(marketingOrigin);
+          u.searchParams.set('view', 'merchant-qr');
+          destination = u.toString();
+        } catch (e) {
+          destination = marketingOrigin.replace(/\/+$/,'') + '/?view=merchant-qr';
+        }
+      } else {
+        destination = `/${role}/signin`;
+      }
       window.location.href = destination;
     }
   };
