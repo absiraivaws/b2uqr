@@ -1,3 +1,4 @@
+import React, { useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,6 +36,8 @@ export function TransactionForm({
   setIncludeReference
 }: TransactionFormProps) {
   const showCashierNumber = Boolean(cashierNumber);
+  const formRef = useRef<HTMLFormElement | null>(null);
+  const isSubmitDisabled = isSubmitting || !amount || !referenceNumber || status === 'PENDING';
 
   return (
     <Card>
@@ -44,7 +47,21 @@ export function TransactionForm({
       </CardHeader>
       <CardContent>
         <form
+          ref={formRef}
           onSubmit={onSubmit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              if (isSubmitDisabled) return;
+              e.preventDefault();
+              const form = formRef.current;
+              if (!form) return;
+              if (typeof (form as any).requestSubmit === 'function') {
+                (form as any).requestSubmit();
+              } else {
+                form.submit();
+              }
+            }
+          }}
           className="space-y-6"
         >
           {showCashierNumber ? (
