@@ -68,6 +68,8 @@ export default function GenerateQRClient() {
     handleVerifyTransaction,
     handleShareQR,
     handleDownloadQR,
+    includeReference,
+    setIncludeReference,
   } = useTransactionManager();
   const {
     transactions,
@@ -95,6 +97,8 @@ export default function GenerateQRClient() {
             referenceType={referenceType}
             manualReferencePlaceholder={manualReferencePlaceholder}
             cashierNumber={cashierNumberDisplay}
+            includeReference={includeReference}
+            setIncludeReference={setIncludeReference}
           />
           <div>
             {isSubmitting && !currentTransaction ? (
@@ -108,6 +112,7 @@ export default function GenerateQRClient() {
                 isSharing={isSharing}
                 onDownload={handleDownloadQR}
                 isDownloading={isDownloading}
+                includeReference={includeReference}
               />
             ) : (
               <TransactionEmpty />

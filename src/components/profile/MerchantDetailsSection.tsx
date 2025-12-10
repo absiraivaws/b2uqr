@@ -33,6 +33,9 @@ const MerchantDetailsSection = forwardRef<MerchantDetailsHandle, Props>(({ onLoa
   const [terminalId, setTerminalId] = useState('');
   const [merchantName, setMerchantName] = useState('');
   const [merchantCity, setMerchantCity] = useState('');
+  const [merchantCategoryCode, setMerchantCategoryCode] = useState('');
+  const [currencyCode, setCurrencyCode] = useState('');
+  const [countryCode, setCountryCode] = useState('');
 
   const getFieldDef = (id: string) => allApiFields.find(f => f.id === id);
 
@@ -52,6 +55,9 @@ const MerchantDetailsSection = forwardRef<MerchantDetailsHandle, Props>(({ onLoa
           if (data.terminalId) setTerminalId(data.terminalId);
           if (data.merchantName) setMerchantName(data.merchantName);
           if (data.merchantCity) setMerchantCity(data.merchantCity);
+          if (data.merchantCategoryCode) setMerchantCategoryCode(data.merchantCategoryCode);
+          if (data.currencyCode) setCurrencyCode(data.currencyCode);
+          if (data.countryCode) setCountryCode(data.countryCode);
         }
       } catch (e) {
         console.error('Failed to load merchant details', e);
@@ -91,11 +97,44 @@ const MerchantDetailsSection = forwardRef<MerchantDetailsHandle, Props>(({ onLoa
           terminalId: terminalId || null,
           merchantName: merchantName || null,
           merchantCity: merchantCity || null,
+          merchantCategoryCode: merchantCategoryCode || null,
+          currencyCode: currencyCode || null,
+          countryCode: countryCode || null,
           detailsLocked: true,
         };
         await setDoc(refDoc, payload, { merge: true });
-        setLocked(true);
-        toast({ title: 'Saved', description: 'Merchant details saved. They are now locked.' });
+
+        // After saving to the user's doc, if this user is a company owner,
+        // also update the company document's `merchantSettings` so the
+        // company-wide settings reflect the new QR data.
+        try {
+          const userSnap = await getDoc(refDoc);
+          const userData: any = userSnap.exists() ? userSnap.data() : null;
+          if (userData?.role === 'company-owner' && userData?.companyId) {
+            const companyRef = doc(db, 'companies', String(userData.companyId));
+            const merchantSettings = {
+              merchantId: merchantId || null,
+              bankCode: bankCode || null,
+              terminalId: terminalId || null,
+              merchantName: merchantName || null,
+              merchantCity: merchantCity || null,
+              merchantCategoryCode: merchantCategoryCode || null,
+              currencyCode: currencyCode || null,
+              countryCode: countryCode || null,
+            };
+            await setDoc(companyRef, { merchantSettings }, { merge: true });
+            setLocked(true);
+            toast({ title: 'Saved', description: 'Merchant details saved. Company settings updated.' });
+          } else {
+            setLocked(true);
+            toast({ title: 'Saved', description: 'Merchant details saved. They are now locked.' });
+          }
+          } catch (innerErr) {
+            console.error('Failed to update company merchant settings', innerErr);
+            // Don't fail the overall save if updating company settings fails.
+            setLocked(true);
+            toast({ title: 'Saved', description: 'Merchant details saved. Company update failed.', variant: 'destructive' });
+          }
       } catch (e) {
         console.error('Failed to save merchant details', e);
         toast({ title: 'Save failed', description: 'Could not save — try again.' });
@@ -113,10 +152,13 @@ const MerchantDetailsSection = forwardRef<MerchantDetailsHandle, Props>(({ onLoa
       setTerminalId(qrData.terminal_id);
       setMerchantName(qrData.merchant_name);
       setMerchantCity(qrData.merchant_city);
+      if (qrData.mcc) setMerchantCategoryCode(qrData.mcc);
+      if (qrData.currency_code) setCurrencyCode(qrData.currency_code);
+      if (qrData.country_code) setCountryCode(qrData.country_code);
       toast({ title: 'Fields populated', description: 'Merchant details filled from QR code.' });
     },
     isLocked: () => locked,
-  }), [locked, merchantId, bankCode, terminalId, merchantName, merchantCity, toast]);
+  }), [locked, merchantId, bankCode, terminalId, merchantName, merchantCity, merchantCategoryCode, currencyCode, countryCode, toast]);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
