@@ -502,21 +502,23 @@ export async function disableBranchManager(companyId: string, branchId: string) 
   const branchData = branchSnap.data() as any;
   if (!branchData.managerUid) return;
   const managerUid = branchData.managerUid as string;
-  await Promise.all([
-    branchRef.update({
-      managerUid: null,
-      managerName: null,
-      managerContact: null,
-      updated_at: FieldValue.serverTimestamp(),
-    }),
-    adminDb.collection('users').doc(managerUid).set({
-      status: 'disabled',
-      pinHash: null,
-      updated_at: FieldValue.serverTimestamp(),
-    }, { merge: true }),
-    adminAuth.updateUser(managerUid, { disabled: true }).catch(() => null),
-    adminAuth.revokeRefreshTokens(managerUid).catch(() => null),
-  ]);
+
+  // Remove manager refs from branch and delete user records
+  const ops: Promise<any>[] = [];
+
+  // Clear manager fields on branch (including managerAccountUid)
+  ops.push(branchRef.update({
+    managerUid: null,
+    managerName: null,
+    managerContact: null,
+    updated_at: FieldValue.serverTimestamp(),
+  }));
+
+  // Delete users doc and auth user (best-effort)
+  ops.push(adminDb.collection('users').doc(managerUid).delete().catch(() => null));
+  ops.push(adminAuth.deleteUser(managerUid).catch(() => null));
+
+  await Promise.all(ops);
 }
 
 export async function createCashier(input: CreateCashierInput) {
