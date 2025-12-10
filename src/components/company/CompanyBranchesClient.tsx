@@ -24,6 +24,7 @@ export default function CompanyBranchesClient({ companyName, initialBranches }: 
   const [addBranchDialog, setAddBranchDialog] = useState(false);
   const [managerDialog, setManagerDialog] = useState<ManagerDialogState>({ open: false, branch: null });
   const [managerForm, setManagerForm] = useState({ displayName: '', phone: '', email: '' });
+  const [assigningManager, setAssigningManager] = useState(false);
   const [cashierDialog, setCashierDialog] = useState<CashierDialogState>({ open: false, branch: null });
   const [cashierForm, setCashierForm] = useState({ displayName: '', pin: '' });
   const [expandedBranch, setExpandedBranch] = useState<string | null>(null);
@@ -85,6 +86,7 @@ export default function CompanyBranchesClient({ companyName, initialBranches }: 
       toast({ title: 'Invalid input', description: 'Enter manager name and a valid email to send the setup link.' });
       return;
     }
+    setAssigningManager(true);
     try {
       const res = await fetch(`/api/company/branches/${managerDialog.branch.id}/manager`, {
         method: 'POST',
@@ -109,6 +111,8 @@ export default function CompanyBranchesClient({ companyName, initialBranches }: 
       setManagerForm({ displayName: '', phone: '', email: '' });
     } catch (err: any) {
       toast({ title: 'Error', description: err?.message || 'Failed to set manager', variant: 'destructive' });
+    } finally {
+      setAssigningManager(false);
     }
   };
 
@@ -264,6 +268,7 @@ export default function CompanyBranchesClient({ companyName, initialBranches }: 
         form={managerForm}
         setForm={setManagerForm}
         onSubmit={handleAssignManager}
+        loading={assigningManager}
       />
       <CashierDialog
         open={cashierDialog.open}
