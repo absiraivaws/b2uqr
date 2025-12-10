@@ -9,6 +9,7 @@ import {
   verifyTransaction,
   getLastTransactionToday,
   getUserSettings,
+  previewQR,
 } from "@/lib/actions";
 import type { Transaction } from "@/lib/types";
 import { generateQRImage } from "@/lib/qr-image-generator";
@@ -17,15 +18,16 @@ import { collection, limit, onSnapshot, orderBy, query, where } from "firebase/f
 import { onAuthStateChanged } from "firebase/auth";
 
 const SERIAL_COUNTER_DIGITS = 6;
+const CASHIER_SERIAL_COUNTER_DIGITS = 4;
 const COMPANY_SEGMENT_FALLBACK = 'MERCHANT';
 const BRANCH_SEGMENT_FALLBACK = '000';
 const CASHIER_SEGMENT_FALLBACK = '00';
 
 const formatDateSegment = (date: Date) => {
-  const yyyy = date.getFullYear();
+  const yy = String(date.getFullYear() % 100).padStart(2, '0');
   const mm = String(date.getMonth() + 1).padStart(2, '0');
   const dd = String(date.getDate()).padStart(2, '0');
-  return `${yyyy}${mm}${dd}`;
+  return `${yy}${mm}${dd}`;
 };
 
 const normalizeCompanySegment = (input?: string | null) => {
@@ -82,6 +84,7 @@ export function useTransactionManager() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [includeReference, setIncludeReference] = useState<boolean>(true);
   const [referenceNumber, setReferenceNumber] = useState("");
   const [lastTxNumber, setLastTxNumber] = useState(0);
   const [amount, setAmount] = useState("");
@@ -157,32 +160,36 @@ export function useTransactionManager() {
     return () => { mounted = false; };
   }, []);
 
+  // Function to dynamically get serial digit length (cashiers use shorter counters)
+  const getSerialDigits = useCallback(() => (isCashierUser ? CASHIER_SERIAL_COUNTER_DIGITS : SERIAL_COUNTER_DIGITS), [isCashierUser]);
+
   // Function to extract counter from reference number
   const extractCounterFromReference = useCallback((refNum: string): number => {
-    const lastDigits = refNum.slice(-SERIAL_COUNTER_DIGITS);
+    const digits = getSerialDigits();
+    const lastDigits = refNum.slice(-digits);
     return parseInt(lastDigits, 10) || 0;
-  }, []);
+  }, [getSerialDigits]);
 
   const buildReferenceBase = useCallback(
     (date: Date = new Date()) => {
       const dateSegment = formatDateSegment(date);
       if (isCashierUser) {
-        const companySegment = normalizeCompanySegment(userCompanyName);
         const branchSegment = formatNumericSegment(userBranchNumber, 3, BRANCH_SEGMENT_FALLBACK);
         const cashierSegment = formatNumericSegment(userCashierNumber, 2, CASHIER_SEGMENT_FALLBACK);
-        return `${companySegment}-${branchSegment}-${cashierSegment}-${dateSegment}`;
+        return `${branchSegment}-${cashierSegment}-${dateSegment}`;
       }
       return dateSegment;
     },
-    [isCashierUser, userCompanyName, userBranchNumber, userCashierNumber]
+    [isCashierUser, userBranchNumber, userCashierNumber]
   );
 
   const buildReferenceValue = useCallback(
     (counter: number, date: Date = new Date()) => {
-      const counterPart = String(counter).padStart(SERIAL_COUNTER_DIGITS, '0');
+      const digits = getSerialDigits();
+      const counterPart = String(counter).padStart(digits, '0');
       return `${buildReferenceBase(date)}${counterPart}`;
     },
-    [buildReferenceBase]
+    [buildReferenceBase, getSerialDigits]
   );
 
   // Load the last transaction counter for today
@@ -354,6 +361,29 @@ export function useTransactionManager() {
     };
   }, [currentTransaction, generateReferenceNumber, isVerifying, referenceType]);
 
+  // Regenerate QR payload (preview) when the includeReference flag changes
+  useEffect(() => {
+    if (!currentTransaction) return;
+
+    let cancelled = false;
+    const tx = currentTransaction;
+    async function regenPreview() {
+      try {
+        const preview = await previewQR({
+          amount: tx!.amount,
+          reference_number: includeReference ? tx!.reference_number : undefined,
+        });
+        if (cancelled) return;
+        setCurrentTransaction(prev => (prev ? { ...prev, qr_payload: preview.qr_payload, expires_at: preview.expires_at } : prev));
+      } catch (err) {
+        console.error('Failed to regenerate preview QR:', err);
+      }
+    }
+
+    regenPreview();
+    return () => { cancelled = true; };
+  }, [includeReference, currentTransaction?.transaction_uuid]);
+
   const handleIncomingSale = useCallback(
     async (saleData: Record<string, any>) => {
       if (isSubmitting) return;
@@ -498,9 +528,11 @@ export function useTransactionManager() {
         displayReference,
         merchantName,
         merchantCity,
+        includeReference
       );
 
-      const file = new File([compositeBlob], `Payment-QR-${displayReference}.png`, { type: 'image/png' });
+      const fileName = includeReference ? `Payment-QR-${displayReference}.png` : `Payment-QR.png`;
+      const file = new File([compositeBlob], fileName, { type: 'image/png' });
 
       if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({
@@ -512,9 +544,8 @@ export function useTransactionManager() {
         const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(currentTransaction.qr_payload)}&logo=https://storage.googleapis.com/proudcity/mebanenc/uploads/2021/03/Peoples-Pay-Logo.png`;
         const whatsappMessage = `*Payment QR Code*\n\n` +
           `Amount: LKR ${parseFloat(currentTransaction.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n` +
-          `Reference: ${displayReference}\n` +
-          `Merchant: ${merchantName}${merchantCity ? `, ${merchantCity}` : ''}\n` +
-          `Terminal: ${terminalId}\n\n` +
+          `${includeReference ? `Reference: ${displayReference}\n` : ''}` +
+          `Merchant: ${merchantName}${merchantCity ? `, ${merchantCity}` : ''}\n\n` +
           `View QR: ${qrUrl}`;
         const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(whatsappMessage)}`;
         window.open(whatsappUrl, '_blank');
@@ -553,12 +584,13 @@ export function useTransactionManager() {
         displayReference,
         merchantName,
         merchantCity,
+        includeReference
       );
 
       const url = URL.createObjectURL(compositeBlob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `Payment-QR-${displayReference}.png`;
+      link.download = includeReference ? `Payment-QR-${displayReference}.png` : `Payment-QR.png`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -593,6 +625,8 @@ export function useTransactionManager() {
     referenceType,
     cashierNumberDisplay,
     isCashierUser,
+    includeReference,
+    setIncludeReference,
     // Actions
     handleCreateTransaction,
     handleVerifyTransaction,

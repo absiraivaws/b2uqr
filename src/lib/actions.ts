@@ -233,6 +233,68 @@ export async function createTransaction(transactionData: { amount: string, refer
   return finalTx;
 }
 
+// Create a preview QR payload without persisting a transaction.
+export async function previewQR(params: { amount: string; reference_number?: string }): Promise<{ qr_payload: string; expires_at: string }> {
+  const { amount, reference_number } = params;
+
+  // Read session and user settings same as createTransaction
+  let uid: string | null = null;
+  try {
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get('session')?.value;
+    if (sessionCookie) {
+      const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
+      if (decoded && decoded.uid) {
+        uid = decoded.uid;
+      }
+    }
+  } catch (err) {
+    console.warn('Could not verify session cookie when creating preview QR:', err);
+  }
+
+  if (!uid) {
+    throw new Error('User must be signed in to preview a QR.');
+  }
+
+  const userDoc = await adminDb.collection('users').doc(uid).get();
+  if (!userDoc.exists) {
+    throw new Error('User document not found. Merchant configuration must be set in Firestore.');
+  }
+
+  const userData = userDoc.data() || {};
+
+  let companySettings: Record<string, any> | null = null;
+  if (userData.accountType === 'company' && userData.companyId) {
+    companySettings = await loadCompanyMerchantSettings(String(userData.companyId));
+  }
+
+  const serverSideSettings = resolveMerchantSettings(userData, companySettings);
+
+  // Validate required merchant fields are present
+  const missing = REQUIRED_MERCHANT_FIELDS.filter(field => !serverSideSettings[field]);
+  if (missing.length) {
+    throw new Error(`Missing merchant configuration in Firestore user doc: ${missing.join(', ')}`);
+  }
+
+  const sanitizedSettings = serverSideSettings as Required<ServerMerchantSettings>;
+
+  const bankResponse = await callBankCreateQR({
+    amount: amount,
+    // Only include reference when provided
+    ...(reference_number ? { reference_number } : {}),
+    merchant_id: sanitizedSettings.merchant_id,
+    bank_code: sanitizedSettings.bank_code,
+    terminal_id: sanitizedSettings.terminal_id,
+    merchant_name: sanitizedSettings.merchant_name,
+    merchant_city: sanitizedSettings.merchant_city,
+    mcc: sanitizedSettings.mcc,
+    currency_code: sanitizedSettings.currency_code,
+    country_code: sanitizedSettings.country_code,
+  });
+
+  return { qr_payload: bankResponse.qr_payload, expires_at: bankResponse.expires_at };
+}
+
 export async function getTransactionStatus(uuid: string): Promise<Transaction | null> {
   const tx = await getDbTransaction(uuid);
   return tx || null;

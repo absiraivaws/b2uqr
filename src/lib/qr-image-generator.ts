@@ -4,7 +4,7 @@ export async function generateQRImage(
   referenceNumber: string,
   merchantName: string,
   merchantCity: string,
-
+  includeReference: boolean = true
 ): Promise<Blob> {
   const qrSize = 500;
   const padding = 30;
@@ -79,10 +79,12 @@ export async function generateQRImage(
   // Details
   ctx.font = '18px Arial';
   ctx.fillStyle = '#000000';
-  ctx.fillText(`Reference: ${referenceNumber}`, canvas.width / 2, yPos);
-  yPos += 30;
+  if (includeReference && referenceNumber) {
+    ctx.fillText(`Reference: ${referenceNumber}`, canvas.width / 2, yPos);
+    yPos += 30;
+  }
   ctx.fillText(`Merchant: ${merchantName}${merchantCity ? `, ${merchantCity}` : ''}`, canvas.width / 2, yPos);
-  yPos += 30
+  yPos += 30;
 
   // Footer
   ctx.font = 'italic 16px Arial';

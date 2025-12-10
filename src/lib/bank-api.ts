@@ -4,7 +4,7 @@
 
 interface CreateQrRequest {
   amount: string;
-  reference_number: string;
+  reference_number?: string;
   // Merchant details that would typically come from settings or a database
   merchant_id: string; // 19 digits
   bank_code: string; // 5 digits

@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2, Send } from "lucide-react";
 
 interface TransactionFormProps {
@@ -15,6 +16,8 @@ interface TransactionFormProps {
   referenceType: 'serial' | 'invoice';
   manualReferencePlaceholder: string;
   cashierNumber?: string | null;
+  includeReference?: boolean;
+  setIncludeReference?: (v: boolean) => void;
 }
 
 export function TransactionForm({
@@ -27,7 +30,9 @@ export function TransactionForm({
   status,
   referenceType,
   manualReferencePlaceholder,
-  cashierNumber
+  cashierNumber,
+  includeReference = true,
+  setIncludeReference
 }: TransactionFormProps) {
   const showCashierNumber = Boolean(cashierNumber);
 
@@ -109,6 +114,14 @@ export function TransactionForm({
               )}
               Generate QR Code
             </Button>
+          </div>
+          <div className="mt-4 flex items-center gap-2">
+            <Checkbox
+              id="include_reference"
+              checked={includeReference}
+              onCheckedChange={(v) => setIncludeReference?.(Boolean(v))}
+            />
+            <Label htmlFor="include_reference" className="select-none">Include reference on QR</Label>  
           </div>
         </form>
       </CardContent>
