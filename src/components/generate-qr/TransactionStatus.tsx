@@ -37,6 +37,7 @@ export function TransactionStatus({
   includeReference = true,
 }: TransactionStatusProps) {
   const [qrDataUrl, setQrDataUrl] = useState<string>("");
+  const [isBlurred, setIsBlurred] = useState<boolean>(false);
 
   // Generate QR Code
   useEffect(() => {
@@ -45,10 +46,20 @@ export function TransactionStatus({
         errorCorrectionLevel: "H",
         width: 400,
       })
-        .then(setQrDataUrl)
+        .then((dataUrl) => {
+          setQrDataUrl(dataUrl);
+          // Unblur when a new QR has been generated
+          setIsBlurred(false);
+        })
         .catch(console.error);
     }
   }, [transaction.qr_payload, transaction.status]);
+
+  // Blur QR immediately when includeReference toggles
+  useEffect(() => {
+    // if includeReference toggles, blur the current QR until a new one is generated
+    setIsBlurred(true);
+  }, [includeReference]);
 
   return (
     <Card className="overflow-hidden">
@@ -86,7 +97,7 @@ export function TransactionStatus({
                   src={qrDataUrl}
                   alt="QR Code"
                   fill
-                  className="object-contain rounded-lg shadow-lg"
+                  className={`object-contain rounded-lg shadow-lg transition-[filter] duration-300 ${isBlurred ? 'filter blur-sm' : ''}`}
                 />
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[15%] h-[15%]">
                   <Image
