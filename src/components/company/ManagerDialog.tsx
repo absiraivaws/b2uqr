@@ -11,7 +11,6 @@ type ManagerForm = {
   displayName: string;
   phone: string;
   email: string;
-  pin: string;
 };
 
 type Props = {
@@ -29,7 +28,7 @@ export default function ManagerDialog({ open, onOpenChange, branch, form, setFor
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{branch ? `Manager for ${branch.name}` : 'Assign manager'}</DialogTitle>
-          <DialogDescription>Provide the manager details and a PIN to activate the account.</DialogDescription>
+          <DialogDescription>Provide the manager details. An email will be sent so the manager can set their password.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">
@@ -44,10 +43,7 @@ export default function ManagerDialog({ open, onOpenChange, branch, form, setFor
             <Label>Contact email (optional)</Label>
             <Input type="email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} />
           </div>
-          <div className="space-y-2">
-            <Label>PIN (4-6 digits)</Label>
-            <Input value={form.pin} onChange={(e) => setForm((p) => ({ ...p, pin: e.target.value.replace(/\D/g, '').slice(0, 6) }))} />
-          </div>
+          {/* PIN is no longer entered here — manager will set password via email link */}
         </div>
         <DialogFooter>
           <Button variant="secondary" onClick={() => onOpenChange(false)}>Cancel</Button>

@@ -30,9 +30,8 @@ export async function POST(req: Request, context: RouteParams) {
     }
     const body = await req.json().catch(() => ({}));
     const displayName = (body?.displayName || '').toString().trim();
-    const pin = (body?.pin || '').toString().trim();
-    if (!displayName || !pin) {
-      return NextResponse.json({ ok: false, message: 'Display name and PIN are required' }, { status: 400 });
+    if (!displayName) {
+      return NextResponse.json({ ok: false, message: 'Display name is required' }, { status: 400 });
     }
     const branchSnap = await adminDb.collection('companies').doc(companyId).collection('branches').doc(branchId).get();
     if (!branchSnap.exists) {
@@ -48,7 +47,7 @@ export async function POST(req: Request, context: RouteParams) {
       companyId,
       branchId,
       branchUsername,
-      pin,
+      pin: body?.pin ?? undefined,
       displayName,
       contact: parseContact(body),
     });

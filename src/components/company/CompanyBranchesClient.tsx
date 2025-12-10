@@ -23,7 +23,7 @@ export default function CompanyBranchesClient({ companyName, initialBranches }: 
   const [branchForm, setBranchForm] = useState({ name: '', address: '' });
   const [addBranchDialog, setAddBranchDialog] = useState(false);
   const [managerDialog, setManagerDialog] = useState<ManagerDialogState>({ open: false, branch: null });
-  const [managerForm, setManagerForm] = useState({ displayName: '', phone: '', email: '', pin: '' });
+  const [managerForm, setManagerForm] = useState({ displayName: '', phone: '', email: '' });
   const [cashierDialog, setCashierDialog] = useState<CashierDialogState>({ open: false, branch: null });
   const [cashierForm, setCashierForm] = useState({ displayName: '', pin: '' });
   const [expandedBranch, setExpandedBranch] = useState<string | null>(null);
@@ -74,15 +74,15 @@ export default function CompanyBranchesClient({ companyName, initialBranches }: 
       displayName: branch.managerName ?? '',
       phone: branch.managerContact?.phone ?? '',
       email: branch.managerContact?.email ?? '',
-      pin: '',
     });
     setManagerDialog({ open: true, branch });
   };
 
   const handleAssignManager = async () => {
     if (!managerDialog.branch) return;
-    if (!managerForm.displayName.trim() || !/^[0-9]{4,6}$/.test(managerForm.pin)) {
-      toast({ title: 'Invalid input', description: 'Enter manager name and a 4-6 digit PIN.' });
+    // Require a display name and email so we can send the set-password email
+    if (!managerForm.displayName.trim() || !managerForm.email.trim() || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(managerForm.email)) {
+      toast({ title: 'Invalid input', description: 'Enter manager name and a valid email to send the setup link.' });
       return;
     }
     try {
@@ -91,9 +91,9 @@ export default function CompanyBranchesClient({ companyName, initialBranches }: 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           displayName: managerForm.displayName,
-          pin: managerForm.pin,
           phone: managerForm.phone || undefined,
-          email: managerForm.email || undefined,
+          email: managerForm.email,
+          // NOTE: Do not send or create a PIN here. Server will send a set-password email.
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -104,9 +104,9 @@ export default function CompanyBranchesClient({ companyName, initialBranches }: 
         managerContact: { phone: managerForm.phone || null, email: managerForm.email || null },
         managerUid: data.managerUid,
       } : b));
-      toast({ title: 'Manager updated', description: `${managerDialog.branch.name} now uses username ${managerDialog.branch.username}` });
+      toast({ title: 'Manager updated', description: `An email was sent to ${managerForm.email} so they can set their password.` });
       setManagerDialog({ open: false, branch: null });
-      setManagerForm({ displayName: '', phone: '', email: '', pin: '' });
+      setManagerForm({ displayName: '', phone: '', email: '' });
     } catch (err: any) {
       toast({ title: 'Error', description: err?.message || 'Failed to set manager', variant: 'destructive' });
     }

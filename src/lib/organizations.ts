@@ -1,5 +1,7 @@
 import admin, { adminAuth, adminDb } from './firebaseAdmin';
 import { hashPin } from './pinHash';
+import nodemailer from 'nodemailer';
+import { generateSetPasswordEmail } from './emailTemplates';
 
 const FieldValue = admin.firestore.FieldValue;
 const GeoPoint = admin.firestore.GeoPoint;
@@ -70,7 +72,8 @@ export interface UpsertBranchManagerInput {
   companyId: string;
   branchId: string;
   branchUsername: string;
-  pin: string;
+  // pin is optional; if omitted an invite email will be sent so the manager can set a password
+  pin?: string | null;
   displayName: string;
   contact: ContactInput;
 }
@@ -341,7 +344,8 @@ export async function deleteBranch(input: DeleteBranchInput) {
 
 export async function upsertBranchManager(input: UpsertBranchManagerInput) {
   const { companyId, branchId, branchUsername, pin, displayName, contact } = input;
-  if (!/^[0-9]{4,6}$/.test(pin)) {
+  const hasPin = typeof pin === 'string' && pin !== null && pin !== undefined && String(pin).trim() !== '';
+  if (hasPin && !/^[0-9]{4,6}$/.test(String(pin))) {
     throw new Error('PIN must be 4 to 6 digits');
   }
   const branchRef = adminDb.collection('companies').doc(companyId).collection('branches').doc(branchId);
@@ -351,8 +355,59 @@ export async function upsertBranchManager(input: UpsertBranchManagerInput) {
   const branchSlug = branchData.slug as string;
   const companySlug = branchData.companySlug as string;
   const managerUid = branchData.managerAccountUid as string;
-  const pinHash = await hashPin(pin);
-  const email = buildVirtualEmail(branchUsername);
+
+  // If a PIN was provided, keep the existing behavior: create active account with virtual email
+  if (hasPin) {
+    const pinHash = await hashPin(String(pin));
+    const email = buildVirtualEmail(branchUsername);
+
+    await adminDb.runTransaction(async (tx) => {
+      tx.set(adminDb.collection('users').doc(managerUid), {
+        uid: managerUid,
+        role: 'branch-manager',
+        accountType: 'company',
+        companyId,
+        companySlug,
+        branchId,
+        branchSlug,
+        username: branchUsername,
+        email,
+        phone: contact.phone || null,
+        displayName,
+        pinHash,
+        status: 'active',
+        permissions: PERMISSIONS.branchManager,
+        updated_at: FieldValue.serverTimestamp(),
+        created_at: FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+      tx.update(branchRef, {
+        managerUid,
+        managerName: displayName,
+        managerContact: contact,
+        updated_at: FieldValue.serverTimestamp(),
+      });
+    });
+
+    await ensureAuthUser(managerUid, buildVirtualEmail(branchUsername), displayName, { disabled: false });
+    await adminAuth.setCustomUserClaims(managerUid, {
+      role: 'branch-manager',
+      accountType: 'company',
+      companyId,
+      branchId,
+      companySlug,
+      branchSlug,
+      permissions: PERMISSIONS.branchManager,
+    });
+
+    return { managerUid, username: branchUsername, email: buildVirtualEmail(branchUsername) };
+  }
+
+  // No PIN provided: create disabled/pending account and send set-password email to contact.email
+  const inviteEmail = contact.email || null;
+  if (!inviteEmail || !/\S+@\S+\.\S+/.test(inviteEmail)) {
+    throw new Error('Email is required to send set-password email');
+  }
 
   await adminDb.runTransaction(async (tx) => {
     tx.set(adminDb.collection('users').doc(managerUid), {
@@ -364,11 +419,11 @@ export async function upsertBranchManager(input: UpsertBranchManagerInput) {
       branchId,
       branchSlug,
       username: branchUsername,
-      email,
+      email: inviteEmail,
       phone: contact.phone || null,
       displayName,
-      pinHash,
-      status: 'active',
+      pinHash: null,
+      status: 'pending',
       permissions: PERMISSIONS.branchManager,
       updated_at: FieldValue.serverTimestamp(),
       created_at: FieldValue.serverTimestamp(),
@@ -382,7 +437,51 @@ export async function upsertBranchManager(input: UpsertBranchManagerInput) {
     });
   });
 
-  await ensureAuthUser(managerUid, email, displayName, { disabled: false });
+  // create invite token
+  const crypto = await import('crypto');
+  const token = crypto.randomBytes(32).toString('hex');
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  const id = `invite_${encodeURIComponent(inviteEmail)}_${Date.now()}`;
+  const expiresAtMs = Date.now() + 24 * 60 * 60 * 1000;
+
+  await adminDb.collection('branch_manager_invites').doc(id).set({
+    email: inviteEmail,
+    name: displayName || '',
+    tokenHash,
+    created_at: new Date(),
+    expires_at_ms: expiresAtMs,
+    used: false,
+  });
+
+  const origin = process.env.NEXT_PUBLIC_APP_ORIGIN || `http://localhost:${process.env.PORT || 3000}`;
+  // Invite link points to a branch-specific set-pin page: /[companySlug]/[branchSlug]/set-pin
+  const safeCompany = encodeURIComponent(companySlug || '');
+  const safeBranch = encodeURIComponent(branchSlug || '');
+  const link = `${origin}/${safeCompany}/${safeBranch}/set-pin?token=${encodeURIComponent(token)}`;
+
+  const SMTP_HOST = process.env.SMTP_HOST;
+  const SMTP_PORT = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : undefined;
+  const SMTP_USER = process.env.SMTP_USER;
+  const SMTP_PASS = process.env.SMTP_PASS;
+  const SMTP_SECURE = process.env.SMTP_SECURE === 'true';
+  const FROM_EMAIL = process.env.FROM_EMAIL || SMTP_USER || 'no-reply@lankaqr.local';
+
+  if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
+    try {
+      const transporter = nodemailer.createTransport({ host: SMTP_HOST, port: SMTP_PORT || 587, secure: SMTP_SECURE || (SMTP_PORT === 465), auth: { user: SMTP_USER, pass: SMTP_PASS } });
+      const { subject, text, html } = generateSetPasswordEmail({ name: displayName || inviteEmail, email: inviteEmail, link, appName: 'LankaQR' });
+      const info = await transporter.sendMail({ from: FROM_EMAIL, to: inviteEmail, subject, text, html });
+      console.log('Invite email sent:', info && (info.messageId || info.response));
+    } catch (err: any) {
+      console.error('Failed to send invite email via SMTP:', err);
+      console.log(`Invite link for ${inviteEmail}: ${link}`);
+    }
+  } else {
+    console.warn('SMTP not configured — falling back to server log for invite link');
+    console.log(`Invite link for ${inviteEmail}: ${link}`);
+  }
+
+  await ensureAuthUser(managerUid, inviteEmail, displayName, { disabled: true });
   await adminAuth.setCustomUserClaims(managerUid, {
     role: 'branch-manager',
     accountType: 'company',
@@ -393,7 +492,7 @@ export async function upsertBranchManager(input: UpsertBranchManagerInput) {
     permissions: PERMISSIONS.branchManager,
   });
 
-  return { managerUid, username: branchUsername, email };
+  return { managerUid, username: branchUsername, email: inviteEmail };
 }
 
 export async function disableBranchManager(companyId: string, branchId: string) {
