@@ -113,7 +113,7 @@ export async function POST(req: Request, context: RouteParams) {
         displayName,
         pinHash: null,
         status: 'pending',
-        permissions: ['generate-qr', 'transactions', 'summary'],
+        permissions: ['qr-registration', 'transactions', 'summary'],
         created_at: admin.firestore.FieldValue.serverTimestamp(),
         updated_at: admin.firestore.FieldValue.serverTimestamp(),
       });
@@ -140,7 +140,7 @@ export async function POST(req: Request, context: RouteParams) {
         companyId,
         branchId,
         cashierSlug: cashierSlugSegment,
-        permissions: ['generate-qr', 'transactions', 'summary'],
+        permissions: ['qr-registration', 'transactions', 'summary'],
       }).catch(() => null);
     } catch (e) {
       // ignore errors creating auth user

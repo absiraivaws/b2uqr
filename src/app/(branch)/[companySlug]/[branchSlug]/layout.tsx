@@ -23,7 +23,7 @@ export default async function BranchSlugLayout({ children, params }: BranchLayou
   const claimedCompanySlug = session.claims?.companySlug as string | undefined;
   const claimedBranchSlug = session.claims?.branchSlug as string | undefined;
   if (!claimedCompanySlug || !claimedBranchSlug) {
-    redirect('/generate-qr');
+    redirect('/qr-registration');
   }
   if (claimedCompanySlug !== requestedCompanySlug || claimedBranchSlug !== requestedBranchSlug) {
     redirect(`/${claimedCompanySlug}/${claimedBranchSlug}`);

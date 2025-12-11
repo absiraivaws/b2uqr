@@ -59,7 +59,7 @@ export default function CashierSetPinPage() {
       const company = params?.companySlug || '';
       const branch = params?.branchSlug || '';
       const cashier = params?.cashierSlug || '';
-      const dest = company && branch && cashier ? `/${company}/${branch}/${cashier}` : '/generate-qr';
+      const dest = company && branch && cashier ? `/${company}/${branch}/${cashier}` : '/qr-registration';
       setTimeout(() => router.push(dest), 900);
     } catch (err) {
       console.error(err);

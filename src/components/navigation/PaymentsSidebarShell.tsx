@@ -44,7 +44,7 @@ export default function PaymentsSidebarShell({ children, basePath = '', title = 
     {
       label: 'Payments',
       links: [
-        { href: joinPath(basePath || '', '/generate-qr'), label: 'Generate QR', icon: QrCode, permission: 'generate-qr' },
+        { href: joinPath(basePath || '', '/qr-registration'), label: 'Generate QR', icon: QrCode, permission: 'qr-registration' },
         { href: joinPath(basePath || '', '/transactions'), label: 'Transactions', icon: History, permission: 'transactions' },
         { href: joinPath(basePath || '', '/summary'), label: 'Summary', icon: BarChart, permission: 'summary' },
       ],

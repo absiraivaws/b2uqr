@@ -24,14 +24,14 @@ export default async function CashierLayout({ children, params }: CashierLayoutP
   const claimedBranchSlug = session.claims?.branchSlug as string | undefined;
   const claimedCashierSlug = session.claims?.cashierSlug as string | undefined;
   if (!claimedCompanySlug || !claimedBranchSlug || !claimedCashierSlug) {
-    redirect('/generate-qr');
+    redirect('/qr-registration');
   }
   if (
     claimedCompanySlug !== requestedCompanySlug ||
     claimedBranchSlug !== requestedBranchSlug ||
     claimedCashierSlug !== requestedCashierSlug
   ) {
-    redirect(`/${claimedCompanySlug}/${claimedBranchSlug}/${claimedCashierSlug}/generate-qr`);
+    redirect(`/${claimedCompanySlug}/${claimedBranchSlug}/${claimedCashierSlug}/qr-registration`);
   }
 
   const company = await getCompanyBySlug(requestedCompanySlug);

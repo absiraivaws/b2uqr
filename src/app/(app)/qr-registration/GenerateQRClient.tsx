@@ -9,9 +9,9 @@ import { Badge } from "@/components/ui/badge";
 import { useTransactionManager } from "@/hooks/use-transaction-manager";
 import useTransactions from "@/hooks/use-transactions";
 import type { Transaction } from "@/lib/types";
-import { TransactionForm } from "@/components/generate-qr/TransactionForm";
-import { TransactionStatus } from "@/components/generate-qr/TransactionStatus";
-import { TransactionLoading, TransactionEmpty } from "@/components/generate-qr/TransactionStates";
+import { TransactionForm } from "@/components/qr-registration/TransactionForm";
+import { TransactionStatus } from "@/components/qr-registration/TransactionStatus";
+import { TransactionLoading, TransactionEmpty } from "@/components/qr-registration/TransactionStates";
 
 const MAX_RECENT_TRANSACTIONS = 5;
 

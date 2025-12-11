@@ -1,7 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 
 // Always enforce auth for these static routes
-const PROTECTED_PREFIXES = ['/generate-qr', '/transactions', '/summary', '/profile', '/settings'];
+const PROTECTED_PREFIXES = ['/qr-registration', '/transactions', '/summary', '/profile', '/settings'];
 const PUBLIC_ROOT_SEGMENTS = new Set([
   '',
   'signin',

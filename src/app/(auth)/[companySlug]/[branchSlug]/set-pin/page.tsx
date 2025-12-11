@@ -59,7 +59,7 @@ export default function SetPinPage() {
 
 			const company = params?.companySlug || '';
 			const branch = params?.branchSlug || '';
-			const dest = company && branch ? `/${company}/${branch}` : '/generate-qr';
+			const dest = company && branch ? `/${company}/${branch}` : '/qr-registration';
 			setTimeout(() => router.push(dest), 900);
 		} catch (err) {
 			console.error(err);
