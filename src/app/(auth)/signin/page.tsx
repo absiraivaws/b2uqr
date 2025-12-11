@@ -101,10 +101,10 @@ export default function SignInPage() {
       try {
         const verifyRes = await fetch('/api/session/verify', { cache: 'no-store', credentials: 'include' });
         const verifyData = await verifyRes.json().catch(() => ({}));
-        const nextRoute = verifyRes.ok ? getDefaultRouteForRole(verifyData?.role, verifyData) : '/generate-qr';
+        const nextRoute = verifyRes.ok ? getDefaultRouteForRole(verifyData?.role, verifyData) : '/qr-registration';
         router.push(nextRoute);
       } catch {
-        router.push('/generate-qr');
+        router.push('/qr-registration');
       }
     } catch (err: any) {
       console.error(err);

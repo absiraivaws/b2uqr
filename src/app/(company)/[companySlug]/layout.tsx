@@ -36,7 +36,7 @@ export default async function CompanySlugLayout({ children, params }: CompanyLay
 
   const canonicalSlug = company.slug;
   if (!canonicalSlug) {
-    redirect('/generate-qr');
+    redirect('/qr-registration');
   }
   if (requestedSlug !== canonicalSlug) {
     // Keep owners on the company root page (company home) after canonicalizing slug.

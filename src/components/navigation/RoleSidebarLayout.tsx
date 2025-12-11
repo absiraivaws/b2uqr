@@ -125,7 +125,18 @@ export default function RoleSidebarLayout({
     setSigningOut(true);
     try {
       await clientSignOut();
-      const destination = marketingOrigin || '/signin';
+      let destination: string;
+      if (marketingOrigin) {
+        try {
+          const u = new URL(marketingOrigin);
+          u.searchParams.set('view', 'merchant-qr');
+          destination = u.toString();
+        } catch (e) {
+          destination = marketingOrigin.replace(/\/+$/,'') + '/?view=merchant-qr';
+        }
+      } else {
+        destination = '/signin';
+      }
       window.location.href = destination;
     } catch (err) {
       console.error('Sign out failed', err);

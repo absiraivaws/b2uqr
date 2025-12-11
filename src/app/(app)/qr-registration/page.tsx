@@ -1,10 +1,9 @@
-
 import { redirect } from "next/navigation";
 import { getServerUser } from "@/lib/serverUser";
 import { getDefaultRouteForRole } from "@/lib/roleRouting";
-import GenerateQRClient from "./GenerateQRClient";
+import GenerateQRClient from '@/app/(app)/qr-registration/GenerateQRClient';
 
-export default async function GenerateQRPage() {
+export default async function QRRegistrationPage() {
   const session = await getServerUser();
   if (!session) {
     redirect("/signin");
@@ -16,7 +15,7 @@ export default async function GenerateQRPage() {
     cashierSlug: session.claims?.cashierSlug ?? null,
   });
 
-  if (nextRoute !== "/generate-qr") {
+  if (nextRoute !== "/qr-registration") {
     redirect(nextRoute);
   }
 

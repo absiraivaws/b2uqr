@@ -84,7 +84,7 @@ This section details the core logic that powers the B2U QR application.
 
 ### Transaction Flow
 
-1.  **Generation**: A user enters an amount on the `/generate-qr` page. A unique `reference_number` is generated on the client.
+1.  **Generation**: A user enters an amount on the `/qr-registration` page. A unique `reference_number` is generated on the client.
 2.  **Server Action**: The `createTransaction` Server Action in `src/lib/actions.ts` is called with the amount and other details from the settings store.
 3.  **Bank API Mock**: `createTransaction` calls the `callBankCreateQR` function in `src/lib/bank-api.ts`. This function constructs the LankaQR payload string.
 4.  **Database**: A new transaction record is created with a `PENDING` status in the in-memory database (`src/lib/db.ts`).

@@ -8,25 +8,25 @@ export function getDefaultRouteForRole(role?: string | null, context?: RoleRoute
   switch (role) {
     case 'company-owner':
       if (context?.companySlug) return `/${context.companySlug}`;
-      return '/generate-qr';
+      return '/qr-registration';
     case 'branch-manager':
       if (context?.companySlug && context?.branchSlug) {
         return `/${context.companySlug}/${context.branchSlug}`;
       }
-      return '/generate-qr';
+      return '/qr-registration';
     case 'cashier':
       if (context?.companySlug && context?.branchSlug && context?.cashierSlug) {
         return `/${context.companySlug}/${context.branchSlug}/${context.cashierSlug}`;
       }
-      return '/generate-qr';
+      return '/qr-registration';
     case 'individual':
     default:
-      return '/generate-qr';
+      return '/qr-registration';
   }
 }
 
 const PERMISSION_RULES: Array<{ prefix: string; permission: string }> = [
-  { prefix: '/generate-qr', permission: 'generate-qr' },
+  { prefix: '/qr-registration', permission: 'qr-registration' },
   { prefix: '/transactions', permission: 'transactions' },
   { prefix: '/summary', permission: 'summary' },
   { prefix: '/profile', permission: 'profile' },
@@ -34,7 +34,7 @@ const PERMISSION_RULES: Array<{ prefix: string; permission: string }> = [
 ];
 
 const RESERVED_ROOT_SEGMENTS = new Set([
-  'generate-qr',
+  'qr-registration',
   'transactions',
   'summary',
   'profile',
@@ -75,7 +75,7 @@ export function getRequiredPermissionForPath(pathname: string) {
 
     // Cashier area /:companySlug/:branchSlug/cashierX/...
     if (third.startsWith('cashier')) {
-      const target = segments[3] || 'generate-qr';
+      const target = segments[3] || 'qr-registration';
       return mapPagePermission(target);
     }
 
@@ -88,8 +88,8 @@ export function getRequiredPermissionForPath(pathname: string) {
 
 function mapPagePermission(segment: string) {
   switch (segment) {
-    case 'generate-qr':
-      return 'generate-qr';
+    case 'qr-registration':
+      return 'qr-registration';
     case 'transactions':
       return 'transactions';
     case 'summary':

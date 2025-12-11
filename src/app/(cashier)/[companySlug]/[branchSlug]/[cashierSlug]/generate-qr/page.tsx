@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getServerUser } from '@/lib/serverUser';
-import GenerateQRClient from '@/app/(app)/generate-qr/GenerateQRClient';
+import GenerateQRClient from '@/app/(app)/qr-registration/GenerateQRClient';
 
 interface CashierParams {
 	companySlug: string;
@@ -25,7 +25,7 @@ export default async function CashierGenerateQRPage({
 	const claimedCashierSlug = session.claims?.cashierSlug as string | undefined;
 
 	if (!claimedCompanySlug || !claimedBranchSlug || !claimedCashierSlug) {
-		redirect('/generate-qr');
+		redirect('/qr-registration');
 	}
 
 	if (
@@ -33,7 +33,7 @@ export default async function CashierGenerateQRPage({
 		claimedBranchSlug !== branchSlug ||
 		claimedCashierSlug !== cashierSlug
 	) {
-		redirect(`/${claimedCompanySlug}/${claimedBranchSlug}/${claimedCashierSlug}/generate-qr`);
+		redirect(`/${claimedCompanySlug}/${claimedBranchSlug}/${claimedCashierSlug}/qr-registration`);
 	}
 
 	return <GenerateQRClient />;
