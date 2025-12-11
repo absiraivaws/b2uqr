@@ -22,31 +22,29 @@ export default function QrStep(props: Props) {
       <div className='flex justify-center mb-3'>
         <div className="relative w-96 h-96">
           {qrParsed ? (
-            <div className="absolute inset-0 p-4 bg-white rounded border flex flex-col justify-start items-stretch text-left text-sm space-y-3 overflow-auto">
+            <div className="absolute inset-0 p-4 bg-transparent shadow-xl rounded-xl border flex flex-col justify-start items-stretch text-left text-sm space-y-3 overflow-auto">
               <div className="w-full text-center">
                 <div className="text-3xl font-bold my-8">{qrParsed.merchantName ?? qrParsed.merchant_name ?? 'Merchant'}</div>
               </div>
               <div className="w-full">
-                <div className="grid grid-cols-[auto_auto_1fr] gap-x-4 gap-y-2 items-center text-sm text-gray-600">
+                <div className="grid grid-cols-[auto_auto_1fr] gap-x-4 gap-y-2 items-center text-sm text-gray-600 dark:text-gray-200">
                   <div className="text-left pr-2">Merchant ID</div>
                   <div className="text-center">:</div>
-                  <div className="font-mono text-lg text-gray-800">{maskMerchantId(qrParsed.merchantId ?? qrParsed.merchant_id ?? '')}</div>
+                  <div className="font-mono text-lg text-gray-800 dark:text-gray-200">{maskMerchantId(qrParsed.merchantId ?? qrParsed.merchant_id ?? '')}</div>
 
                   <div className="text-left pr-2">City</div>
                   <div className="text-center">:</div>
-                  <div className="font-mono text-lg text-gray-800">{qrParsed.merchantCity ?? qrParsed.merchant_city ?? ''}</div>
-
+                  <div className="font-mono text-lg text-gray-800 dark:text-gray-200">{qrParsed.merchantCity ?? qrParsed.merchant_city ?? ''}</div>
                   <div className="text-left pr-2">Bank</div>
                   <div className="text-center">:</div>
-                  <div className="font-mono text-lg text-gray-800">{getBankName(qrParsed.bankCode ?? qrParsed.bank_code ?? '')}</div>
+                  <div className="font-mono text-lg text-gray-800 dark:text-gray-200">{getBankName(qrParsed.bankCode ?? qrParsed.bank_code ?? '')}</div>
 
                   <div className="text-left pr-2">Currency</div>
                   <div className="text-center">:</div>
-                  <div className="font-mono text-lg text-gray-800">{qrParsed.currencyCode ?? qrParsed.currency_code ?? ''}</div>
-
+                  <div className="font-mono text-lg text-gray-800 dark:text-gray-200">{qrParsed.currencyCode ?? qrParsed.currency_code ?? ''}</div>
                   <div className="text-left pr-2">Terminal</div>
                   <div className="text-center">:</div>
-                  <div className="font-mono text-lg text-gray-800">{qrParsed.terminalId ?? qrParsed.terminal_id ?? ''}</div>
+                  <div className="font-mono text-lg text-gray-800 dark:text-gray-200">{qrParsed.terminalId ?? qrParsed.terminal_id ?? ''}</div>
                 </div>
               </div>
             </div>
