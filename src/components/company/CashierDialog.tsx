@@ -9,7 +9,7 @@ import { BranchInfo } from './types';
 
 type CashierForm = {
   displayName: string;
-  pin: string;
+  email: string;
 };
 
 type Props = {
@@ -19,9 +19,10 @@ type Props = {
   form: CashierForm;
   setForm: React.Dispatch<React.SetStateAction<CashierForm>>;
   onSubmit: () => void;
+  loading?: boolean;
 };
 
-export default function CashierDialog({ open, onOpenChange, branch, form, setForm, onSubmit }: Props) {
+export default function CashierDialog({ open, onOpenChange, branch, form, setForm, onSubmit, loading = false }: Props) {
   return (
     <Dialog open={open} onOpenChange={(v) => onOpenChange(v)}>
       <DialogContent>
@@ -35,13 +36,13 @@ export default function CashierDialog({ open, onOpenChange, branch, form, setFor
             <Input value={form.displayName} onChange={(e) => setForm((p) => ({ ...p, displayName: e.target.value }))} />
           </div>
           <div className="space-y-2">
-            <Label>PIN (4-6 digits)</Label>
-            <Input value={form.pin} onChange={(e) => setForm((p) => ({ ...p, pin: e.target.value.replace(/\D/g, '').slice(0, 6) }))} />
+            <Label>Contact email (cashier will receive invite)</Label>
+            <Input type="email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} />
           </div>
         </div>
         <DialogFooter>
-          <Button variant="secondary" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={onSubmit}>Create cashier</Button>
+          <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={loading}>Cancel</Button>
+          <Button onClick={onSubmit} disabled={loading}>{loading ? 'Creating...' : 'Create cashier'}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -26,7 +26,8 @@ export default function CompanyBranchesClient({ companyName, initialBranches }: 
   const [managerForm, setManagerForm] = useState({ displayName: '', phone: '', email: '' });
   const [assigningManager, setAssigningManager] = useState(false);
   const [cashierDialog, setCashierDialog] = useState<CashierDialogState>({ open: false, branch: null });
-  const [cashierForm, setCashierForm] = useState({ displayName: '', pin: '' });
+  const [cashierForm, setCashierForm] = useState({ displayName: '', email: '' });
+  const [creatingCashier, setCreatingCashier] = useState(false);
   const [expandedBranch, setExpandedBranch] = useState<string | null>(null);
   // measurement of branch content moved into each BranchCard
   const [removingManager, setRemovingManager] = useState<string | null>(null);
@@ -138,34 +139,37 @@ export default function CompanyBranchesClient({ companyName, initialBranches }: 
   };
 
   const openCashierDialog = (branch: BranchInfo) => {
-    setCashierForm({ displayName: '', pin: '' });
+    setCashierForm({ displayName: '', email: '' });
     setCashierDialog({ open: true, branch });
   };
 
   const handleCreateCashier = async () => {
     if (!cashierDialog.branch) return;
-    if (!cashierForm.displayName.trim() || !/^[0-9]{4,6}$/.test(cashierForm.pin)) {
-      toast({ title: 'Invalid input', description: 'Enter cashier name and a 4-6 digit PIN.' });
+    if (!cashierForm.displayName.trim() || !cashierForm.email.trim() || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(cashierForm.email)) {
+      toast({ title: 'Invalid input', description: 'Enter cashier name and a valid email to send the setup link.' });
       return;
     }
+    setCreatingCashier(true);
     try {
       const res = await fetch(`/api/company/branches/${cashierDialog.branch.id}/cashiers`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ displayName: cashierForm.displayName, pin: cashierForm.pin }),
+        body: JSON.stringify({ displayName: cashierForm.displayName, email: cashierForm.email }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data?.ok) throw new Error(data?.message || 'Failed to create cashier');
       setBranches((prev) => prev.map((b) => b.id === cashierDialog.branch!.id ? {
         ...b,
-        cashiers: [{ id: data.cashierId, username: data.username, displayName: cashierForm.displayName, status: 'active' }, ...b.cashiers],
+        cashiers: [{ id: data.cashierId, username: data.username, displayName: cashierForm.displayName, status: 'pending' }, ...b.cashiers],
       } : b));
-      toast({ title: 'Cashier created', description: `Credentials username: ${data.username}` });
+      toast({ title: 'Cashier invited', description: `An email was sent to ${cashierForm.email} so they can set their PIN.` });
       setCashierDialog({ open: false, branch: null });
-      setCashierForm({ displayName: '', pin: '' });
+      setCashierForm({ displayName: '', email: '' });
       // BranchCard will re-measure itself on prop changes
     } catch (err: any) {
       toast({ title: 'Error', description: err?.message || 'Failed to create cashier', variant: 'destructive' });
+    } finally {
+      setCreatingCashier(false);
     }
   };
 
@@ -277,6 +281,7 @@ export default function CompanyBranchesClient({ companyName, initialBranches }: 
         form={cashierForm}
         setForm={setCashierForm}
         onSubmit={handleCreateCashier}
+        loading={creatingCashier}
       />
       <BranchDialog
         open={addBranchDialog}

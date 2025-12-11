@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, PlusCircle, Trash2 } from 'lucide-react';
-import type { CashierInfo } from './CompanyBranchesClient';
+import type { CashierInfo } from './types';
 
 interface Props {
   branch: {
@@ -24,29 +24,29 @@ interface Props {
 export default function BranchManagerClient({ branch }: Props) {
   const [cashiers, setCashiers] = useState<CashierInfo[]>(branch.cashiers);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [form, setForm] = useState({ displayName: '', pin: '' });
+  const [form, setForm] = useState({ displayName: '', email: '' });
   const [deleting, setDeleting] = useState<string | null>(null);
   const { toast } = useToast();
 
   const handleCreateCashier = async () => {
-    if (!form.displayName.trim() || !/^[0-9]{4,6}$/.test(form.pin)) {
-      toast({ title: 'Invalid input', description: 'Provide a name and 4-6 digit PIN.' });
+    if (!form.displayName.trim() || !form.email.trim() || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email)) {
+      toast({ title: 'Invalid input', description: 'Provide a name and valid email to invite cashier.' });
       return;
     }
     try {
       const res = await fetch(`/api/company/branches/${branch.id}/cashiers`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ displayName: form.displayName, pin: form.pin }),
+        body: JSON.stringify({ displayName: form.displayName, email: form.email }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data?.ok) throw new Error(data?.message || 'Failed to create cashier');
-      setCashiers((prev) => [{ id: data.cashierId, username: data.username, displayName: form.displayName, status: 'active' }, ...prev]);
-      toast({ title: 'Cashier created', description: `Use username ${data.username}` });
+      if (!res.ok || !data?.ok) throw new Error(data?.message || 'Failed to invite cashier');
+      setCashiers((prev) => [{ id: data.cashierId, username: data.username || '—', displayName: form.displayName, status: 'pending' }, ...prev]);
+      toast({ title: 'Cashier invited', description: `Invite sent to ${form.email}` });
       setDialogOpen(false);
-      setForm({ displayName: '', pin: '' });
+      setForm({ displayName: '', email: '' });
     } catch (err: any) {
-      toast({ title: 'Error', description: err?.message || 'Failed to create cashier', variant: 'destructive' });
+      toast({ title: 'Error', description: err?.message || 'Failed to invite cashier', variant: 'destructive' });
     }
   };
 
@@ -125,13 +125,13 @@ export default function BranchManagerClient({ branch }: Props) {
               <Input value={form.displayName} onChange={(e) => setForm((prev) => ({ ...prev, displayName: e.target.value }))} />
             </div>
             <div className="space-y-2">
-              <Label>PIN</Label>
-              <Input value={form.pin} onChange={(e) => setForm((prev) => ({ ...prev, pin: e.target.value.replace(/\D/g, '').slice(0,6) }))} placeholder="4-6 digits" />
+              <Label>Contact email (invite will be sent)</Label>
+              <Input type="email" value={form.email} onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))} placeholder="cashier@example.com" />
             </div>
           </div>
           <DialogFooter>
             <Button variant="secondary" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreateCashier}>Create</Button>
+            <Button onClick={handleCreateCashier}>Invite</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
