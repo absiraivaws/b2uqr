@@ -33,11 +33,11 @@ export default function CashierDialog({ open, onOpenChange, branch, form, setFor
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <Label>Cashier name</Label>
-            <Input value={form.displayName} onChange={(e) => setForm((p) => ({ ...p, displayName: e.target.value }))} />
+            <Input className='bg-gray-300 dark:bg-transparent' value={form.displayName} onChange={(e) => setForm((p) => ({ ...p, displayName: e.target.value }))} />
           </div>
           <div className="space-y-2">
             <Label>Contact email (cashier will receive invite)</Label>
-            <Input type="email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} />
+            <Input className='bg-gray-300 dark:bg-transparent' type="email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} />
           </div>
         </div>
         <DialogFooter>
