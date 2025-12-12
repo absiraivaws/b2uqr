@@ -6,7 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Loader2, LogIn } from "lucide-react";
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import SignupKycSection, { KycValues, KycRequiredFlags } from '@/components/signup/SignupKycSection';
 import SignupOtpSection from '@/components/signup/SignupOtpSection';
 import SignupPinSection from '@/components/signup/SignupPinSection';
@@ -16,7 +16,6 @@ type AccountType = 'individual' | 'company';
 
 export default function SignUpPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [accountType, setAccountType] = useState<AccountType>('individual');
   const [kyc, setKyc] = useState<KycValues>({
     displayName: '',
@@ -45,6 +44,7 @@ export default function SignUpPage() {
   const [confirmPin, setConfirmPin] = useState('');
   const [savingUser, setSavingUser] = useState(false);
   const [kycRequiredFlags, setKycRequiredFlags] = useState<KycRequiredFlags>({});
+  const [clientSearchParams, setClientSearchParams] = useState<URLSearchParams | null>(null);
 
   // Phone OTP logic (recaptcha, send/verify) moved to `use-phone-otp` hook.
 
@@ -106,6 +106,15 @@ export default function SignUpPage() {
     });
   }, [accountType, kyc.companyName, kyc.displayName, kyc.nic, kyc.businessReg, kyc.address, kyc.lat, kyc.lng]);
 
+  // parse search params on client using the browser API to avoid Next `useSearchParams` prerender requirement
+  useEffect(() => {
+    try {
+      setClientSearchParams(new URLSearchParams(window.location.search));
+    } catch (err) {
+      setClientSearchParams(null);
+    }
+  }, []);
+
   const handleSavePinAndCreateUser = async () => {
     setError(null);
     if (!verifiedUser) {
@@ -144,7 +153,7 @@ export default function SignUpPage() {
       const finalWhatsappNumber = verifiedUser.whatsappNumber ?? (whatsappNumber && whatsappNumber.toString().trim() ? whatsappNumber : null);
       const finalEmail = verifiedUser.email ?? (email && email.toString().trim() ? email : null);
 
-      const referrerUid = (searchParams?.get('ref') || searchParams?.get('referrer') || null) as string | null;
+      const referrerUid = (clientSearchParams?.get('ref') || clientSearchParams?.get('referrer') || null) as string | null;
 
       const onboardRes = await fetch('/api/merchant/onboard', {
         method: 'POST',
