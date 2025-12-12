@@ -53,6 +53,14 @@ service cloud.firestore {
 
       allow create, update: if isSelf(userId);
       allow delete: if false;
+
+      // Allow the authenticated user to read their own referrals subcollection.
+      // This is needed so clients can list and show referral entries (who they referred).
+      match /referrals/{refId} {
+        allow get, list: if isSelf(userId);
+        allow create: if false;
+        allow update, delete: if false;
+      }
     }
 
     // ----- admin console collections -----

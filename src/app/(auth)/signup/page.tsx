@@ -6,7 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Loader2, LogIn } from "lucide-react";
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import SignupKycSection, { KycValues, KycRequiredFlags } from '@/components/signup/SignupKycSection';
 import SignupOtpSection from '@/components/signup/SignupOtpSection';
 import SignupPinSection from '@/components/signup/SignupPinSection';
@@ -16,6 +16,7 @@ type AccountType = 'individual' | 'company';
 
 export default function SignUpPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [accountType, setAccountType] = useState<AccountType>('individual');
   const [kyc, setKyc] = useState<KycValues>({
     displayName: '',
@@ -143,6 +144,8 @@ export default function SignUpPage() {
       const finalWhatsappNumber = verifiedUser.whatsappNumber ?? (whatsappNumber && whatsappNumber.toString().trim() ? whatsappNumber : null);
       const finalEmail = verifiedUser.email ?? (email && email.toString().trim() ? email : null);
 
+      const referrerUid = (searchParams?.get('ref') || searchParams?.get('referrer') || null) as string | null;
+
       const onboardRes = await fetch('/api/merchant/onboard', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -153,6 +156,7 @@ export default function SignUpPage() {
             whatsappNumber: finalWhatsappNumber,
             email: finalEmail,
           },
+          referrerUid,
         }),
       });
       const onboardJson = await onboardRes.json().catch(() => ({}));
