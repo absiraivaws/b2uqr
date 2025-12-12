@@ -204,7 +204,8 @@ export function useTransactionManager() {
 
       setIsLoadingCounter(true);
       try {
-        const lastTx = await getLastTransactionToday(terminalId);
+        // Scope the lookup to the authenticated user so counters are per-user
+        const lastTx = await getLastTransactionToday();
         if (lastTx && lastTx.reference_number) {
           const todayPrefix = buildReferenceBase(new Date());
 
