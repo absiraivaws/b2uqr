@@ -171,13 +171,19 @@ export async function onboardIndividualMerchant(input: OnboardIndividualInput) {
     if (refUid && refUid !== uid) {
       const alreadyReferred = existing.exists && existing.data() && (existing.data() as any).referredBy;
       if (!alreadyReferred) {
-        // award referrer: increment points and record referral entry
+        // mark referral as pending: create a pending referral entry under referrer and mark pending on user
         const refRef = adminDb.collection('users').doc(refUid);
-        tx.set(refRef, { referralPoints: FieldValue.increment(1), referralCount: FieldValue.increment(1) }, { merge: true });
         const referralDocRef = refRef.collection('referrals').doc(uid);
-        tx.set(referralDocRef, { referredUid: uid, created_at: FieldValue.serverTimestamp(), accountType: 'individual' });
-        // set referredBy on new user's doc
-        userPayload.referredBy = refUid;
+        tx.set(referralDocRef, {
+          referredUid: uid,
+          referredDisplayName: profile.displayName || null,
+          referredEmail: contact.email || null,
+          created_at: FieldValue.serverTimestamp(),
+          status: 'pending',
+          accountType: 'individual',
+        });
+        // set pendingReferralFrom on new user's doc so we can confirm later
+        userPayload.pendingReferralFrom = refUid;
       }
     }
 
@@ -256,10 +262,16 @@ export async function onboardCompanyMerchant(input: OnboardCompanyInput) {
       const alreadyReferred = userSnap.exists && userSnap.data() && (userSnap.data() as any).referredBy;
       if (!alreadyReferred) {
         const refRef = adminDb.collection('users').doc(refUid);
-        tx.set(refRef, { referralPoints: FieldValue.increment(1), referralCount: FieldValue.increment(1) }, { merge: true });
         const referralDocRef = refRef.collection('referrals').doc(uid);
-        tx.set(referralDocRef, { referredUid: uid, created_at: FieldValue.serverTimestamp(), accountType: 'company' });
-        userPayload.referredBy = refUid;
+        tx.set(referralDocRef, {
+          referredUid: uid,
+          referredDisplayName: owner.displayName || null,
+          referredEmail: contact.email || null,
+          created_at: FieldValue.serverTimestamp(),
+          status: 'pending',
+          accountType: 'company',
+        });
+        userPayload.pendingReferralFrom = refUid;
       }
     }
 

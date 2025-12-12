@@ -147,6 +147,41 @@ export function generateSignupSuccessEmail(params: {
   return { subject, text, html };
 }
 
+export function generateReferralConfirmedEmail(params: { referrerName?: string | null; referredName?: string | null; appName?: string; }) {
+  const { referrerName, referredName, appName = 'LankaQR' } = params;
+  const subject = `${appName} - Referral confirmed`;
+  const refName = (referrerName && referrerName.trim()) || 'there';
+  const referredLabel = (referredName && referredName.trim()) || 'a user you referred';
+  const text = `Hi ${refName},
+
+Good news — ${referredLabel} has completed KYC and your referral has been confirmed. Thank you!
+
+— ${appName} Team`;
+
+  const html = `
+  <!doctype html>
+  <html lang="en">
+    <head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>${escapeHtml(subject)}</title>
+    </head>
+    <body style="margin:0;padding:24px;background:#f3f4f6;font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;">
+      <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:12px;padding:24px;">
+        <h2 style="margin:0 0 4px 0;color:#111827;font-size:22px;">${escapeHtml(appName)}</h2>
+        <p style="margin:8px 0 0 0;color:#374151">Hi ${escapeHtml(refName)},</p>
+        <p style="margin:16px 0;color:#374151;font-size:15px;line-height:24px;">Good news — ${escapeHtml(referredLabel)} has completed KYC and your referral has been confirmed. Your referral points have been updated.</p>
+        <p style="margin:0;color:#6b7280;font-size:13px;line-height:22px;">Thank you for sharing ${escapeHtml(appName)}.</p>
+        <hr style="border:none;border-top:1px solid #eef2f7;margin:20px 0;" />
+        <p style="color:#9ca3af;font-size:12px">© ${new Date().getFullYear()} ${escapeHtml(appName)}. All rights reserved.</p>
+      </div>
+    </body>
+  </html>
+  `;
+
+  return { subject, text, html };
+}
+
 function escapeHtml(input: string) {
   return input
     .replaceAll('&', '&amp;')

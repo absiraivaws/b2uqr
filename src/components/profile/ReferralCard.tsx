@@ -14,7 +14,7 @@ export default function ReferralCard() {
   const [points, setPoints] = useState<number>(0);
   const [count, setCount] = useState<number>(0);
   const [referredBy, setReferredBy] = useState<string | null>(null);
-  const [referrals, setReferrals] = useState<Array<{ referredUid: string; created_at?: any }>>([]);
+  const [referrals, setReferrals] = useState<Array<{ referredUid: string; referredDisplayName?: string | null; referredEmail?: string | null; created_at?: any }>>([]);
   const [notAllowed, setNotAllowed] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
 
@@ -131,11 +131,18 @@ export default function ReferralCard() {
               {referrals.length > 0 && (
                 <div>
                   <div className="text-sm text-muted-foreground mb-2">Recent referrals</div>
-                  <ul className="text-sm list-disc list-inside max-h-40 overflow-auto">
-                    {referrals.map((r) => (
-                      <li key={r.referredUid}>{r.referredUid}{r.created_at ? ` — ${new Date((r.created_at?.seconds || r.created_at) * 1000).toLocaleString()}` : ''}</li>
-                    ))}
-                  </ul>
+                  <div className="space-y-2 max-h-40 overflow-auto">
+                    {referrals.map((r) => {
+                      const ts = r.created_at as any;
+                      const dateStr = ts ? new Date((ts?.seconds || ts) * 1000).toLocaleString() : '';
+                      return (
+                        <div key={r.referredUid} className="flex gap-4 items-center text-sm">
+                          <div className="font-medium">{r.referredDisplayName || r.referredUid}</div>
+                          <div className="text-xs text-muted-foreground">{dateStr}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </>

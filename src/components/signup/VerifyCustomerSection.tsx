@@ -88,6 +88,17 @@ export default function VerifyCustomerSection({ uid, next }: VerifyCustomerSecti
   useEffect(() => {
     if (step !== 4) return;
 
+    // When onboarding reaches the final step, attempt to confirm KYC server-side
+    // so pending referrals can be awarded.
+    (async () => {
+      try {
+        await fetch('/api/user/confirm-kyc', { method: 'POST', credentials: 'include' });
+      } catch (e) {
+        // Non-critical; ignore errors here
+        console.warn('confirm-kyc call failed', e);
+      }
+    })();
+
     setRedirectCountdown(10);
     const interval = window.setInterval(() => {
       setRedirectCountdown((c) => (c <= 1 ? 0 : c - 1));

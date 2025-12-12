@@ -114,10 +114,12 @@ export default function ProfilePage({ showMerchantDetails = true }: { showMercha
 					
 				</CardContent>
 			</Card>
-
-			<div className='mt-4'>
-				<ReferralCard />
-			</div>
+			
+			{showMerchantDetails && (
+				<div className='mt-4'>
+					<ReferralCard />
+				</div>
+			)}
 		</main>
 	);
 }
