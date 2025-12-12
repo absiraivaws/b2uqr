@@ -309,9 +309,22 @@ export async function getLastTransaction(): Promise<Transaction | null> {
   return tx || null;
 }
 
-export async function getLastTransactionToday(terminalId: string): Promise<Transaction | null> {
-  const tx = await getLastTransactionForToday(terminalId);
-  return tx || null;
+export async function getLastTransactionToday(): Promise<Transaction | null> {
+  // Resolve the authenticated user's UID from the session cookie and
+  // perform a UID-scoped lookup. If uid can't be resolved, return null.
+  try {
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get('session')?.value;
+    if (!sessionCookie) return null;
+    const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
+    if (!decoded || !decoded.uid) return null;
+
+    const tx = await getLastTransactionForToday(decoded.uid);
+    return tx || null;
+  } catch (err) {
+    console.warn('Could not resolve session cookie for last-transaction lookup:', err);
+    return null;
+  }
 }
 
 // Return the Firestore user document for the currently authenticated user (server-side).

@@ -36,6 +36,7 @@ export interface OnboardIndividualInput {
   uid: string;
   profile: BaseProfileInput;
   contact: ContactInput;
+  referrerUid?: string | null;
 }
 
 export interface OnboardCompanyInput {
@@ -49,6 +50,7 @@ export interface OnboardCompanyInput {
     lat?: number | null;
     lng?: number | null;
   };
+  referrerUid?: string | null;
 }
 
 export interface CreateBranchInput {
@@ -140,7 +142,7 @@ async function ensureAuthUser(uid: string, email: string | null, displayName?: s
 }
 
 export async function onboardIndividualMerchant(input: OnboardIndividualInput) {
-  const { uid, profile, contact } = input;
+  const { uid, profile, contact, referrerUid } = input;
   const userRef = adminDb.collection('users').doc(uid);
   await adminDb.runTransaction(async (tx) => {
     const existing = await tx.get(userRef);
@@ -150,7 +152,7 @@ export async function onboardIndividualMerchant(input: OnboardIndividualInput) {
     if (!existing.exists) {
       timestamps.created_at = FieldValue.serverTimestamp();
     }
-    tx.set(userRef, {
+    const userPayload: Record<string, any> = {
       uid,
       role: 'individual',
       accountType: 'individual',
@@ -163,7 +165,29 @@ export async function onboardIndividualMerchant(input: OnboardIndividualInput) {
       email: contact.email || null,
       whatsappNumber: contact.whatsappNumber || null,
       ...timestamps,
-    }, { merge: true });
+    };
+
+    const refUid = (typeof referrerUid === 'string' && referrerUid) ? String(referrerUid) : null;
+    if (refUid && refUid !== uid) {
+      const alreadyReferred = existing.exists && existing.data() && (existing.data() as any).referredBy;
+      if (!alreadyReferred) {
+        // mark referral as pending: create a pending referral entry under referrer and mark pending on user
+        const refRef = adminDb.collection('users').doc(refUid);
+        const referralDocRef = refRef.collection('referrals').doc(uid);
+        tx.set(referralDocRef, {
+          referredUid: uid,
+          referredDisplayName: profile.displayName || null,
+          referredEmail: contact.email || null,
+          created_at: FieldValue.serverTimestamp(),
+          status: 'pending',
+          accountType: 'individual',
+        });
+        // set pendingReferralFrom on new user's doc so we can confirm later
+        userPayload.pendingReferralFrom = refUid;
+      }
+    }
+
+    tx.set(userRef, userPayload, { merge: true });
   });
 
   await ensureAuthUser(uid, contact.email ?? null, profile.displayName ?? null, { disabled: false });
@@ -175,7 +199,7 @@ export async function onboardIndividualMerchant(input: OnboardIndividualInput) {
 }
 
 export async function onboardCompanyMerchant(input: OnboardCompanyInput) {
-  const { uid, owner, company, contact } = input;
+  const { uid, owner, company, contact, referrerUid } = input;
   const userRef = adminDb.collection('users').doc(uid);
   const companyRef = adminDb.collection('companies').doc();
   const baseSlug = slugify(company.name) || 'company';
@@ -215,7 +239,7 @@ export async function onboardCompanyMerchant(input: OnboardCompanyInput) {
       timestamps.created_at = FieldValue.serverTimestamp();
     }
 
-    tx.set(userRef, {
+    const userPayload: Record<string, any> = {
       uid,
       role: 'company-owner',
       accountType: 'company',
@@ -231,7 +255,27 @@ export async function onboardCompanyMerchant(input: OnboardCompanyInput) {
       email: contact.email || null,
       whatsappNumber: contact.whatsappNumber || null,
       ...timestamps,
-    }, { merge: true });
+    };
+
+    const refUid = (typeof referrerUid === 'string' && referrerUid) ? String(referrerUid) : null;
+    if (refUid && refUid !== uid) {
+      const alreadyReferred = userSnap.exists && userSnap.data() && (userSnap.data() as any).referredBy;
+      if (!alreadyReferred) {
+        const refRef = adminDb.collection('users').doc(refUid);
+        const referralDocRef = refRef.collection('referrals').doc(uid);
+        tx.set(referralDocRef, {
+          referredUid: uid,
+          referredDisplayName: owner.displayName || null,
+          referredEmail: contact.email || null,
+          created_at: FieldValue.serverTimestamp(),
+          status: 'pending',
+          accountType: 'company',
+        });
+        userPayload.pendingReferralFrom = refUid;
+      }
+    }
+
+    tx.set(userRef, userPayload, { merge: true });
   });
 
   await ensureAuthUser(uid, contact.email ?? null, owner.displayName ?? company.name, { disabled: false });

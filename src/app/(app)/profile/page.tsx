@@ -11,6 +11,7 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import PersonalDetailsSection, { PersonalDetailsHandle } from '@/components/profile/PersonalDetailsSection';
 import MerchantDetailsSection, { MerchantDetailsHandle } from '@/components/profile/MerchantDetailsSection';
 import { QrUploadSection } from '@/components/profile/QrUploadSection';
+import ReferralCard from '@/components/profile/ReferralCard';
 
 
 export default function ProfilePage({ showMerchantDetails = true }: { showMerchantDetails?: boolean }) {
@@ -113,6 +114,12 @@ export default function ProfilePage({ showMerchantDetails = true }: { showMercha
 					
 				</CardContent>
 			</Card>
+			
+			{showMerchantDetails && (
+				<div className='mt-4'>
+					<ReferralCard />
+				</div>
+			)}
 		</main>
 	);
 }

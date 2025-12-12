@@ -40,17 +40,19 @@ export async function getLastDbTransaction(): Promise<Transaction | undefined> {
   return snap.docs[0].data() as Transaction;
 }
 
-export async function getLastTransactionForToday(terminalId: string): Promise<Transaction | undefined> {
+export async function getLastTransactionForToday(uid: string): Promise<Transaction | undefined> {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const todayISO = today.toISOString();
 
+  // Always scope by user UID so counters are isolated per individual user.
   const snap = await collectionRef
-    .where("terminal_id", "==", terminalId)
+    .where("uid", "==", uid)
     .where("created_at", ">=", todayISO)
     .orderBy("created_at", "desc")
     .limit(1)
     .get();
+
   if (snap.empty) return undefined;
   return snap.docs[0].data() as Transaction;
 }

@@ -58,6 +58,7 @@ export async function POST(req: Request) {
 
     const body = await req.json().catch(() => ({}));
     const accountType = (body?.accountType || '').toString();
+    const referrerUid = (body?.referrerUid || null) as string | null;
     if (accountType !== 'individual' && accountType !== 'company') {
       return NextResponse.json({ ok: false, message: 'Invalid account type' }, { status: 400 });
     }
@@ -88,6 +89,7 @@ export async function POST(req: Request) {
         uid: user.uid,
         profile: baseProfile,
         contact: normalizedContact,
+        referrerUid,
       });
       if (normalizedContact.email) {
         try {
@@ -115,6 +117,7 @@ export async function POST(req: Request) {
         lat: baseProfile.lat,
         lng: baseProfile.lng,
       },
+      referrerUid,
     });
 
     if (normalizedContact.email) {
