@@ -1,6 +1,4 @@
 import nodemailer from 'nodemailer';
-import fs from 'fs';
-import path from 'path';
 import { generatePhpposSetupEmail } from './emailTemplates';
 
 type Recipient = { email: string; name?: string | null };
@@ -37,15 +35,11 @@ export async function sendPhpposSetupEmail(to: string | Recipient | Array<string
   const appOrigin = appOriginRaw.replace(/\/$/, '');
   const phpposToken = (process.env.PHPPOS_WEBHOOK_TOKEN || 'PHPPOS_WEBHOOK_TOKEN').toString();
 
-  const posDir = path.join(process.cwd(), 'public', 'possteps');
   const stepFiles = ['step1.png', 'step2.png', 'step3.png'];
-  const attachments = stepFiles.map((f, i) => {
-    const p = path.join(posDir, f);
-    if (fs.existsSync(p)) {
-      return { filename: f, path: p, cid: `posstep${i + 1}` };
-    }
-    return null;
-  }).filter(Boolean) as Array<{ filename: string; path: string; cid: string }>;
+
+  // Always resolve attachments from the public URL (`${appOrigin}/possteps/...`).
+  // This avoids relying on local filesystem availability in production builds.
+  const attachments: Array<{ filename: string; cid: string }> = stepFiles.map((f, i) => ({ filename: f, cid: `posstep${i + 1}` }));
 
   // Send personalized email to each recipient separately so greetings are individualized.
   for (const r of recipients) {
@@ -60,8 +54,24 @@ export async function sendPhpposSetupEmail(to: string | Recipient | Array<string
         .replaceAll('PHPPOS_WEBHOOK_TOKEN', phpposToken)
         .replaceAll('{uid}', uid);
 
+      // Fetch all attachments from the public URL and attach as buffers (inline CIDs).
+      const resolvedAttachments = await Promise.all(attachments.map(async (att) => {
+        try {
+          const url = `${appOrigin}/possteps/${att.filename}`;
+          const resp = await fetch(url);
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          const buf = Buffer.from(await resp.arrayBuffer());
+          const contentType = resp.headers.get('content-type') || undefined;
+          return { filename: att.filename, content: buf, cid: att.cid, contentType } as any;
+        } catch (err) {
+          console.warn('Could not fetch attachment from', `${appOrigin}/possteps/${att.filename}`, err && (err as any).message || err);
+          return null;
+        }
+      }));
+      const finalAttachments = resolvedAttachments.filter(Boolean) as any[];
+
       const mailOptions: any = { from: FROM_EMAIL, to: r.email, subject, text: finalText, html: finalHtml };
-      if (attachments.length) mailOptions.attachments = attachments;
+      if (finalAttachments.length) mailOptions.attachments = finalAttachments;
       const info = await transporter.sendMail(mailOptions);
       console.log('PHPPOS setup email sent to', r.email, info && (info.messageId || info.response));
     } catch (err) {
