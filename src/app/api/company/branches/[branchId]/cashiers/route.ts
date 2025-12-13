@@ -141,6 +141,7 @@ export async function POST(req: Request, context: RouteParams) {
         uid: cashierRef.id,
         username,
         displayName,
+        email: inviteEmail,
         status: 'pending',
         created_at: admin.firestore.FieldValue.serverTimestamp(),
         updated_at: admin.firestore.FieldValue.serverTimestamp(),
@@ -258,6 +259,7 @@ export async function GET(req: Request, context: RouteParams) {
       return {
         id: doc.id,
         username: data.username,
+        email: data.email || null,
         displayName: data.displayName,
         status: data.status || 'active',
       };

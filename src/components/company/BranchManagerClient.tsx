@@ -17,6 +17,7 @@ interface Props {
     id: string;
     name: string;
     username: string;
+    email?: string;
     cashiers: CashierInfo[];
   };
 }
@@ -41,7 +42,7 @@ export default function BranchManagerClient({ branch }: Props) {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data?.ok) throw new Error(data?.message || 'Failed to invite cashier');
-      setCashiers((prev) => [{ id: data.cashierId, username: data.username || '—', displayName: form.displayName, status: 'pending' }, ...prev]);
+      setCashiers((prev) => [{ id: data.cashierId, username: data.username || '—', email: data.email, displayName: form.displayName, status: 'pending' }, ...prev]);
       toast({ title: 'Cashier invited', description: `Invite sent to ${form.email}` });
       setDialogOpen(false);
       setForm({ displayName: '', email: '' });
@@ -73,7 +74,7 @@ export default function BranchManagerClient({ branch }: Props) {
       </div>
 
       <Card>
-        <CardHeader className="flex items-center justify-between">
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Cashiers</CardTitle>
           <Button size="sm" onClick={() => setDialogOpen(true)}>
             <PlusCircle className="mr-2 h-4 w-4" /> Add cashier
@@ -84,6 +85,7 @@ export default function BranchManagerClient({ branch }: Props) {
             <TableHeader>
               <TableRow>
                 <TableHead>Username</TableHead>
+                <TableHead>Email</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -92,11 +94,12 @@ export default function BranchManagerClient({ branch }: Props) {
             <TableBody>
               {cashiers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center text-muted-foreground">No cashiers yet.</TableCell>
+                  <TableCell colSpan={5} className="text-center text-muted-foreground">No cashiers yet.</TableCell>
                 </TableRow>
               ) : cashiers.map((cashier) => (
                 <TableRow key={cashier.id}>
                   <TableCell className="font-mono text-sm">{cashier.username}</TableCell>
+                  <TableCell className="font-mono text-sm">{cashier.email ?? '-'}</TableCell>
                   <TableCell>{cashier.displayName}</TableCell>
                   <TableCell>
                     <Badge variant={cashier.status === 'active' ? 'secondary' : 'outline'} className="capitalize">{cashier.status}</Badge>
@@ -122,11 +125,11 @@ export default function BranchManagerClient({ branch }: Props) {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>Name</Label>
-              <Input value={form.displayName} onChange={(e) => setForm((prev) => ({ ...prev, displayName: e.target.value }))} />
+              <Input className='bg-gray-300/50 dark:bg-transparent' value={form.displayName} onChange={(e) => setForm((prev) => ({ ...prev, displayName: e.target.value }))} />
             </div>
             <div className="space-y-2">
               <Label>Contact email (invite will be sent)</Label>
-              <Input type="email" value={form.email} onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))} placeholder="cashier@example.com" />
+              <Input className='bg-gray-300/50 dark:bg-transparent' type="email" value={form.email} onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))} placeholder="cashier@example.com" />
             </div>
           </div>
           <DialogFooter>

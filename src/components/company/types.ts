@@ -1,6 +1,7 @@
 export type CashierInfo = {
   id: string;
   username: string;
+  email?: string;
   displayName: string;
   status: string;
 };

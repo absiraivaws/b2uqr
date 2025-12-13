@@ -30,6 +30,7 @@ export default async function BranchDashboardPage({ params }: { params: Promise<
     return {
       id: doc.id,
       username: data.username,
+      email: data.email || null,
       displayName: data.displayName,
       status: data.status || 'active',
     };
