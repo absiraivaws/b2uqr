@@ -84,7 +84,20 @@ export async function POST(req: Request) {
 
     // create custom token
     const customToken = await adminAuth.createCustomToken(uid);
-    return respond({ ok: true, customToken, uid });
+
+    // include useful metadata so marketing clients can route correctly
+    const metadata: Record<string, any> = {
+      role: data?.role || null,
+      accountType: data?.accountType || null,
+      companyId: data?.companyId || null,
+      companySlug: data?.companySlug || null,
+      branchId: data?.branchId || null,
+      branchSlug: data?.branchSlug || null,
+      cashierSlug: data?.cashierSlug || null,
+      username: data?.username || null,
+    };
+
+    return respond({ ok: true, customToken, uid, ...metadata });
   } catch (err: any) {
     console.error('signin-pin error', err);
     const origin = req.headers.get('origin');
