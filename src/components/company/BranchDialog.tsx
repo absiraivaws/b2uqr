@@ -32,11 +32,11 @@ export default function BranchDialog({ open, onOpenChange, form, setForm, onSubm
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <Label>Branch name</Label>
-            <Input className='bg-gray-300 dark:bg-transparent' value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} placeholder="Colombo HQ" required />
+            <Input className='bg-gray-300/50 dark:bg-transparent' value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} placeholder="Colombo HQ" required />
           </div>
           <div className="space-y-2">
             <Label>Address (optional)</Label>
-            <Textarea className='bg-gray-300 dark:bg-transparent' value={form.address} onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))} placeholder="Street, City" rows={2} />
+            <Textarea className='bg-gray-300/50 dark:bg-transparent' value={form.address} onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))} placeholder="Street, City" rows={2} />
           </div>
         </div>
         <DialogFooter>
