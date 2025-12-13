@@ -19,15 +19,26 @@ export async function POST(req: Request) {
     const pin = (body?.pin || '').toString().trim();
     if (!identifier || !pin) return respond({ ok: false, message: 'Missing identifier or pin' }, 400);
 
-    // find user doc by email or phone
+    // find user doc by email (case-insensitive try), then phone, then username
     let userDocSnap = null;
+    // try exact email match first
     const byEmail = await adminDb.collection('users').where('email', '==', identifier).limit(1).get();
-    if (!byEmail.empty) userDocSnap = byEmail.docs[0];
-    else {
-      const byPhone = await adminDb.collection('users').where('phone', '==', identifier).limit(1).get();
-      if (!byPhone.empty) userDocSnap = byPhone.docs[0];
+    if (!byEmail.empty) {
+      userDocSnap = byEmail.docs[0];
+    } else {
+      // try lowercased email (some stored emails may be lowercased)
+      if (normalizedIdentifier !== identifier) {
+        const byEmailLower = await adminDb.collection('users').where('email', '==', normalizedIdentifier).limit(1).get();
+        if (!byEmailLower.empty) userDocSnap = byEmailLower.docs[0];
+      }
+      // fallback to phone
+      if (!userDocSnap) {
+        const byPhone = await adminDb.collection('users').where('phone', '==', identifier).limit(1).get();
+        if (!byPhone.empty) userDocSnap = byPhone.docs[0];
+      }
     }
 
+    // fallback: username lookup using normalized identifier
     if (!userDocSnap) {
       const usernameLookup = await adminDb.collection('users').where('username', '==', normalizedIdentifier).limit(1).get();
       if (!usernameLookup.empty) userDocSnap = usernameLookup.docs[0];

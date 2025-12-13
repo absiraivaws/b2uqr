@@ -35,15 +35,15 @@ export default function ManagerDialog({ open, onOpenChange, branch, form, setFor
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <Label>Manager name</Label>
-            <Input className='bg-gray-300 dark:bg-transparent' value={form.displayName} onChange={(e) => setForm((p) => ({ ...p, displayName: e.target.value }))} />
+            <Input className='bg-gray-300/50 dark:bg-transparent' value={form.displayName} onChange={(e) => setForm((p) => ({ ...p, displayName: e.target.value }))} />
           </div>
           <div className="space-y-2">
             <Label>Contact phone (optional)</Label>
-            <Input className='bg-gray-300 dark:bg-transparent' value={form.phone} onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))} />
+            <Input className='bg-gray-300/50 dark:bg-transparent' value={form.phone} onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))} />
           </div>
           <div className="space-y-2">
             <Label>Contact email (optional)</Label>
-            <Input className='bg-gray-300 dark:bg-transparent' type="email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} />
+            <Input className='bg-gray-300/50 dark:bg-transparent' type="email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} />
           </div>
           {/* PIN is no longer entered here — manager will set password via email link */}
         </div>

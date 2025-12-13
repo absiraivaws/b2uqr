@@ -603,6 +603,7 @@ export async function createCashier(input: CreateCashierInput) {
       uid: cashierRef.id,
       username,
       displayName,
+      email,
       status: 'active',
       created_at: FieldValue.serverTimestamp(),
       updated_at: FieldValue.serverTimestamp(),
