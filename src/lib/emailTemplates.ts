@@ -77,8 +77,8 @@ export function generateOTPEmail(params: {
 
 export function generateSetPasswordEmail(params: { name: string; email: string; link: string; appName?: string }) {
   const { name, email, link, appName = 'LankaQR' } = params;
-  const subject = `${appName} - Set your admin password`;
-  const text = `Hello ${name},\n\nPlease set your admin password by visiting the link: ${link}\n\nIf you didn't expect this, ignore.`;
+  const subject = `${appName} - Set your PIN`;
+  const text = `Hello ${name},\n\nPlease set your PIN by visiting the link: ${link}\n\nIf you didn't expect this, ignore.`;
 
   const html = `
   <!doctype html>
@@ -92,9 +92,9 @@ export function generateSetPasswordEmail(params: { name: string; email: string; 
       <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:12px;padding:24px;">
         <h2 style="margin:0 0 8px 0;color:#111827">${escapeHtml(appName)}</h2>
         <p style="color:#374151">Hello ${escapeHtml(name || email)},</p>
-        <p style="color:#374151">An administrator account was created for you. Click the button below to set your password. This link can be used once and will expire shortly.</p>
+        <p style="color:#374151">An account was created for you. Click the button below to set your PIN. This link can be used once and will expire shortly.</p>
         <div style="text-align:center;margin:20px 0;">
-          <a href="${escapeHtml(link)}" style="display:inline-block;padding:12px 18px;background:#0b61ff;color:#fff;border-radius:8px;text-decoration:none;">Set password</a>
+          <a href="${escapeHtml(link)}" style="display:inline-block;padding:12px 18px;background:#0b61ff;color:#fff;border-radius:8px;text-decoration:none;">Set PIN</a>
         </div>
         <p style="color:#6b7280;font-size:13px">If you didn't expect this, ignore this email or contact the site administrator.</p>
         <hr style="border:none;border-top:1px solid #eef2f7;margin:20px 0;" />
@@ -135,6 +135,7 @@ export function generateSignupSuccessEmail(params: {
         <div style="text-align:center;margin:28px 0;">
           <a href="${escapeHtml(signinUrl)}" style="display:inline-block;padding:12px 20px;background:#0f62fe;color:#ffffff;border-radius:999px;text-decoration:none;font-weight:600;">Go to sign in</a>
         </div>
+        <!-- PHPPOS integration instructions and screenshots are sent using a separate email when applicable -->
         <p style="margin:0;color:#6b7280;font-size:13px;line-height:22px;">If the button doesn’t work, copy and paste this link into your browser:</p>
         <p style="margin:8px 0 0 0;color:#2563eb;font-size:13px;word-break:break-all;">${escapeHtml(signinUrl)}</p>
         <hr style="border:none;border-top:1px solid #e5e7eb;margin:28px 0;" />
@@ -174,6 +175,54 @@ Good news — ${referredLabel} has completed KYC and your referral has been conf
         <p style="margin:0;color:#6b7280;font-size:13px;line-height:22px;">Thank you for sharing ${escapeHtml(appName)}.</p>
         <hr style="border:none;border-top:1px solid #eef2f7;margin:20px 0;" />
         <p style="color:#9ca3af;font-size:12px">© ${new Date().getFullYear()} ${escapeHtml(appName)}. All rights reserved.</p>
+      </div>
+    </body>
+  </html>
+  `;
+
+  return { subject, text, html };
+}
+
+export function generatePhpposSetupEmail(params: { name?: string | null; uid: string; appName?: string; cashierName?: string | null }) {
+  const { name, uid, appName = 'LankaQR', cashierName } = params;
+  const greetingName = (name && name.trim()) || 'there';
+  const subject = `${appName} - POS integration instructions`;
+  const cashierLabel = (cashierName && cashierName.trim()) || 'a cashier';
+  const text = `Hi ${greetingName},\n\nNew cashier ${cashierLabel} has signed up.\n\nIf you are using POS system in your business, please use this link to integrate with B2U QR:\nNEXT_PUBLIC_APP_ORIGIN/api/phppos/sales?token=PHPPOS_WEBHOOK_TOKEN&uid={uid}\n\nScreenshots showing the setup steps are attached to this email.\n\nThanks,\n${appName} Team`;
+
+  const html = `
+  <!doctype html>
+  <html lang="en">
+    <head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>${escapeHtml(subject)}</title>
+    </head>
+    <body style="margin:0;padding:24px;background:#f3f4f6;font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;">
+      <div style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:12px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.08);">
+        <h2 style="margin:0 0 4px 0;color:#111827;font-size:22px;">${escapeHtml(appName)}</h2>
+        <p style="margin:8px 0 0 0;color:#4b5563;font-size:15px;">Hi ${escapeHtml(greetingName)},</p>
+        <p style="margin:16px 0;color:#374151;font-size:15px;line-height:24px;">New cashier has signed up.</p>
+        <p style="margin:16px 0;color:#374151;font-size:15px;line-height:24px;">If you are using POS system in your business, please use this link to integrate your POS system with B2U QR payments</p>
+        <p style="margin:8px 0 0 0;color:#2563eb;font-size:13px;word-break:break-all;"><a href="${escapeHtml('NEXT_PUBLIC_APP_ORIGIN/api/phppos/sales?token=PHPPOS_WEBHOOK_TOKEN&uid={uid}')}">NEXT_PUBLIC_APP_ORIGIN/api/phppos/sales?token=PHPPOS_WEBHOOK_TOKEN&uid={uid}</a></p>
+        <div style="text-align:center;margin:12px 0;">
+          <a href="${escapeHtml('NEXT_PUBLIC_APP_ORIGIN/api/phppos/sales?token=PHPPOS_WEBHOOK_TOKEN&uid={uid}')}" style="display:inline-block;padding:10px 14px;background:#eef2f7;color:#2563eb;border-radius:8px;text-decoration:none;font-weight:600;border:1px solid #e5e7eb;">Copy link</a>
+        </div>
+        <p style="margin:8px 0 0 0;color:#6b7280;font-size:12px;">If the "Copy link" control doesn't work in your email client, copy the link above manually.</p>
+        <p style="margin:16px 0;color:#374151;font-size:14px;line-height:22px;">Follow these steps (screenshots attached):</p>
+        <div style="margin:12px 0;">
+          <div style="margin-bottom:12px;">
+            <img src="cid:posstep1" alt="Step 1" style="width:100%;height:auto;border-radius:8px;border:1px solid #eef2f7;display:block;" />
+          </div>
+          <div style="margin-bottom:12px;">
+            <img src="cid:posstep2" alt="Step 2" style="width:100%;height:auto;border-radius:8px;border:1px solid #eef2f7;display:block;" />
+          </div>
+          <div>
+            <img src="cid:posstep3" alt="Step 3" style="width:100%;height:auto;border-radius:8px;border:1px solid #eef2f7;display:block;" />
+          </div>
+        </div>
+        <hr style="border:none;border-top:1px solid #e5e7eb;margin:28px 0;" />
+        <p style="margin:0;color:#9ca3af;font-size:12px;">© ${new Date().getFullYear()} ${escapeHtml(appName)}. All rights reserved.</p>
       </div>
     </body>
   </html>

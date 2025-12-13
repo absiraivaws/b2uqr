@@ -4,7 +4,7 @@ import { onboardCompanyMerchant, onboardIndividualMerchant } from '@/lib/organiz
 import nodemailer from 'nodemailer';
 import { generateSignupSuccessEmail } from '@/lib/emailTemplates';
 
-async function sendSignupSuccessEmailIfPossible(email: string, name: string | null | undefined, accountType: 'individual' | 'company') {
+async function sendSignupSuccessEmailIfPossible(email: string, name: string | null | undefined, accountType: 'individual' | 'company', uid?: string) {
   const SMTP_HOST = process.env.SMTP_HOST;
   const SMTP_PORT = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : undefined;
   const SMTP_USER = process.env.SMTP_USER;
@@ -91,13 +91,19 @@ export async function POST(req: Request) {
         contact: normalizedContact,
         referrerUid,
       });
-      if (normalizedContact.email) {
-        try {
-          await sendSignupSuccessEmailIfPossible(normalizedContact.email, baseProfile.displayName || null, 'individual');
-        } catch (emailErr) {
-          console.warn('Failed to send signup success email (individual)', emailErr);
-        }
-      }
+        if (normalizedContact.email) {
+            try {
+              await sendSignupSuccessEmailIfPossible(normalizedContact.email, baseProfile.displayName || null, 'individual', user.uid);
+            } catch (emailErr) {
+              console.warn('Failed to send signup success email (individual)', emailErr);
+            }
+            try {
+              const { sendPhpposSetupEmail } = await import('@/lib/sendPhpposEmail');
+              await sendPhpposSetupEmail({ email: normalizedContact.email, name: baseProfile.displayName || null }, user.uid);
+            } catch (phperr) {
+              console.warn('Failed to send PHPPOS setup email (individual)', phperr);
+            }
+          }
       return NextResponse.json({ ok: true, accountType: 'individual' });
     }
 
@@ -122,7 +128,7 @@ export async function POST(req: Request) {
 
     if (normalizedContact.email) {
       try {
-        await sendSignupSuccessEmailIfPossible(normalizedContact.email, baseProfile.displayName || companyName, 'company');
+        await sendSignupSuccessEmailIfPossible(normalizedContact.email, baseProfile.displayName || companyName, 'company', user.uid);
       } catch (emailErr) {
         console.warn('Failed to send signup success email (company)', emailErr);
       }

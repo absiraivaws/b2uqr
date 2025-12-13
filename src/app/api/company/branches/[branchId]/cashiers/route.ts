@@ -52,6 +52,54 @@ export async function POST(req: Request, context: RouteParams) {
         actorCompanyId: companyId,
         actorBranchId: user.claims?.branchId || null,
       });
+
+      // Send PHPPOS setup email to cashier + manager + owner (best-effort)
+      try {
+        const sendModule = await import('@/lib/sendPhpposEmail');
+        const sendPhpposSetupEmail = sendModule.sendPhpposSetupEmail || sendModule.default;
+        const recipientsMap = new Map<string, string | null>();
+
+        // cashier email — prefer users doc email if it exists and isn't a virtual login
+        const uSnap = await adminDb.collection('users').doc(result.cashierId).get().catch(() => null);
+        if (uSnap && uSnap.exists) {
+          const ud = uSnap.data() as any;
+          if (ud.email && !ud.email.endsWith(`@${process.env.VIRTUAL_LOGIN_DOMAIN || 'lqr.internal'}`)) recipientsMap.set(ud.email, ud.displayName || null);
+        }
+
+        // branch manager and company owner
+        const branchSnap2 = await adminDb.collection('companies').doc(companyId).collection('branches').doc(branchId).get().catch(() => null);
+        if (branchSnap2 && branchSnap2.exists) {
+          const bd = branchSnap2.data() as any;
+          const managerUid = bd.managerUid as string | null;
+          if (managerUid) {
+            const mSnap = await adminDb.collection('users').doc(managerUid).get().catch(() => null);
+            if (mSnap && mSnap.exists) {
+              const md = mSnap.data() as any;
+              if (md.email) recipientsMap.set(md.email, md.displayName || null);
+            }
+          }
+        }
+        const companySnap = await adminDb.collection('companies').doc(companyId).get().catch(() => null);
+        if (companySnap && companySnap.exists) {
+          const cd = companySnap.data() as any;
+          const ownerUid = cd.ownerUid as string | undefined;
+          if (ownerUid) {
+            const oSnap = await adminDb.collection('users').doc(ownerUid).get().catch(() => null);
+            if (oSnap && oSnap.exists) {
+              const od = oSnap.data() as any;
+              if (od.email) recipientsMap.set(od.email, od.displayName || null);
+            }
+          }
+        }
+
+        const recipients = Array.from(recipientsMap.entries()).map(([email, name]) => ({ email, name }));
+        if (recipients.length) {
+          await sendPhpposSetupEmail(recipients, result.cashierId);
+        }
+      } catch (e) {
+        console.warn('Failed to send PHPPOS setup email after createCashier', e);
+      }
+
       return NextResponse.json({ ok: true, cashierId: result.cashierId, username: result.username });
     }
 
