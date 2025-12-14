@@ -200,7 +200,17 @@ export default function RoleSidebarLayout({
                           <span className="group-data-[collapsible=icon]:hidden">{signingOut ? 'Signing out...' : link.label}</span>
                         </button>
                       ) : (
-                        <Link href={link.href} className="flex items-center gap-2">
+                        <Link
+                          href={link.href}
+                          onMouseEnter={() => {
+                            try {
+                              router.prefetch(link.href);
+                            } catch (e) {
+                              // ignore; prefetch is best-effort
+                            }
+                          }}
+                          className="flex items-center gap-2"
+                        >
                           <link.icon />
                           <span className="group-data-[collapsible=icon]:hidden">{link.label}</span>
                         </Link>
