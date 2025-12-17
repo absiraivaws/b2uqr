@@ -7,6 +7,7 @@ import {
   SidebarProvider,
   Sidebar,
   SidebarHeader,
+  SidebarFooter,
   SidebarContent,
   SidebarMenu,
   SidebarMenuItem,
@@ -17,6 +18,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar';
+import SidebarReferral from './SidebarReferral';
 import type { LucideIcon } from 'lucide-react';
 import { Loader2, QrCode } from 'lucide-react';
 import { clientSignOut } from '@/lib/clientAuth';
@@ -222,6 +224,9 @@ export default function RoleSidebarLayout({
             </SidebarGroup>
           ))}
         </SidebarContent>
+        <SidebarFooter>
+          <SidebarReferral />
+        </SidebarFooter>
       </Sidebar>
 
       <SidebarInset className="app-content pt-14 md:pt-0">
