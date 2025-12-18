@@ -279,8 +279,30 @@ export function useTransactionManager() {
       };
 
       try {
-        const newTransaction = await createTransaction(transactionData);
+        // Client-side timing and correlation id for diagnostics
+        const requestId = (typeof window !== 'undefined' && window.crypto && (window.crypto as any).randomUUID)
+          ? (window.crypto as any).randomUUID()
+          : `req_${Date.now()}`;
+        const clientStart = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+
+        const newTransaction = await createTransaction({ ...transactionData, _client_request_id: requestId });
+        const fetchEnd = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        console.log(`${requestId} client createTransaction fetch RTT: ${fetchEnd - clientStart} ms`);
+
         setCurrentTransaction(newTransaction);
+
+        // Measure time to render (approx) — schedule a rAF so DOM updates can complete
+        try {
+          if (typeof window !== 'undefined' && window.requestAnimationFrame) {
+            window.requestAnimationFrame(() => {
+              const renderEnd = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+              console.log(`${requestId} client time to render (approx): ${renderEnd - clientStart} ms`);
+            });
+          }
+        } catch (e) {
+          // ignore
+        }
+
         return newTransaction;
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";

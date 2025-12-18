@@ -14,6 +14,7 @@ import {
 } from "./db";
 import { cookies } from 'next/headers';
 import admin, { adminAuth, adminDb } from './firebaseAdmin';
+import { incrementRevocationCounter, incrementCacheHit, incrementCacheMiss } from './metrics';
 import { callBankCreateQR, callBankReconciliationAPI } from "./bank-api";
 import { verifyWebhookSignature } from "./security";
 import { alertFailures, type AlertFailuresOutput } from "@/ai/flows/alert-failures";
@@ -88,6 +89,69 @@ async function loadCompanyMerchantSettings(
   }
 }
 
+// --- In-memory TTL cache for company settings ---
+// Caches the full company document (or null) keyed by companyId.
+const companySettingsCache: Map<string, { expires: number; data: Record<string, any> | null }> = new Map();
+const COMPANY_SETTINGS_CACHE_TTL_MS = Number(process.env.COMPANY_SETTINGS_CACHE_TTL_MS) || 60_000;
+
+async function loadCompanyMerchantSettingsWithCache(
+  companyId: string,
+  preloadedData?: Record<string, any> | null
+): Promise<Record<string, any> | null> {
+  try {
+    const now = Date.now();
+    const cached = companySettingsCache.get(companyId);
+    if (cached && cached.expires > now) {
+      console.log(`loadCompanyMerchantSettings cache HIT for ${companyId}`);
+      try { incrementCacheHit(); } catch (e) { /* ignore */ }
+      return (cached.data?.merchantSettings ?? null) as Record<string, any> | null;
+    }
+
+    console.log(`loadCompanyMerchantSettings cache MISS for ${companyId}`);
+    try { incrementCacheMiss(); } catch (e) { /* ignore */ }
+    const data = await loadCompanyMerchantSettings(companyId, preloadedData);
+    // Store full company doc (or null) in cache expiry
+    companySettingsCache.set(companyId, { expires: now + COMPANY_SETTINGS_CACHE_TTL_MS, data: data ? { merchantSettings: data } : null });
+    return data;
+  } catch (err) {
+    console.error('Failed to load (cached) company merchant settings', err);
+    return null;
+  }
+}
+
+// --- In-memory TTL cache for user documents ---
+// Caches the user document data (or null) keyed by UID.
+const userDocCache: Map<string, { expires: number; data: Record<string, any> | null }> = new Map();
+const USER_DOC_CACHE_TTL_MS = Number(process.env.USER_DOC_CACHE_TTL_MS) || 60_000;
+
+async function getUserDocWithCache(uid: string): Promise<Record<string, any> | null> {
+  try {
+    const now = Date.now();
+    const cached = userDocCache.get(uid);
+    if (cached && cached.expires > now) {
+      console.log(`getUserDoc cache HIT for ${uid}`);
+      try { incrementCacheHit(); } catch (e) { /* ignore */ }
+      return cached.data;
+    }
+
+    console.log(`getUserDoc cache MISS for ${uid}`);
+    try { incrementCacheMiss(); } catch (e) { /* ignore */ }
+
+    const snap = await adminDb.collection('users').doc(uid).get();
+    if (!snap.exists) {
+      userDocCache.set(uid, { expires: now + USER_DOC_CACHE_TTL_MS, data: null });
+      return null;
+    }
+    const data = snap.data() as Record<string, any>;
+    userDocCache.set(uid, { expires: now + USER_DOC_CACHE_TTL_MS, data });
+    return data;
+  } catch (err) {
+    console.error('Failed to load user document with cache', err);
+    return null;
+  }
+}
+
+
 function resolveMerchantSettings(userData: Record<string, any>, companySettings?: Record<string, any> | null): ServerMerchantSettings {
   const getGroupValue = (groupKey: MerchantFieldGroupKey) => {
     const keys = MERCHANT_FIELD_GROUPS[groupKey];
@@ -126,7 +190,7 @@ function applyCompanySettingsToUserData(raw: Record<string, any>, companySetting
   }
 }
 
-export async function createTransaction(transactionData: { amount: string, reference_number: string }): Promise<Transaction> {
+export async function createTransaction(transactionData: { amount: string, reference_number: string, _client_request_id?: string }): Promise<Transaction> {
   const parsed = TransactionSchema.safeParse(transactionData);
 
   if (!parsed.success) {
@@ -141,6 +205,7 @@ export async function createTransaction(transactionData: { amount: string, refer
 
   // 1. Generate transaction_uuid
   const transaction_uuid = `uuid_${crypto.randomBytes(12).toString('hex')}`;
+  const clientReqId = (transactionData as any)?._client_request_id ?? null;
 
   // For security and correctness, merchant configuration is read from Firestore
   // users/{uid} document. We require the user to be signed in (session cookie).
@@ -149,10 +214,30 @@ export async function createTransaction(transactionData: { amount: string, refer
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get('session')?.value;
     if (sessionCookie) {
-      const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
+      // Quick verification (no revocation check) to keep the request fast.
+      const quickAuthStart = process.hrtime.bigint();
+      const decoded = await adminAuth.verifySessionCookie(sessionCookie, false);
+      const quickAuthEnd = process.hrtime.bigint();
+      console.log(`${transaction_uuid}${clientReqId ? ' [client:' + clientReqId + ']' : ''} verifySessionCookie (quick) took ${Number(quickAuthEnd - quickAuthStart) / 1e6} ms`);
       if (decoded && decoded.uid) {
         uid = decoded.uid;
       }
+
+      // Background full revocation check (non-blocking). Log duration and increment
+      // a revocation metric if the session is revoked.
+      (async () => {
+        const bgStart = process.hrtime.bigint();
+        try {
+          await adminAuth.verifySessionCookie(sessionCookie, true);
+          const bgEnd = process.hrtime.bigint();
+          console.log(`${transaction_uuid}${clientReqId ? ' [client:' + clientReqId + ']' : ''} verifySessionCookie (background full) took ${Number(bgEnd - bgStart) / 1e6} ms`);
+        } catch (err) {
+          const bgEnd = process.hrtime.bigint();
+          console.warn(`${transaction_uuid}${clientReqId ? ' [client:' + clientReqId + ']' : ''} verifySessionCookie (background full) failed after ${Number(bgEnd - bgStart) / 1e6} ms`, err);
+          try { incrementRevocationCounter(); } catch (e) { console.warn('Failed to increment revocation counter', e); }
+          // Optionally: enqueue action to handle revoked sessions (notify, mark tx, reverse, etc.)
+        }
+      })();
     }
   } catch (err) {
     console.warn('Could not verify session cookie when creating transaction:', err);
@@ -162,16 +247,20 @@ export async function createTransaction(transactionData: { amount: string, refer
     throw new Error('User must be signed in to create a transaction.');
   }
 
-  const userDoc = await adminDb.collection('users').doc(uid).get();
-  if (!userDoc.exists) {
+  const userDocStart = process.hrtime.bigint();
+  const userData = await getUserDocWithCache(uid);
+  const userDocEnd = process.hrtime.bigint();
+  console.log(`${transaction_uuid}${clientReqId ? ' [client:' + clientReqId + ']' : ''} userDoc.get (cached) took ${Number(userDocEnd - userDocStart) / 1e6} ms`);
+  if (!userData) {
     throw new Error('User document not found. Merchant configuration must be set in Firestore.');
   }
 
-  const userData = userDoc.data() || {};
-
   let companySettings: Record<string, any> | null = null;
   if (userData.accountType === 'company' && userData.companyId) {
-    companySettings = await loadCompanyMerchantSettings(String(userData.companyId));
+    const loadCompanyStart = process.hrtime.bigint();
+    companySettings = await loadCompanyMerchantSettingsWithCache(String(userData.companyId));
+    const loadCompanyEnd = process.hrtime.bigint();
+    console.log(`${transaction_uuid}${clientReqId ? ' [client:' + clientReqId + ']' : ''} loadCompanyMerchantSettings (cached) took ${Number(loadCompanyEnd - loadCompanyStart) / 1e6} ms`);
   }
 
   const serverSideSettings = resolveMerchantSettings(userData, companySettings);
@@ -207,6 +296,7 @@ export async function createTransaction(transactionData: { amount: string, refer
   };
 
   // 3. Call Bank API to create QR
+  const bankStart = process.hrtime.bigint();
   const bankResponse = await callBankCreateQR({
     amount: data.amount,
     reference_number: data.reference_number,
@@ -219,6 +309,8 @@ export async function createTransaction(transactionData: { amount: string, refer
     currency_code: sanitizedSettings.currency_code,
     country_code: sanitizedSettings.country_code,
   });
+  const bankEnd = process.hrtime.bigint();
+  console.log(`${transaction_uuid}${clientReqId ? ' [client:' + clientReqId + ']' : ''} callBankCreateQR took ${Number(bankEnd - bankStart) / 1e6} ms`);
 
   // 4. Update transaction with QR data from bank
   pendingTx.qr_payload = bankResponse.qr_payload;
@@ -227,7 +319,10 @@ export async function createTransaction(transactionData: { amount: string, refer
   // attach uid to transaction so we can query transactions by user later
   (pendingTx as any).uid = uid;
 
+  const createStart = process.hrtime.bigint();
   const finalTx = await createDbTransaction(pendingTx);
+  const createEnd = process.hrtime.bigint();
+  console.log(`${finalTx.transaction_uuid}${clientReqId ? ' [client:' + clientReqId + ']' : ''} createDbTransaction took ${Number(createEnd - createStart) / 1e6} ms`);
 
   console.log("Created transaction:", finalTx.transaction_uuid);
   return finalTx;
@@ -256,16 +351,17 @@ export async function previewQR(params: { amount: string; reference_number?: str
     throw new Error('User must be signed in to preview a QR.');
   }
 
-  const userDoc = await adminDb.collection('users').doc(uid).get();
-  if (!userDoc.exists) {
-    throw new Error('User document not found. Merchant configuration must be set in Firestore.');
-  }
-
-  const userData = userDoc.data() || {};
+    const userDocStart = process.hrtime.bigint();
+    const userData = await getUserDocWithCache(uid);
+    const userDocEnd = process.hrtime.bigint();
+    console.log(`previewQR userDoc.get (cached) took ${Number(userDocEnd - userDocStart) / 1e6} ms`);
+    if (!userData) {
+      throw new Error('User document not found. Merchant configuration must be set in Firestore.');
+    }
 
   let companySettings: Record<string, any> | null = null;
   if (userData.accountType === 'company' && userData.companyId) {
-    companySettings = await loadCompanyMerchantSettings(String(userData.companyId));
+    companySettings = await loadCompanyMerchantSettingsWithCache(String(userData.companyId));
   }
 
   const serverSideSettings = resolveMerchantSettings(userData, companySettings);
@@ -367,9 +463,11 @@ export async function getUserSettings(): Promise<Record<string, any> | null> {
     const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
     if (!decoded || !decoded.uid) return null;
 
-    const userDoc = await adminDb.collection('users').doc(decoded.uid).get();
-    if (!userDoc.exists) return null;
-    const raw = userDoc.data() as Record<string, any>;
+    const userDocStart = process.hrtime.bigint();
+    const raw = await getUserDocWithCache(decoded.uid);
+    const userDocEnd = process.hrtime.bigint();
+    console.log(`getUserSettings userDoc.get (cached) took ${Number(userDocEnd - userDocStart) / 1e6} ms`);
+    if (!raw) return null;
 
     let companyDocData: Record<string, any> | null = null;
     let branchDocData: Record<string, any> | null = null;
@@ -396,7 +494,7 @@ export async function getUserSettings(): Promise<Record<string, any> | null> {
     }
 
     if (raw?.accountType === 'company' && raw?.companyId) {
-      const companySettings = await loadCompanyMerchantSettings(String(raw.companyId), companyDocData);
+      const companySettings = await loadCompanyMerchantSettingsWithCache(String(raw.companyId), companyDocData);
       applyCompanySettingsToUserData(raw, companySettings);
       if (companySettings) {
         raw.companyMerchantSettings = companySettings;
