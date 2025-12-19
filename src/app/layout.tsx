@@ -3,12 +3,7 @@ import './globals.css';
 import { ThemeProvider } from '@/components/providers/theme-provider';
 import { Toaster } from "@/components/ui/toaster"
 
-const marketingOrigin =
-  process.env.NEXT_PUBLIC_MARKETING_SITE_ORIGIN ||
-  process.env.NEXT_PUBLIC_MARKETING_ORIGIN ||
-  process.env.MARKETING_SITE_ORIGIN ||
-  (process.env.MARKETING_SITE_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean)[0] ||
-  '';
+const marketingOrigin = process.env.NEXT_PUBLIC_MARKETING_SITE_ORIGIN || '';
 
 export const metadata: Metadata = {
   title: 'B2U QR',

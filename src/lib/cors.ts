@@ -14,9 +14,7 @@ function parseOrigins(value: string | undefined) {
 }
 
 const configuredOrigins = [
-  ...parseOrigins(process.env.MARKETING_SITE_ORIGINS),
-  ...parseOrigins(process.env.MARKETING_SITE_ORIGIN),
-  ...parseOrigins(process.env.NEXT_PUBLIC_MARKETING_ORIGIN),
+  ...parseOrigins(process.env.NEXT_PUBLIC_MARKETING_SITE_ORIGIN ? String(process.env.NEXT_PUBLIC_MARKETING_SITE_ORIGIN) : undefined),
 ].filter((origin, index, list) => list.indexOf(origin) === index);
 
 const allowedOrigins = configuredOrigins.length ? configuredOrigins : FALLBACK_ORIGINS;
