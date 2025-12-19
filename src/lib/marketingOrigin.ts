@@ -1,12 +1,7 @@
 let cachedOrigin: string | null = null;
 
 function readEnvOrigin() {
-  return (
-    process.env.NEXT_PUBLIC_MARKETING_SITE_ORIGIN ||
-    process.env.NEXT_PUBLIC_MARKETING_ORIGIN ||
-    process.env.MARKETING_SITE_ORIGIN ||
-    ''
-  );
+  return (process.env.NEXT_PUBLIC_MARKETING_SITE_ORIGIN || '');
 }
 
 function readWindowOrigin() {

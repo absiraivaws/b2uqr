@@ -16,7 +16,7 @@ async function sendSignupSuccessEmailIfPossible(email: string, name: string | nu
     return;
   }
 
-  const marketingOriginRaw = (process.env.MARKETING_SITE_ORIGIN || 'https://b2u.app').trim();
+  const marketingOriginRaw = (process.env.NEXT_PUBLIC_MARKETING_SITE_ORIGIN || 'https://b2u.app').trim();
   let marketingSigninUrl: string | null = null;
   if (marketingOriginRaw) {
     try {
