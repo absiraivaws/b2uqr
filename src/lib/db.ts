@@ -20,7 +20,10 @@ export async function createDbTransaction(tx: Omit<Transaction, 'created_at' | '
   if (tx.terminal_id) {
     newTx.bankResponse = { ...newTx.bankResponse, terminal_id: tx.terminal_id };
   }
+  const writeStart = process.hrtime.bigint();
   await collectionRef.doc(newTx.transaction_uuid).set(newTx);
+  const writeEnd = process.hrtime.bigint();
+  console.log(`${newTx.transaction_uuid} Firestore write took ${Number(writeEnd - writeStart) / 1e6} ms`);
   return newTx;
 }
 

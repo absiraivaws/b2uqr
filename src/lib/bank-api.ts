@@ -55,13 +55,12 @@ function buildTag(tag: string, value: string | undefined | null): string {
  * This function now constructs a valid LankaQR dynamic QR payload.
  */
 export async function callBankCreateQR(params: CreateQrRequest): Promise<CreateQrResponse> {
+  const start = process.hrtime.bigint();
   console.log("LankaQR Gen: Building QR payload with params:", params);
-  
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 500));
 
   // --- LankaQR Payload Construction based on your requirements ---
-  
+
+  const buildStart = process.hrtime.bigint();
   const payloadIndicator = buildTag('00', '01');
   const pointOfInitiation = buildTag('01', '12'); // 12 for Dynamic QR
   
@@ -106,11 +105,21 @@ export async function callBankCreateQR(params: CreateQrRequest): Promise<CreateQ
     '6304' // CRC Tag and Length placeholder
   ].join('');
 
+  const buildEnd = process.hrtime.bigint();
+  console.log(`LankaQR Gen: payload build took ${Number(buildEnd - buildStart) / 1e6} ms`);
+
+  const crcStart = process.hrtime.bigint();
   const crc = crc16(payloadWithoutCrc);
+  const crcEnd = process.hrtime.bigint();
+  console.log(`LankaQR Gen: crc calc took ${Number(crcEnd - crcStart) / 1e6} ms`);
+
   const finalPayload = payloadWithoutCrc + crc;
 
   const expires = new Date();
   expires.setMinutes(expires.getMinutes() + 10); // QR expires in 10 minutes
+
+  const total = Number(process.hrtime.bigint() - start) / 1e6;
+  console.log(`LankaQR Gen: total callBankCreateQR took ${total.toFixed(2)} ms`);
 
   return {
     qr_payload: finalPayload,
@@ -126,8 +135,6 @@ export async function callBankCreateQR(params: CreateQrRequest): Promise<CreateQ
 export async function callBankReconciliationAPI(uuid: string): Promise<{ status: 'PENDING' | 'SUCCESS' | 'FAILED' } | null> {
     console.log(`Mock Bank API: Reconciling status for ${uuid}`);
 
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
 
     // In this mock, we'll randomly decide if a transaction has "settled" at the bank
     const rand = Math.random();
