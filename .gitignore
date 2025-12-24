@@ -47,3 +47,7 @@ firestore-debug.log
 # PWA generated service worker (next-pwa)
 public/sw.js
 public/workbox-*.js
+
+# build artifacts
+/dist/lankaqr-deployment-pack/
+lankaqr-deployment-pack.zip
