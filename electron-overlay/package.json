@@ -1,0 +1,52 @@
+{
+  "name": "b2uqr-electron-overlay",
+  "version": "0.1.0",
+  "description": "Always-on-top overlay for B2U QR to display transactions",
+  "author": "B2U QR <admib2uapp@gmail.com>",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "start:dev": "DEBUG=1 electron .",
+    "dist": "electron-builder"
+  },
+  "dependencies": {
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "electron": "^26.2.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.b2uqr.electron-overlay",
+    "productName": "B2U QR Overlay",
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
+    "files": [
+      "**/*"
+    ],
+    "protocols": [
+      {
+        "name": "B2U QR Protocol",
+        "schemes": [
+          "b2uqr"
+        ]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.utilities"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage", "deb"
+      ]
+    }
+  }
+}

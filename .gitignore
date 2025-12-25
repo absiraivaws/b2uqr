@@ -51,3 +51,7 @@ public/workbox-*.js
 # build artifacts
 /dist/lankaqr-deployment-pack/
 lankaqr-deployment-pack.zip
+
+# Electron overlay
+/electron-overlay/node_modules
+/electron-overlay/dist

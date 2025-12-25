@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, AlertTriangle, CheckCircle, Clock, ShieldCheck, Share2, Download } from "lucide-react";
 import QRCode from "qrcode";
 import type { Transaction } from "@/lib/types";
+import { useToast } from "@/hooks/use-toast";
 
 interface TransactionStatusProps {
   transaction: Transaction;
@@ -38,6 +39,52 @@ export function TransactionStatus({
 }: TransactionStatusProps) {
   const [qrDataUrl, setQrDataUrl] = useState<string>("");
   const [isBlurred, setIsBlurred] = useState<boolean>(false);
+  const { toast } = useToast();
+
+  const handleOpenOverlay = async () => {
+    if (typeof window === 'undefined') return;
+    const localUrls = [
+      'http://127.0.0.1:3333/open',
+      'http://localhost:3333/open'
+    ];
+    const payload = { transaction };
+    // try POST first
+    for (const url of localUrls) {
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (res.ok) {
+          toast({ title: 'Overlay opened', description: 'Overlay window should appear.' });
+          return;
+        }
+      } catch (e) {
+        // try next
+      }
+    }
+
+    // POST failed — try custom protocol to start installed app with payload
+    try {
+      const json = JSON.stringify(payload.transaction || payload);
+      // base64 encode safely
+      const b64 = window.btoa(unescape(encodeURIComponent(json)));
+      const proto = `lankaqr://open?payload=${encodeURIComponent(b64)}`;
+      // open protocol. This will start the app if installed.
+      window.location.href = proto;
+
+      // show install prompt in case protocol is not handled (user can cancel)
+      setTimeout(() => {
+        const install = window.confirm('If the overlay did not open, the app may not be installed. Open download page?');
+        if (install) {
+          window.open('https://qr.b2u.app/overlay-install', '_blank');
+        }
+      }, 1200);
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Overlay failed', description: 'Could not contact local overlay or open protocol.' });
+    }
+  };
 
   // Generate QR Code
   useEffect(() => {
@@ -149,6 +196,13 @@ export function TransactionStatus({
               {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
               Download
             </Button>
+
+            {/* Dev-only: open Electron overlay on same machine */}
+            {typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && (
+              <Button onClick={handleOpenOverlay} variant="outline">
+                Open Overlay
+              </Button>
+            )}
 
             <p className="text-xs text-muted-foreground mt-1 sm:hidden">
               Tap a button to verify or share.
