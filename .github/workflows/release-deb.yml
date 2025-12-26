@@ -41,14 +41,19 @@ jobs:
       - name: Upload all built artifacts to Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          UPLOAD_URL: ${{ steps.create_release.outputs.upload_url }}
+          UPLOAD_URL_TEMPLATE: ${{ steps.create_release.outputs.upload_url }}
         run: |
           set -e
           echo "Uploading files from electron-overlay/dist"
+          # strip the template suffix '{?name,label}' if present to get the base upload URL
+          BASE_UPLOAD_URL="${UPLOAD_URL_TEMPLATE%\{?name,label\}}"
           for f in electron-overlay/dist/*; do
             if [ -f "$f" ]; then
               name=$(basename "$f")
               echo "Uploading $name"
-              curl -sS -X POST -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: application/octet-stream" --data-binary @"$f" "$UPLOAD_URL?name=$name"
+              curl -sS -X POST \
+                -H "Authorization: token $GITHUB_TOKEN" \
+                -H "Content-Type: application/octet-stream" \
+                --data-binary @"$f" "${BASE_UPLOAD_URL}?name=${name}"
             fi
           done
