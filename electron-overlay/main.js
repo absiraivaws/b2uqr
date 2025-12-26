@@ -12,7 +12,8 @@ function resolveAppUrl() {
   if (fromEnv) return fromEnv;
   const arg = process.argv.find(a => a.startsWith('--appUrl='));
   if (arg) return arg.split('=')[1];
-  return 'http://localhost:9002';
+  // For development of overlay against the vercel preview site use that by default
+  return 'https://lankaqr-demo.vercel.app/overlay';
 }
 
 let win = null;
@@ -101,12 +102,18 @@ function startLocalServer(port = 3333) {
     // Simple CORS for local dev: allow requests from localhost dev server origins
     server.use((req, res, next) => {
       const origin = req.headers.origin;
-      // Allow localhost dev origins or allow all for local testing
-      if (origin && (origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1'))) {
-        res.setHeader('Access-Control-Allow-Origin', origin);
-      } else {
-        res.setHeader('Access-Control-Allow-Origin', 'http://localhost:9002');
-      }
+        // Allowed origins: local dev, the vercel preview, and production QR site
+        const allowed = [
+          'http://localhost:9002',
+          'http://127.0.0.1:9002',
+          'https://lanka-qr-demo.vercel.app',
+          'https://qr.b2u.app'
+        ];
+        if (origin && allowed.some(a => origin.startsWith(a))) {
+          res.setHeader('Access-Control-Allow-Origin', origin);
+        } else if (allowed.length) {
+          res.setHeader('Access-Control-Allow-Origin', allowed[0]);
+        }
       res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Overlay-Token');
       if (req.method === 'OPTIONS') return res.sendStatus(204);

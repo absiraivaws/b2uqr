@@ -2,6 +2,7 @@
   "name": "b2uqr-electron-overlay",
   "version": "0.1.0",
   "description": "Always-on-top overlay for B2U QR to display transactions",
+  "homepage": "https://lanka-qr-demo.vercel.app/overlay",
   "author": "B2U QR <admib2uapp@gmail.com>",
   "private": true,
   "main": "main.js",
@@ -27,6 +28,7 @@
     "files": [
       "**/*"
     ],
+    "icon": "build/icon",
     "protocols": [
       {
         "name": "B2U QR Protocol",
@@ -36,11 +38,13 @@
       }
     ],
     "mac": {
-      "category": "public.app-category.utilities"
+      "target": [
+        "dmg", "zip"
+      ]
     },
     "win": {
       "target": [
-        "nsis"
+        "AppImage", "zip"
       ]
     },
     "linux": {

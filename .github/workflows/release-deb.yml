@@ -1,0 +1,52 @@
+name: release-deb
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: electron-overlay
+
+      - name: Build distributables
+        run: npm run dist
+        working-directory: electron-overlay
+
+      # Signing disabled for now — release unsigned artifacts
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name || github.sha }}
+          release_name: Release ${{ github.ref_name || github.run_id }}
+          draft: false
+          prerelease: false
+
+      - name: Upload all built artifacts to Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          UPLOAD_URL: ${{ steps.create_release.outputs.upload_url }}
+        run: |
+          set -e
+          echo "Uploading files from electron-overlay/dist"
+          for f in electron-overlay/dist/*; do
+            if [ -f "$f" ]; then
+              name=$(basename "$f")
+              echo "Uploading $name"
+              curl -sS -X POST -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: application/octet-stream" --data-binary @"$f" "$UPLOAD_URL?name=$name"
+            fi
+          done
