@@ -1,7 +1,7 @@
 name: release-deb
 on:
   push:
-    tags: ['v*']
+    tags: ['deb-v*']
   workflow_dispatch:
 permissions:
   contents: write
@@ -25,13 +25,19 @@ jobs:
         run: npm run dist
         working-directory: electron-overlay
 
+      - name: Upload distributables as workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: overlay-dist
+          path: electron-overlay/dist/*
+
       # Signing disabled for now — release unsigned artifacts
 
       - name: Create GitHub Release
         id: create_release
         uses: actions/create-release@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
         with:
           tag_name: ${{ github.ref_name || github.sha }}
           release_name: Release ${{ github.ref_name || github.run_id }}
