@@ -13,7 +13,7 @@ function resolveAppUrl() {
   const arg = process.argv.find(a => a.startsWith('--appUrl='));
   if (arg) return arg.split('=')[1];
   // For development of overlay against the vercel preview site use that by default
-  return 'https://lankaqr-demo.vercel.app/overlay';
+  return 'https://lanka-qr-demo.vercel.app/overlay';
 }
 
 let win = null;
@@ -59,7 +59,7 @@ function ensureToken() {
     if (!overlayToken) {
       overlayToken = crypto.randomBytes(16).toString('hex');
       const obj = { token: overlayToken, createdAt: new Date().toISOString() };
-      try { fs.mkdirSync(path.dirname(p), { recursive: true }); } catch (e) {}
+      try { fs.mkdirSync(path.dirname(p), { recursive: true }); } catch (e) { }
       fs.writeFileSync(p, JSON.stringify(obj), { encoding: 'utf8' });
       console.log('Generated overlay token and stored at', p);
     }
@@ -87,7 +87,7 @@ function handleProtocolArg(argv) {
     } else {
       // just ensure window is visible
       if (!win || win.isDestroyed()) createWindow();
-      try { win.show(); win.focus(); } catch (e) {}
+      try { win.show(); win.focus(); } catch (e) { }
     }
   } catch (e) {
     console.warn('handleProtocolArg error', e);
@@ -102,18 +102,18 @@ function startLocalServer(port = 3333) {
     // Simple CORS for local dev: allow requests from localhost dev server origins
     server.use((req, res, next) => {
       const origin = req.headers.origin;
-        // Allowed origins: local dev, the vercel preview, and production QR site
-        const allowed = [
-          'http://localhost:9002',
-          'http://127.0.0.1:9002',
-          'https://lanka-qr-demo.vercel.app',
-          'https://qr.b2u.app'
-        ];
-        if (origin && allowed.some(a => origin.startsWith(a))) {
-          res.setHeader('Access-Control-Allow-Origin', origin);
-        } else if (allowed.length) {
-          res.setHeader('Access-Control-Allow-Origin', allowed[0]);
-        }
+      // Allowed origins: local dev, the vercel preview, and production QR site
+      const allowed = [
+        'http://localhost:9002',
+        'http://127.0.0.1:9002',
+        'https://lanka-qr-demo.vercel.app',
+        'https://qr.b2u.app'
+      ];
+      if (origin && allowed.some(a => origin.startsWith(a))) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+      } else if (allowed.length) {
+        res.setHeader('Access-Control-Allow-Origin', allowed[0]);
+      }
       res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Overlay-Token');
       if (req.method === 'OPTIONS') return res.sendStatus(204);
@@ -126,28 +126,28 @@ function startLocalServer(port = 3333) {
         const payload = req.body?.transaction ?? req.body;
         if (!payload) return res.status(400).json({ error: 'Missing transaction payload' });
 
-          const tokenHeader = (req.headers['x-overlay-token'] || req.headers['X-Overlay-Token'] || req.headers['X-Overlay-token']);
-          // validate token: allow env override or stored token
-          const expected = process.env.OVERLAY_TOKEN || overlayToken;
-          if (expected && tokenHeader && String(tokenHeader) !== expected) {
-            console.warn('Local /open invalid token from', req.ip);
-            return res.status(403).json({ error: 'invalid token' });
-          }
-        
-          if (!win || win.isDestroyed()) {
-            createWindow();
-            // wait for content to load before sending
-            app.once('browser-window-created', () => {
-              setTimeout(() => {
-                try {
-                  if (win && !win.isDestroyed()) win.webContents.send('overlay:transaction', payload);
-                } catch (e) { console.warn('send overlay after create failed', e); }
-              }, 600);
-            });
-          } else {
-            try { win.show(); win.focus(); } catch (e) { /* ignore */ }
-            try { win.webContents.send('overlay:transaction', payload); } catch (e) { console.warn('send overlay failed', e); }
-          }
+        const tokenHeader = (req.headers['x-overlay-token'] || req.headers['X-Overlay-Token'] || req.headers['X-Overlay-token']);
+        // validate token: allow env override or stored token
+        const expected = process.env.OVERLAY_TOKEN || overlayToken;
+        if (expected && tokenHeader && String(tokenHeader) !== expected) {
+          console.warn('Local /open invalid token from', req.ip);
+          return res.status(403).json({ error: 'invalid token' });
+        }
+
+        if (!win || win.isDestroyed()) {
+          createWindow();
+          // wait for content to load before sending
+          app.once('browser-window-created', () => {
+            setTimeout(() => {
+              try {
+                if (win && !win.isDestroyed()) win.webContents.send('overlay:transaction', payload);
+              } catch (e) { console.warn('send overlay after create failed', e); }
+            }, 600);
+          });
+        } else {
+          try { win.show(); win.focus(); } catch (e) { /* ignore */ }
+          try { win.webContents.send('overlay:transaction', payload); } catch (e) { console.warn('send overlay failed', e); }
+        }
 
         return res.json({ ok: true });
       } catch (err) {
