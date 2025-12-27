@@ -291,6 +291,42 @@ export function useTransactionManager() {
 
         setCurrentTransaction(newTransaction);
 
+        try {
+          const bc = new BroadcastChannel('lankaqr-overlay');
+          bc.postMessage({ type: 'transaction', payload: newTransaction });
+          bc.close();
+        } catch (e) {
+          // BroadcastChannel may be unavailable in some environments
+        }
+
+        // Also try posting to a local Electron overlay HTTP endpoint (dev helper)
+        (async function tryPostLocal() {
+          if (typeof window === 'undefined') return;
+          const localUrls = [
+            'http://127.0.0.1:3333/open',
+            'http://localhost:3333/open',
+            'http://127.0.0.1:4444/open',
+            'http://localhost:4444/open'
+          ];
+          const payload = { transaction: newTransaction };
+          for (const url of localUrls) {
+            try {
+              const controller = new AbortController();
+              const id = setTimeout(() => controller.abort(), 1200);
+              await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+                signal: controller.signal,
+              });
+              clearTimeout(id);
+              break; // stop after first success
+            } catch (err) {
+              // ignore and try next
+            }
+          }
+        })();
+
         // Measure time to render (approx) — schedule a rAF so DOM updates can complete
         try {
           if (typeof window !== 'undefined' && window.requestAnimationFrame) {
@@ -406,6 +442,49 @@ export function useTransactionManager() {
     regenPreview();
     return () => { cancelled = true; };
   }, [includeReference, currentTransaction?.transaction_uuid]);
+
+  // Broadcast updated QR preview to overlay if present
+  useEffect(() => {
+    if (!currentTransaction) return;
+    try {
+      const bc = new BroadcastChannel('lankaqr-overlay');
+      bc.postMessage({ type: 'transaction', payload: currentTransaction });
+      bc.close();
+    } catch (e) {
+      // ignore
+    }
+  }, [currentTransaction?.qr_payload, currentTransaction?.status, currentTransaction?.amount]);
+
+  // Also POST updates to local overlay endpoint (non-blocking)
+  useEffect(() => {
+    if (!currentTransaction) return;
+    (async () => {
+      if (typeof window === 'undefined') return;
+      const localUrls = [
+        'http://127.0.0.1:3333/open',
+        'http://localhost:3333/open',
+        'http://127.0.0.1:4444/open',
+        'http://localhost:4444/open'
+      ];
+      const payload = { transaction: currentTransaction };
+      for (const url of localUrls) {
+        try {
+          const controller = new AbortController();
+          const id = setTimeout(() => controller.abort(), 1200);
+          await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            signal: controller.signal,
+          });
+          clearTimeout(id);
+          break;
+        } catch (err) {
+          // try next
+        }
+      }
+    })();
+  }, [currentTransaction?.qr_payload, currentTransaction?.status, currentTransaction?.amount]);
 
   const handleIncomingSale = useCallback(
     async (saleData: Record<string, any>) => {

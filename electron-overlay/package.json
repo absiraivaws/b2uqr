@@ -1,0 +1,64 @@
+{
+  "name": "b2uqr-electron-overlay",
+  "version": "1.0.0",
+  "description": "Always-on-top overlay for B2U QR to display transactions",
+  "homepage": "https://lanka-qr-demo.vercel.app/overlay",
+  "author": "B2U QR <admib2uapp@gmail.com>",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "start:dev": "DEBUG=1 electron .",
+    "dist": "electron-builder",
+    "dist:deb": "electron-builder --linux deb"
+  },
+  "dependencies": {
+    "body-parser": "^1.20.3",
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "electron": "^26.2.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.b2uqr.electron-overlay",
+    "productName": "B2U QR Overlay",
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!**/*.map",
+      "!**/test/**",
+      "!**/tests/**",
+      "!**/.github/**",
+      "!**/docs/**",
+      "!**/*.md",
+      "!**/node_modules/**/.cache/**"
+    ],
+    "asar": false,
+    "compression": "maximum",
+    "icon": "build/icon",
+    "protocols": [
+      {
+        "name": "B2U QR Protocol",
+        "schemes": [
+          "b2uqr"
+        ]
+      }
+    ],
+    "linux": {
+      "target": [
+        "deb"
+      ],
+      "icon": "build/icon.png"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.ico"
+    }
+  }
+}
